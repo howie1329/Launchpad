@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { LaunchpadLogo } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Separator } from '$lib/components/ui/separator';
@@ -49,9 +50,9 @@
 		<nav
 			class="relative z-10 mx-auto flex h-14 w-full max-w-7xl items-center justify-between px-5 sm:px-8"
 		>
-			<a href={resolve('/')} class="text-xs font-semibold tracking-tight text-foreground"
-				>Launchpad</a
-			>
+			<a href={resolve('/')} aria-label="Launchpad home">
+				<LaunchpadLogo />
+			</a>
 			<div class="flex items-center gap-1">
 				<a
 					href="#how-it-works"

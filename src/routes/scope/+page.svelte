@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { LaunchpadLogo } from '$lib/components/brand';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -164,8 +165,8 @@
 	<header
 		class="flex h-12 shrink-0 items-center justify-between border-b border-border/50 px-4 sm:px-5"
 	>
-		<a href={resolve('/')} class="text-xs font-semibold tracking-tight text-foreground">
-			Launchpad
+		<a href={resolve('/')} aria-label="Launchpad home">
+			<LaunchpadLogo />
 		</a>
 		<div class="flex items-center gap-2">
 			<Badge variant="secondary">MVP scope</Badge>
