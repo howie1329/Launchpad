@@ -34,8 +34,9 @@
 				}
 			});
 			if (!response.ok) {
+				const data = await response.json();
 				status = 'error';
-				errorMessage = response.statusText;
+				errorMessage = data.error ?? 'Error generating PRD. Please try again.';
 				return;
 			}
 			const data = await response.json();

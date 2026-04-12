@@ -1,4 +1,3 @@
-// This is a api route that will be used to generate a MVP PPD plan based on the users input.
 import { AI_GATEWAY_API_KEY } from '$env/static/private';
 import { generateText, Output, createGateway } from 'ai';
 import { z } from 'zod';
@@ -11,10 +10,17 @@ const gateway = createGateway({
 
 export const POST: RequestHandler = async ({ request }) => {
     try {
-        const { idea } = await request.json();
-        const trimmedIdea = idea.trim();
-        if (!trimmedIdea || trimmedIdea.length === 0) {
-            return json({ error: 'Idea is required' }, { status: 400 });
+        const body = await request.json()
+        const idea = body.idea
+
+        if (typeof idea !== 'string') {
+            return json({ error: 'Idea is required' }, { status: 400 })
+        }
+
+        const trimmedIdea = idea.trim()
+
+        if (!trimmedIdea) {
+            return json({ error: 'Idea is required' }, { status: 400 })
         }
 
         const { output } = await generateText({
