@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
+	import { Textarea } from '$lib/components/ui/textarea';
+
 </script>
+
 
 <svelte:head>
 	<title>Start Scoping | Launchpad</title>
@@ -18,6 +21,7 @@
 			This route is ready for the MVP idea intake form. For now, the marketing CTA has a stable
 			destination.
 		</p>
+		<Textarea placeholder="Enter your idea here" />
 		<Button href={resolve('/')} variant="ghost" class="mt-7">Back to landing page</Button>
 	</section>
 </main>
