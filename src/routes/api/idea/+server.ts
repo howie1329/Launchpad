@@ -1,0 +1,1 @@
+// This is a server component that will be used to generate a list of ideas based on the users input.
