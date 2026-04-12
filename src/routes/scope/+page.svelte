@@ -19,6 +19,7 @@
 		outOfScope: string[];
 		suggestedStack: string;
 		fullMVPPlan: string;
+		projectType: string;
 	};
 
 	const emptyPrd: Prd = {
@@ -27,10 +28,12 @@
 		mustHaveFeatures: [],
 		outOfScope: [],
 		suggestedStack: '',
-		fullMVPPlan: ''
+		fullMVPPlan: '',
+		projectType: 'personal'
 	};
 
 	const appTypes = ['web app', 'SaaS', 'mobile', 'CLI', 'API'];
+	const projectTypes = ['personal', 'side project', 'resume project', 'client project'];
 
 	let idea = $state('');
 	let appType = $state('web app');
@@ -39,12 +42,14 @@
 	let errorMessage = $state('');
 	let copied = $state(false);
 	let prd = $state<Prd>(emptyPrd);
+	let projectType = $state('personal');
 
 	const trimmedIdea = $derived(idea.trim());
 	const canSubmit = $derived(Boolean(trimmedIdea) && status !== 'loading');
 	const hasResult = $derived(status === 'done');
 	const briefMeta = $derived([
 		{ label: 'App type', value: appType },
+		{ label: 'Project type', value: projectType },
 		{ label: 'Stack', value: preferredStack.trim() || 'Not specified' }
 	]);
 	const prdSections = $derived([
@@ -132,7 +137,8 @@
 				body: JSON.stringify({
 					idea: trimmedIdea,
 					appType,
-					preferredStack: preferredStack.trim()
+					preferredStack: preferredStack.trim(),
+					projectType: projectType.trim()
 				}),
 				headers: {
 					'Content-Type': 'application/json'
@@ -210,6 +216,14 @@
 				</div>
 
 				<div class="grid gap-3 sm:grid-cols-2 md:grid-cols-1">
+					<div>
+						<Label for="project-type">Project type</Label>
+						<NativeSelect id="project-type" bind:value={projectType} class="w-full">
+							{#each projectTypes as type (type)}
+								<NativeSelectOption value={type}>{type}</NativeSelectOption>
+							{/each}
+						</NativeSelect>
+					</div>
 					<div class="flex flex-col gap-2">
 						<Label for="app-type">App type</Label>
 						<NativeSelect id="app-type" bind:value={appType} class="w-full">

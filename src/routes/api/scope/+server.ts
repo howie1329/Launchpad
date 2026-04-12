@@ -13,6 +13,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		const body = await request.json();
 		const idea = body.idea;
 		const appType = typeof body.appType === 'string' ? body.appType.trim() : '';
+		const projectType = typeof body.projectType === 'string' ? body.projectType.trim() : '';
 		const preferredStack =
 			typeof body.preferredStack === 'string' ? body.preferredStack.trim() : '';
 
@@ -35,13 +36,17 @@ export const POST: RequestHandler = async ({ request }) => {
 					mustHaveFeatures: z.array(z.string()),
 					outOfScope: z.array(z.string()),
 					suggestedStack: z.string(),
-					fullMVPPlan: z.string()
+					fullMVPPlan: z.string(),
+					projectType: z.string()
 				})
 			}),
 			prompt: `Generate a focused MVP PRD for this idea.
 
 Idea:
 ${trimmedIdea}
+
+Project type:
+${projectType || 'Not specified'}
 
 App type:
 ${appType || 'Not specified'}
