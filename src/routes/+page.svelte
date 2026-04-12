@@ -60,6 +60,12 @@
 				>
 					How it works
 				</a>
+				<a
+					href={resolve('/ideas')}
+					class="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+				>
+					Ideas
+				</a>
 				<Button href={resolve('/scope')} size="sm">Start Scoping</Button>
 			</div>
 		</nav>
@@ -235,7 +241,10 @@
 					Start with scope, constraints, and a first-week plan you can actually finish.
 				</p>
 			</div>
-			<Button href={resolve('/scope')} size="lg" class="mt-6 sm:mt-0">Start Scoping</Button>
+			<div class="mt-6 flex flex-wrap items-center gap-3 sm:mt-0">
+				<Button href={resolve('/ideas')} variant="ghost" size="lg">Idea Generator</Button>
+				<Button href={resolve('/scope')} size="lg">Start Scoping</Button>
+			</div>
 		</div>
 	</section>
 </main>
