@@ -156,6 +156,10 @@ function getClient() {
 	return client;
 }
 
+export function getConvexClient() {
+	return getClient();
+}
+
 function getHttpClient() {
 	if (!httpClient) throw new Error('Convex Auth has not been set up');
 	return httpClient;

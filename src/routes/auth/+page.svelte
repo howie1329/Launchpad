@@ -11,7 +11,7 @@
 
 	type Flow = 'signIn' | 'signUp';
 	type Status = 'idle' | 'loading' | 'error';
-	type RedirectRoute = '/' | '/ideas' | '/scope';
+	type RedirectRoute = '/' | '/dashboard' | '/ideas' | '/scope' | '/settings';
 
 	let flow = $state<Flow>('signIn');
 	let status = $state<Status>('idle');
@@ -20,7 +20,13 @@
 	const isSignUp = $derived(flow === 'signUp');
 	const redirectTo = $derived.by<RedirectRoute>(() => {
 		const value = page.url.searchParams.get('redirectTo');
-		return value === '/ideas' || value === '/scope' ? value : '/';
+		return value === '/' ||
+			value === '/dashboard' ||
+			value === '/ideas' ||
+			value === '/scope' ||
+			value === '/settings'
+			? value
+			: '/dashboard';
 	});
 
 	const toggleFlow = () => {

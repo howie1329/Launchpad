@@ -67,7 +67,7 @@
 				>
 					Ideas
 				</a>
-				<AuthControls redirectTo="/" />
+				<AuthControls />
 				<Button href={resolve('/scope')} size="sm">Start Scoping</Button>
 			</div>
 		</nav>
