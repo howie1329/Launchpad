@@ -6,6 +6,7 @@
 	import IdeasWorkspace from '$lib/components/workspaces/IdeasWorkspace.svelte';
 	import ScopeWorkspace from '$lib/components/workspaces/ScopeWorkspace.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as Kbd from '$lib/components/ui/kbd';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Separator } from '$lib/components/ui/separator';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -104,11 +105,14 @@
 								{#each tools as tool (tool.id)}
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
-											tooltipContent={tool.label}
 											isActive={activeTool?.id === tool.id}
 											class="px-2.5 md:px-2"
 											onclick={() => selectTool(tool)}
 										>
+											{#snippet tooltipContent()}
+												<span>{tool.label}</span>
+												<Kbd.Root>{tool.id === 'scope' ? '1' : '2'}</Kbd.Root>
+											{/snippet}
 											<tool.icon />
 											<span>{tool.label}</span>
 										</Sidebar.MenuButton>
@@ -150,6 +154,10 @@
 						placeholder={activeTool ? `Search ${activeTool.label.toLowerCase()}` : 'Search items'}
 						disabled
 					/>
+					<div class="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
+						<span>Search when items exist</span>
+						<Kbd.Root>/</Kbd.Root>
+					</div>
 				</Sidebar.Header>
 
 				<Sidebar.Content>
@@ -175,6 +183,10 @@
 				class="flex h-12 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
 			>
 				<Sidebar.Trigger class="-ms-1" />
+				<Kbd.Group class="hidden text-muted-foreground sm:inline-flex">
+					<Kbd.Root>⌘/Ctrl</Kbd.Root>
+					<Kbd.Root>B</Kbd.Root>
+				</Kbd.Group>
 				<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
 				<div class="min-w-0 flex-1">
 					<p class="truncate text-sm font-semibold tracking-tight">
