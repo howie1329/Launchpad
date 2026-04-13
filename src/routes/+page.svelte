@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { LaunchpadLogo } from '$lib/components/brand';
+	import AuthControls from '$lib/components/AuthControls.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Separator } from '$lib/components/ui/separator';
@@ -66,6 +67,7 @@
 				>
 					Ideas
 				</a>
+				<AuthControls redirectTo="/" />
 				<Button href={resolve('/scope')} size="sm">Start Scoping</Button>
 			</div>
 		</nav>
