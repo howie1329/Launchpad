@@ -12,6 +12,8 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import LightbulbIcon from '@lucide/svelte/icons/lightbulb';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import SettingsWorkspace from '$lib/components/workspaces/SettingsWorkspace.svelte';
 
 	const tools = [
 		{
@@ -29,6 +31,14 @@
 			icon: LightbulbIcon,
 			emptyTitle: 'No ideas yet',
 			emptyDescription: 'Saved idea directions will appear here when attached items are added.'
+		},
+		{
+			id: 'settings',
+			label: 'Settings',
+			href: '/settings',
+			icon: SettingsIcon,
+			emptyTitle: 'No settings sections yet',
+			emptyDescription: 'Settings sections will appear here as account controls are added.'
 		}
 	] as const;
 
@@ -111,7 +121,9 @@
 										>
 											{#snippet tooltipContent()}
 												<span>{tool.label}</span>
-												<Kbd.Root>{tool.id === 'scope' ? '1' : '2'}</Kbd.Root>
+												<Kbd.Root
+													>{tool.id === 'scope' ? '1' : tool.id === 'ideas' ? '2' : '3'}</Kbd.Root
+												>
 											{/snippet}
 											<tool.icon />
 											<span>{tool.label}</span>
@@ -198,18 +210,20 @@
 							: 'Choose a tool from the sidebar.'}
 					</p>
 				</div>
-				{#if activeTool}
+				{#if activeTool && activeTool.id !== 'settings'}
 					<Button href={resolve(activeTool.href)} variant="ghost" size="sm">
-						Open public page
+						Open {activeTool.label}
 					</Button>
 				{/if}
 			</header>
 
 			<main class="min-h-0 flex-1 overflow-hidden bg-background text-foreground">
 				{#if activeTool?.id === 'scope'}
-					<ScopeWorkspace />
+					<ScopeWorkspace startMode="compact" />
 				{:else if activeTool?.id === 'ideas'}
 					<IdeasWorkspace showActions={false} />
+				{:else if activeTool?.id === 'settings'}
+					<SettingsWorkspace />
 				{:else}
 					<div class="flex h-full min-h-72 items-center justify-center px-5">
 						<div class="max-w-sm text-center">
