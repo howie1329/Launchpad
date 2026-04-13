@@ -6,6 +6,7 @@
 	import IdeasWorkspace from '$lib/components/workspaces/IdeasWorkspace.svelte';
 	import ScopeWorkspace from '$lib/components/workspaces/ScopeWorkspace.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { listPrdsQuery } from '$lib/prds';
 	import * as Kbd from '$lib/components/ui/kbd';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Separator } from '$lib/components/ui/separator';
@@ -14,6 +15,7 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SettingsWorkspace from '$lib/components/workspaces/SettingsWorkspace.svelte';
+	import { useQuery } from 'convex-svelte';
 
 	const tools = [
 		{
@@ -47,9 +49,18 @@
 	let activeTool = $state<Tool | null>(null);
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
+	let selectedPrdId = $state<string | null>(null);
+
+	const savedPrds = useQuery(listPrdsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 
 	const selectTool = (tool: Tool) => {
 		activeTool = tool;
+		sidebarOpen = true;
+	};
+
+	const selectPrd = (prdId: string) => {
+		selectedPrdId = prdId;
+		activeTool = tools[0];
 		sidebarOpen = true;
 	};
 
@@ -86,7 +97,11 @@
 		</div>
 	</main>
 {:else}
-	<Sidebar.Provider bind:open={sidebarOpen} style="--sidebar-width: 20rem;">
+	<Sidebar.Provider
+		bind:open={sidebarOpen}
+		class="h-svh overflow-hidden"
+		style="--sidebar-width: 20rem;"
+	>
 		<Sidebar.Root collapsible="icon" class="overflow-hidden [&>[data-sidebar=sidebar]]:flex-row">
 			<Sidebar.Root collapsible="none" class="!w-[calc(var(--sidebar-width-icon)_+_1px)] border-e">
 				<Sidebar.Header>
@@ -176,21 +191,41 @@
 					<Sidebar.Group>
 						<Sidebar.GroupLabel>Attached items</Sidebar.GroupLabel>
 						<Sidebar.GroupContent>
-							<div class="px-2 py-8 text-center">
-								<p class="text-xs font-medium tracking-tight">
-									{activeTool?.emptyTitle ?? 'No tool selected'}
-								</p>
-								<p class="mx-auto mt-2 max-w-52 text-[11px] leading-5 text-muted-foreground">
-									{activeTool?.emptyDescription ?? 'Pick MVP Creator or Ideas to open a workspace.'}
-								</p>
-							</div>
+							{#if activeTool?.id === 'scope' && savedPrds.data?.length}
+								<Sidebar.Menu>
+									{#each savedPrds.data as prd (prd._id)}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton
+												isActive={selectedPrdId === prd._id}
+												onclick={() => selectPrd(prd._id)}
+											>
+												<FileTextIcon />
+												<span class="truncate">{prd.title}</span>
+												<span class="ml-auto text-[10px] text-muted-foreground">
+													v{prd.latestVersion}
+												</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{/each}
+								</Sidebar.Menu>
+							{:else}
+								<div class="px-2 py-8 text-center">
+									<p class="text-xs font-medium tracking-tight">
+										{activeTool?.emptyTitle ?? 'No tool selected'}
+									</p>
+									<p class="mx-auto mt-2 max-w-52 text-[11px] leading-5 text-muted-foreground">
+										{activeTool?.emptyDescription ??
+											'Pick MVP Creator or Ideas to open a workspace.'}
+									</p>
+								</div>
+							{/if}
 						</Sidebar.GroupContent>
 					</Sidebar.Group>
 				</Sidebar.Content>
 			</Sidebar.Root>
 		</Sidebar.Root>
 
-		<Sidebar.Inset class="min-w-0">
+		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
 			<header
 				class="flex h-12 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
 			>
@@ -219,7 +254,7 @@
 
 			<main class="min-h-0 flex-1 overflow-hidden bg-background text-foreground">
 				{#if activeTool?.id === 'scope'}
-					<ScopeWorkspace startMode="compact" />
+					<ScopeWorkspace startMode="compact" {selectedPrdId} />
 				{:else if activeTool?.id === 'ideas'}
 					<IdeasWorkspace showActions={false} />
 				{:else if activeTool?.id === 'settings'}

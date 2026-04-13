@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
@@ -6,8 +8,17 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Button } from '$lib/components/ui/button';
+	import {
+		getPrdQuery,
+		listPrdGenerationsQuery,
+		saveNewPrdMutation,
+		savePrdGenerationMutation,
+		type PrdGeneration
+	} from '$lib/prds';
+	import { useQuery } from 'convex-svelte';
 
 	type Status = 'idle' | 'loading' | 'done' | 'error';
+	type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 	type StartMode = 'full' | 'compact';
 
 	type Prd = {
@@ -33,25 +44,59 @@
 	const appTypes = ['web app', 'SaaS', 'mobile', 'CLI', 'API'];
 	const projectTypes = ['personal', 'side project', 'resume project', 'client project'];
 
-	let { startMode = 'full' }: { startMode?: StartMode } = $props();
+	let {
+		startMode = 'full',
+		selectedPrdId = null
+	}: { startMode?: StartMode; selectedPrdId?: string | null } = $props();
 
 	let idea = $state('');
 	let appType = $state('web app');
 	let preferredStack = $state('');
 	let status = $state<Status>('idle');
+	let saveStatus = $state<SaveStatus>('idle');
 	let errorMessage = $state('');
+	let saveErrorMessage = $state('');
 	let copied = $state(false);
 	let prd = $state<Prd>(emptyPrd);
 	let projectType = $state('personal');
+	let activePrdId = $state<string | null>(null);
+	let activeVersion = $state<number | null>(null);
+	let latestSavedVersion = $state(0);
+	let loadedSelectionKey = $state('');
+	let hasUnsavedGeneration = $state(false);
+
+	const selectedPrd = useQuery(getPrdQuery, () =>
+		auth.isAuthenticated && selectedPrdId ? { prdId: selectedPrdId } : 'skip'
+	);
+	const savedGenerations = useQuery(listPrdGenerationsQuery, () =>
+		auth.isAuthenticated && activePrdId ? { prdId: activePrdId } : 'skip'
+	);
 
 	const trimmedIdea = $derived(idea.trim());
 	const canSubmit = $derived(Boolean(trimmedIdea) && status !== 'loading');
 	const hasResult = $derived(status === 'done');
 	const showCompactStart = $derived(startMode === 'compact' && !hasResult);
+	const hasSavedContext = $derived(Boolean(activePrdId));
+	const canSave = $derived(
+		hasResult && hasUnsavedGeneration && saveStatus !== 'saving' && auth.isAuthenticated
+	);
+	const saveButtonLabel = $derived(
+		saveStatus === 'saving'
+			? 'Saving...'
+			: !hasUnsavedGeneration && activeVersion
+				? `Saved v${activeVersion}`
+				: hasSavedContext
+				? `Save as v${latestSavedVersion + 1}`
+				: 'Save PRD'
+	);
+	const selectedGenerationValue = $derived(
+		activePrdId && activeVersion ? `${activePrdId}:${activeVersion}` : ''
+	);
 	const briefMeta = $derived([
 		{ label: 'App type', value: appType },
 		{ label: 'Project type', value: projectType },
-		{ label: 'Stack', value: preferredStack.trim() || 'Not specified' }
+		{ label: 'Stack', value: preferredStack.trim() || 'Not specified' },
+		{ label: 'Version', value: activeVersion ? `v${activeVersion}` : 'Unsaved' }
 	]);
 	const prdSections = $derived([
 		{
@@ -126,11 +171,75 @@
 		}, 1600);
 	};
 
+	const savePrd = async () => {
+		if (!hasResult || !hasUnsavedGeneration || saveStatus === 'saving') return;
+
+		if (!auth.isAuthenticated) {
+			saveStatus = 'error';
+			saveErrorMessage = 'Sign in to save PRDs.';
+			return;
+		}
+
+		saveStatus = 'saving';
+		saveErrorMessage = '';
+
+		const args = {
+			idea: trimmedIdea,
+			appType,
+			projectType,
+			preferredStack: preferredStack.trim(),
+			output: prd
+		};
+
+		try {
+			const result = activePrdId
+				? await getConvexClient().mutation(savePrdGenerationMutation, {
+						prdId: activePrdId,
+						...args
+					})
+				: await getConvexClient().mutation(saveNewPrdMutation, args);
+
+			activePrdId = result.prdId;
+			activeVersion = result.version;
+			latestSavedVersion = result.version;
+			hasUnsavedGeneration = false;
+			saveStatus = 'saved';
+		} catch (error) {
+			console.error(error);
+			saveStatus = 'error';
+			saveErrorMessage = 'Error saving PRD. Please try again.';
+		}
+	};
+
+	const loadGeneration = (generation: PrdGeneration) => {
+		activePrdId = generation.prdId;
+		activeVersion = generation.version;
+		idea = generation.idea;
+		appType = generation.appType;
+		projectType = generation.projectType;
+		preferredStack = generation.preferredStack;
+		prd = generation.output;
+		status = 'done';
+		errorMessage = '';
+		saveErrorMessage = '';
+		saveStatus = 'idle';
+		hasUnsavedGeneration = false;
+	};
+
+	const selectGeneration = (value: string) => {
+		const generation = savedGenerations.data?.find(
+			(item) => `${item.prdId}:${item.version}` === value
+		);
+		if (generation) loadGeneration(generation);
+	};
+
 	const generatePrd = async () => {
 		if (!canSubmit) return;
 
 		status = 'loading';
+		saveStatus = 'idle';
 		errorMessage = '';
+		saveErrorMessage = '';
 
 		try {
 			const response = await fetch('/api/scope', {
@@ -155,12 +264,27 @@
 
 			prd = await response.json();
 			status = 'done';
+			activeVersion = null;
+			hasUnsavedGeneration = true;
 		} catch (error) {
 			console.error(error);
 			status = 'error';
 			errorMessage = 'Error generating PRD. Please try again.';
 		}
 	};
+
+	$effect(() => {
+		const data = selectedPrd.data;
+		const generation = data?.latestGeneration;
+		if (!data || !generation) return;
+
+		const selectionKey = `${data.prd._id}:${generation.version}:${generation._id}`;
+		if (selectionKey === loadedSelectionKey) return;
+
+		loadedSelectionKey = selectionKey;
+		latestSavedVersion = data.prd.latestVersion;
+		loadGeneration(generation);
+	});
 </script>
 
 {#if showCompactStart}
@@ -228,7 +352,9 @@
 			{/if}
 
 			<div class="flex items-center justify-between gap-3">
-				<p class="text-[11px] text-muted-foreground">No saved PRD selected.</p>
+				<p class="text-[11px] text-muted-foreground">
+					{activeVersion ? `Saved v${activeVersion}` : 'No saved PRD selected.'}
+				</p>
 				<Button type="submit" disabled={!canSubmit}>
 					{status === 'loading' ? 'Generating...' : 'Generate PRD'}
 				</Button>
@@ -237,7 +363,7 @@
 	</div>
 {:else}
 	<div
-		class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background text-foreground md:grid-cols-[22rem_minmax(0,1fr)] md:grid-rows-1"
+		class="grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background text-foreground md:grid-cols-[22rem_minmax(0,1fr)] md:grid-rows-1"
 	>
 		<section
 			class="min-h-0 overflow-y-auto border-b border-border/50 p-4 md:border-r md:border-b-0 md:p-5"
@@ -307,7 +433,11 @@
 
 				<div class="flex items-center justify-between gap-3">
 					<p class="text-[11px] text-muted-foreground">
-						{hasResult ? 'PRD generated' : 'No history or saved drafts in this MVP.'}
+						{hasResult
+							? activeVersion
+								? `Viewing saved v${activeVersion}`
+								: 'PRD generated'
+							: 'Saved PRDs will appear in the dashboard.'}
 					</p>
 					<Button type="submit" disabled={!canSubmit}>
 						{status === 'loading' ? 'Generating...' : 'Generate PRD'}
@@ -316,7 +446,7 @@
 			</form>
 		</section>
 
-		<section class="flex min-h-0 flex-col overflow-hidden">
+		<section class="flex min-h-0 min-w-0 flex-col overflow-hidden">
 			<div
 				class="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border/50 px-4 md:px-5"
 			>
@@ -326,16 +456,35 @@
 					</p>
 					<p class="truncate text-[11px] text-muted-foreground">
 						{hasResult
-							? 'Ready to copy into your build notes.'
+							? hasUnsavedGeneration
+								? 'Unsaved generation ready to review.'
+								: activeVersion
+									? `Saved as v${activeVersion}.`
+									: 'Ready to copy into your build notes.'
 							: 'The result will stay in this workspace.'}
 					</p>
 				</div>
-				<Button size="sm" disabled={!hasResult} onclick={copyMarkdown}>
-					{copied ? 'Copied' : 'Copy Markdown'}
-				</Button>
+				<div class="flex items-center gap-2">
+					{#if hasResult}
+						{#if auth.isAuthenticated}
+							<Button size="sm" disabled={!canSave} onclick={savePrd}>
+								{saveButtonLabel}
+							</Button>
+						{:else}
+							<Button size="sm" href={resolve('/auth?redirectTo=/dashboard')} variant="secondary">
+								Sign in to save
+							</Button>
+						{/if}
+					{/if}
+					<Button size="sm" disabled={!hasResult} onclick={copyMarkdown}>
+						{copied ? 'Copied' : 'Copy Markdown'}
+					</Button>
+				</div>
 			</div>
 
-			<div class="grid min-h-0 flex-1 overflow-hidden md:grid-cols-[14rem_minmax(0,1fr)]">
+			<div
+				class="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden md:grid-cols-[14rem_minmax(0,1fr)] md:grid-rows-1"
+			>
 				<aside
 					class="min-h-0 overflow-y-auto border-b border-border/50 p-4 md:border-r md:border-b-0 md:p-5"
 				>
@@ -359,6 +508,25 @@
 
 					<Separator class="my-4" />
 
+					{#if activePrdId && savedGenerations.data?.length}
+						<div class="mb-4 flex flex-col gap-2">
+							<Label for="prd-version">Saved versions</Label>
+							<NativeSelect
+								id="prd-version"
+								value={selectedGenerationValue}
+								onchange={(event) => selectGeneration(event.currentTarget.value)}
+								class="w-full"
+							>
+								{#each savedGenerations.data as generation (generation._id)}
+									<NativeSelectOption value={`${generation.prdId}:${generation.version}`}>
+										v{generation.version}
+									</NativeSelectOption>
+								{/each}
+							</NativeSelect>
+						</div>
+						<Separator class="my-4" />
+					{/if}
+
 					<div class="flex flex-col gap-3">
 						{#each briefMeta as item (item.label)}
 							<div>
@@ -369,11 +537,11 @@
 					</div>
 				</aside>
 
-				<div class="min-h-0 overflow-y-auto p-4 md:p-5">
+				<div class="min-h-0 min-w-0 overflow-y-auto p-4 md:p-5">
 					{#if status === 'loading'}
-						<div class="flex flex-col gap-5">
+						<div class="flex min-w-0 flex-col gap-5">
 							{#each prdSections as section (section.id)}
-								<section class="scroll-mt-5">
+								<section class="min-w-0 scroll-mt-5">
 									<Skeleton class="mb-3 h-3 w-32" />
 									<Skeleton class="mb-2 h-3 w-full" />
 									<Skeleton class="mb-2 h-3 w-10/12" />
@@ -382,25 +550,33 @@
 							{/each}
 						</div>
 					{:else if hasResult}
-						<div class="flex flex-col gap-6">
+						<div class="flex min-w-0 flex-col gap-6">
+							{#if saveStatus === 'error'}
+								<p class="text-xs leading-5 text-destructive">{saveErrorMessage}</p>
+							{:else if saveStatus === 'saved'}
+								<p class="text-xs leading-5 text-muted-foreground">Saved v{activeVersion}.</p>
+							{/if}
 							{#each prdSections as section (section.id)}
-								<section id={section.id} class="scroll-mt-5">
+								<section id={section.id} class="min-w-0 scroll-mt-5">
 									<p
 										class="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
 									>
 										{section.title}
 									</p>
 									{#if section.items}
-										<ul class="flex flex-col gap-2">
+										<ul class="flex min-w-0 flex-col gap-2">
 											{#each section.items as item (item)}
-												<li class="flex gap-2 text-xs leading-5">
-													<span class="mt-2 size-1 rounded-full bg-muted-foreground/50"></span>
-													<span>{item}</span>
+												<li class="flex min-w-0 gap-2 text-xs leading-5">
+													<span class="mt-2 size-1 shrink-0 rounded-full bg-muted-foreground/50"
+													></span>
+													<span class="min-w-0 break-words">{item}</span>
 												</li>
 											{/each}
 										</ul>
 									{:else}
-										<p class="max-w-3xl text-xs leading-5 whitespace-pre-line text-foreground">
+										<p
+											class="max-w-3xl min-w-0 text-xs leading-5 break-words whitespace-pre-line text-foreground"
+										>
 											{section.value}
 										</p>
 									{/if}
