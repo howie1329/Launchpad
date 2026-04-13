@@ -3,7 +3,7 @@
 	import { auth, signOut } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
 
-	let { redirectTo = '/', size = 'sm' } = $props<{
+	let { redirectTo = '/dashboard', size = 'sm' } = $props<{
 		redirectTo?: string;
 		size?: 'sm' | 'lg';
 	}>();
