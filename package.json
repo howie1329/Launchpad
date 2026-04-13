@@ -1,17 +1,20 @@
 {
-	"name": "mvp-scoper",
+	"name": "Launchpad",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:all": "concurrently \"vite dev\" \"convex dev\"",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write ."
+		"format": "prettier --write .",
+		"dev:frontend": "vite dev",
+		"dev:backend": "convex dev"
 	},
 	"devDependencies": {
 		"@ai-sdk/svelte": "^4.0.158",
@@ -32,6 +35,7 @@
 		"ai": "^6.0.158",
 		"bits-ui": "^2.17.3",
 		"clsx": "^2.1.1",
+		"concurrently": "^9.2.1",
 		"eslint": "^10.2.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.17.0",
