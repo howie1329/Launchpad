@@ -13,6 +13,7 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import LightbulbIcon from '@lucide/svelte/icons/lightbulb';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SettingsWorkspace from '$lib/components/workspaces/SettingsWorkspace.svelte';
 	import { useQuery } from 'convex-svelte';
@@ -23,24 +24,24 @@
 			label: 'MVP Creator',
 			href: '/scope',
 			icon: FileTextIcon,
-			emptyTitle: 'No MVP scopes yet',
-			emptyDescription: 'Generated scopes will appear here when saved items are added.'
+			emptyTitle: 'No saved PRDs',
+			emptyDescription: 'Create a new PRD, then save it to keep it here.'
 		},
 		{
 			id: 'ideas',
 			label: 'Ideas',
 			href: '/ideas',
 			icon: LightbulbIcon,
-			emptyTitle: 'No ideas yet',
-			emptyDescription: 'Saved idea directions will appear here when attached items are added.'
+			emptyTitle: 'Idea generator',
+			emptyDescription: 'This workspace is still being shaped. No saved idea list yet.'
 		},
 		{
 			id: 'settings',
 			label: 'Settings',
 			href: '/settings',
 			icon: SettingsIcon,
-			emptyTitle: 'No settings sections yet',
-			emptyDescription: 'Settings sections will appear here as account controls are added.'
+			emptyTitle: 'Workspace settings',
+			emptyDescription: 'Account and workspace controls live in the main panel.'
 		}
 	] as const;
 
@@ -50,8 +51,19 @@
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
 	let selectedPrdId = $state<string | null>(null);
+	let scopeWorkspaceKey = $state(0);
 
 	const savedPrds = useQuery(listPrdsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+
+	const activeToolStatus = $derived(
+		activeTool?.id === 'scope'
+			? 'Create a PRD or reopen a saved scope.'
+			: activeTool?.id === 'ideas'
+				? 'Explore product directions before scoping.'
+				: activeTool?.id === 'settings'
+					? 'Manage workspace preferences.'
+					: 'Choose a tool to start.'
+	);
 
 	const selectTool = (tool: Tool) => {
 		activeTool = tool;
@@ -61,6 +73,13 @@
 	const selectPrd = (prdId: string) => {
 		selectedPrdId = prdId;
 		activeTool = tools[0];
+		sidebarOpen = true;
+	};
+
+	const startNewPrd = () => {
+		activeTool = tools[0];
+		selectedPrdId = null;
+		scopeWorkspaceKey += 1;
 		sidebarOpen = true;
 	};
 
@@ -100,7 +119,7 @@
 	<Sidebar.Provider
 		bind:open={sidebarOpen}
 		class="h-svh overflow-hidden"
-		style="--sidebar-width: 20rem;"
+		style="--sidebar-width: 18rem;"
 	>
 		<Sidebar.Root collapsible="icon" class="overflow-hidden [&>[data-sidebar=sidebar]]:flex-row">
 			<Sidebar.Root collapsible="none" class="!w-[calc(var(--sidebar-width-icon)_+_1px)] border-e">
@@ -131,7 +150,7 @@
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
 											isActive={activeTool?.id === tool.id}
-											class="px-2.5 md:px-2"
+											class="justify-center px-0 md:size-8 md:p-0"
 											onclick={() => selectTool(tool)}
 										>
 											{#snippet tooltipContent()}
@@ -141,7 +160,7 @@
 												>
 											{/snippet}
 											<tool.icon />
-											<span>{tool.label}</span>
+											<span class="sr-only">{tool.label}</span>
 										</Sidebar.MenuButton>
 									</Sidebar.MenuItem>
 								{/each}
@@ -157,51 +176,52 @@
 								tooltipContent="Sign out"
 								aria-disabled={isSigningOut}
 								onclick={handleSignOut}
-								class="px-2.5 md:px-2"
+								class="justify-center px-0 md:size-8 md:p-0"
 							>
 								<LogOutIcon />
-								<span>{isSigningOut ? 'Signing out' : 'Sign out'}</span>
+								<span class="sr-only">{isSigningOut ? 'Signing out' : 'Sign out'}</span>
 							</Sidebar.MenuButton>
 						</Sidebar.MenuItem>
 					</Sidebar.Menu>
 				</Sidebar.Footer>
 			</Sidebar.Root>
 
-			<Sidebar.Root collapsible="none" class="hidden flex-1 md:flex">
-				<Sidebar.Header class="gap-3 border-b border-sidebar-border p-4">
+			<Sidebar.Root collapsible="none" class="hidden min-w-0 flex-1 md:flex">
+				<Sidebar.Header class="gap-3 border-b border-sidebar-border p-3">
 					<div>
-						<p class="text-base font-medium tracking-tight">
+						<p class="text-sm font-medium tracking-tight">
 							{activeTool?.label ?? 'Workspace'}
 						</p>
 						<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
-							{activeTool ? 'Attached items will collect here.' : 'Choose a tool to start.'}
+							{activeToolStatus}
 						</p>
 					</div>
-					<Sidebar.Input
-						placeholder={activeTool ? `Search ${activeTool.label.toLowerCase()}` : 'Search items'}
-						disabled
-					/>
-					<div class="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
-						<span>Search when items exist</span>
-						<Kbd.Root>/</Kbd.Root>
-					</div>
+					{#if activeTool?.id === 'scope'}
+						<Button size="sm" class="w-full justify-start" onclick={startNewPrd}>
+							<PlusIcon />
+							New PRD
+						</Button>
+					{/if}
 				</Sidebar.Header>
 
 				<Sidebar.Content>
 					<Sidebar.Group>
-						<Sidebar.GroupLabel>Attached items</Sidebar.GroupLabel>
-						<Sidebar.GroupContent>
+						<Sidebar.GroupLabel>
+							{activeTool?.id === 'scope' ? 'Saved PRDs' : 'Context'}
+						</Sidebar.GroupLabel>
+						<Sidebar.GroupContent class="min-w-0">
 							{#if activeTool?.id === 'scope' && savedPrds.data?.length}
-								<Sidebar.Menu>
+								<Sidebar.Menu class="min-w-0">
 									{#each savedPrds.data as prd (prd._id)}
-										<Sidebar.MenuItem>
+										<Sidebar.MenuItem class="min-w-0">
 											<Sidebar.MenuButton
 												isActive={selectedPrdId === prd._id}
 												onclick={() => selectPrd(prd._id)}
+												class="h-7 max-w-full min-w-0 rounded-full px-2.5"
 											>
-												<FileTextIcon />
-												<span class="truncate">{prd.title}</span>
-												<span class="ml-auto text-[10px] text-muted-foreground">
+												<FileTextIcon class="size-3 shrink-0" />
+												<span class="min-w-0 flex-1 truncate">{prd.title}</span>
+												<span class="ml-auto shrink-0 text-[10px] text-muted-foreground">
 													v{prd.latestVersion}
 												</span>
 											</Sidebar.MenuButton>
@@ -214,9 +234,13 @@
 										{activeTool?.emptyTitle ?? 'No tool selected'}
 									</p>
 									<p class="mx-auto mt-2 max-w-52 text-[11px] leading-5 text-muted-foreground">
-										{activeTool?.emptyDescription ??
-											'Pick MVP Creator or Ideas to open a workspace.'}
+										{activeTool?.emptyDescription ?? 'Pick a workspace from the rail.'}
 									</p>
+									{#if activeTool?.id === 'scope'}
+										<Button size="sm" variant="ghost" class="mt-4" onclick={startNewPrd}>
+											New PRD
+										</Button>
+									{/if}
 								</div>
 							{/if}
 						</Sidebar.GroupContent>
@@ -254,7 +278,9 @@
 
 			<main class="min-h-0 flex-1 overflow-hidden bg-background text-foreground">
 				{#if activeTool?.id === 'scope'}
-					<ScopeWorkspace startMode="compact" {selectedPrdId} />
+					{#key scopeWorkspaceKey}
+						<ScopeWorkspace startMode="compact" {selectedPrdId} />
+					{/key}
 				{:else if activeTool?.id === 'ideas'}
 					<IdeasWorkspace showActions={false} />
 				{:else if activeTool?.id === 'settings'}
