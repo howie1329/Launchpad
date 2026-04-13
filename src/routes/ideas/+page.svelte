@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { LaunchpadLogo } from '$lib/components/brand';
+	import AuthControls from '$lib/components/AuthControls.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
@@ -23,6 +24,7 @@
 		</a>
 		<nav class="flex items-center gap-1" aria-label="Idea generator navigation">
 			<Button href={resolve('/')} variant="ghost" size="sm">Home</Button>
+			<AuthControls redirectTo="/ideas" />
 			<Button href={resolve('/scope')} size="sm">Start Scoping</Button>
 		</nav>
 	</header>
