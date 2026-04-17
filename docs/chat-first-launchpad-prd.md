@@ -1,103 +1,203 @@
-# PRD: Chat-First Launchpad For Turning Pain Points Into Projects
+# Product Positioning
+Launchpad is a chat-first workspace for builders who turn raw pain points into scoped software projects. Chat is the primary interface; structured artifacts are persistent workspace memory created and refined from the conversation.
 
-## Problem Statement
+# Problem Statement
+Today’s workflow still feels tool-first: users pick “ideas” or “PRD tools” before they know what they’re building. That creates friction, fragmented context, and duplicate work.
 
-Launchpad currently behaves like separate tools: Ideas for chat-based exploration and Scope/MVP Creator for generating PRDs. That split does not match the desired workflow.
+Why the old model fails:
+- It forces early structure before the idea is mature.
+- It treats artifacts as destinations instead of outputs of reasoning.
+- It mixes thread context and project memory in ways that make AI responses noisy.
+- It encourages a file-manager mental model instead of a builder workflow.
 
-The first user wants one place to start with a rough thought, explore whether it represents a real pain point, shape it into an idea, draft research plans, create an MVP/PRD, define tests, and promote the work into a durable project. The product should feel like a focused ChatGPT-style workspace, but with structured memory: projects, loose ideas, PRDs, MVP scope, research plans, and test lists.
+The target user needs one continuous loop: think in chat, capture decisions as artifacts, promote when ready, and continue with stronger context.
 
-The current artifact-first navigation makes the user choose the tool before the work is clear. The new direction should let the conversation lead, while the app quietly creates and organizes structured outputs.
+# Solution
+Launchpad will center the product on persistent chat sessions with linked, editable artifacts.
 
-## Solution
+Core model:
+- Users can start in a **general chat** with no project attached.
+- From chat, users can create a **Loose Idea** artifact.
+- From a loose idea or chat, users can generate a **PRD** (including MVP scope and test scenarios).
+- When work is mature, users can **promote to Project**.
+- Inside a project, chats are **project-scoped** and load project context by default.
 
-Reposition Launchpad as a chat-first workspace for builders turning pain points into scoped, buildable software projects.
+Artifacts are not passive files:
+- Artifacts are directly editable.
+- AI can create new artifacts from chat.
+- AI can suggest updates to existing artifacts, but saved content changes only through draft-then-apply.
 
-The main interface becomes a persistent chat surface. The sidebar becomes workspace memory, organized around `New Chat`, `Inbox`, `Projects`, `Loose Ideas`, `Recent`, and `Settings`. Projects become the top-level container for mature work. Ideas may exist outside projects until promoted.
+Thread UI stays focused:
+- A thread shows artifacts created or referenced in that thread.
+- It does not automatically dump every artifact from the project.
+- Project memory remains available through a project artifact sidebar.
+- Users explicitly bring project artifacts into thread context via actions like “Attach to chat” or “Import to context.”
 
-The right panel shows one active artifact at a time, such as an idea outline, PRD, MVP scope section, research plan, or test list. AI can draft updates, but saved artifact changes require explicit user confirmation through an "Apply" action.
+# Core UX Principles
+1. **Chat is primary**: every meaningful action starts from or returns to chat.
+2. **Memory is structured**: artifacts are durable workspace memory, not transient assistant output.
+3. **Context is explicit**: project-level memory exists globally, thread-level context is scoped intentionally.
+4. **User controls writes**: AI suggestions are drafts until explicitly applied.
+5. **MVP is narrow**: optimize for one strong loop over broad feature coverage.
 
-The first shippable version should support:
+# MVP Scope
+In scope for v1:
+- Persistent chat threads in two modes:
+  - General (no project)
+  - Project-scoped
+- Artifact types:
+  - Loose Idea
+  - PRD (single doc type with required sections)
+  - Optional lightweight Research Plan section inside PRD (planning only, no execution)
+- PRD sections (editable):
+  - Problem
+  - Target user
+  - Goals
+  - MVP scope
+  - Out of scope
+  - Test scenarios
+  - Research plan (structured plan, not automated research)
+- Create PRD from chat/idea.
+- Promote loose idea (or PRD-backed work) into a project.
+- Project workspace with:
+  - Project chats
+  - Artifact sidebar (project memory)
+- Thread artifact rail/list showing only artifacts created/referenced in that thread.
+- Explicit context actions:
+  - Attach to chat
+  - Import to context
+- AI draft-then-apply updates for existing artifacts.
+- Direct manual editing of artifacts.
 
-- Context-specific chats attached to inbox, loose ideas, projects, or PRDs.
-- Loose ideas that can be explored before becoming projects.
-- Projects as top-level containers for mature work.
-- Human-editable PRDs as canonical documents.
-- MVP scope and test list as editable PRD sections.
-- AI-generated research plans, competitor scan plans, pain-point search plans, and customer interview plans, without live web automation in v1.
-- "Create project from this" flow that links the source idea, attaches or creates the PRD, and makes future chats use the project as context.
-- Workflow SDK documented as a future extension for long-running research workflows, not included in v1.
+Not included in MVP scope definition:
+- Additional first-class artifact types beyond Loose Idea and PRD.
+- Any automation framework, web research, or workflow execution engine.
 
-## User Stories
+# Primary User Flows
+1. **Start from a new chat**
+   - User opens New Chat (general).
+   - User describes a pain point.
+   - AI helps clarify user, pain severity, and potential solution direction.
 
-1. As the first user, I want to start a new chat from the dashboard, so that I can capture a rough product thought immediately.
-2. As the first user, I want loose ideas to exist outside projects, so that early thoughts do not require project structure too soon.
-3. As the first user, I want to promote a loose idea into a project, so that promising ideas become durable workspaces.
-4. As the first user, I want projects to contain related ideas, PRDs, research plans, MVP scope, tests, and chats, so that all context stays together.
-5. As the first user, I want each chat to have a clear context, so that future AI responses use the right project, idea, or PRD.
-6. As the first user, I want the sidebar to show Projects, Loose Ideas, Recent, Inbox, and Settings, so that I can quickly resume work.
-7. As the first user, I want to ask "turn this into an MVP," so that the current idea becomes a structured PRD/MVP draft.
-8. As the first user, I want AI-generated changes to appear as drafts before being applied, so that saved work is not mutated unexpectedly.
-9. As the first user, I want to approve artifact updates, so that I stay in control of my project memory.
-10. As the first user, I want PRDs to be human-editable, so that I can refine the document directly after AI generates a starting point.
-11. As the first user, I want MVP scope to live inside the PRD, so that scope and requirements do not fragment into separate documents too early.
-12. As the first user, I want test scenarios to live inside the PRD, so that the PRD describes both what to build and how I will know it works.
-13. As the first user, I want AI to draft research plans, competitor scan plans, pain-point search plans, and customer interview plans, so that I can validate ideas before building.
-14. As the first user, I want live web research to be deferred, so that the first version stays focused and shippable.
-15. As the first user, I want a project created from an idea to retain links back to the source idea and PRD, so that the project history remains understandable.
-16. As the first user, I want future chats inside a project to use prior artifacts as context, so that I do not need to repeat the same background.
-17. As the first user, I want the dashboard home to help me continue recent work, so that Launchpad feels like an active workspace rather than a menu.
-18. As the first user, I want the app to stay builder-focused, so that it remains opinionated around turning pain points into software projects.
+2. **Turn conversation into a loose idea**
+   - User clicks “Save as Idea” (or accepts AI suggestion).
+   - System creates Loose Idea linked to the thread.
+   - Thread now shows this idea in its artifact list.
 
-## Implementation Decisions
+3. **Generate a PRD**
+   - User asks for PRD from current conversation/idea.
+   - System creates a PRD with required sections prefilled.
+   - PRD opens in editor; user can edit immediately.
 
-- Use **Projects** as the top-level mature container. Projects can own or link ideas, PRDs, research plans, chat sessions, and future task/build artifacts.
-- Keep **Loose Ideas** outside projects until promoted. A loose idea may later receive a project association.
-- Use **context-specific chat sessions**. Each chat has a context such as inbox/general, idea, project, or PRD.
-- Replace the current tool-first mental model with a **chat-first workspace**. The chat is the primary interaction surface; artifacts are created, previewed, edited, and applied alongside it.
-- The sidebar should organize memory as `New Chat`, `Inbox`, `Projects`, `Loose Ideas`, `Recent`, and `Settings`.
-- The right panel shows one active artifact at a time. Artifact switching is explicit, not multiple side panels at once.
-- AI changes to saved artifacts use a **draft then apply** flow. The AI can propose updates, but user confirmation writes to saved records.
-- PRDs are canonical editable documents. Version history stores immutable snapshots.
-- MVP scope and test list are sections inside the PRD, not separate v1 artifact types.
-- Research in v1 is generated as structured plans, not automated live web research.
-- Workflow SDK is not part of v1 implementation. It is noted as a future engine for durable, resumable research workflows.
-- "Create project from this" creates a project, links the source idea, attaches or creates the PRD, and routes future chat context to the project.
-- Product positioning is builder-focused: Launchpad helps the first user turn pain points into scoped software projects.
+4. **Promote work into a project**
+   - User chooses “Create Project from this.”
+   - System creates project and links source idea/PRD.
+   - Existing artifacts remain intact; promotion links them, not copies them.
 
-## Important Interfaces And Types
+5. **Continue inside a project chat**
+   - User opens project and starts/continues project chat.
+   - AI loads project context baseline (project metadata + linked core artifacts).
+   - Thread remains focused on artifacts referenced in that thread.
 
-- Add a `projects` domain model with title, description/summary, status, owner, timestamps, and links to associated artifacts.
-- Add or evolve chat sessions so each session records its context type and context id.
-- Allow ideas to optionally reference a project once promoted.
-- Allow PRDs to optionally reference a source idea and/or project.
-- PRD content should include editable sections for problem, target user, MVP scope, requirements, out of scope, research plan, test scenarios, and build plan.
-- Add artifact draft/application behavior: AI-generated updates are represented as pending changes until the user applies them.
-- Add project creation behavior that links existing source artifacts rather than copying them.
+6. **Open, edit, and import artifacts**
+   - From project sidebar, user opens any project artifact.
+   - User edits directly in artifact editor.
+   - User can explicitly attach/import artifact into active thread context.
+   - AI suggestions to existing artifacts appear as draft changes; user applies or discards.
 
-## Testing Decisions
+# User Stories
+1. As a builder, I can start with an unstructured pain point in chat so I can think before organizing.
+2. As a builder, I can save promising threads as loose ideas without creating a project too early.
+3. As a builder, I can generate an editable PRD from chat so I can move from exploration to execution quickly.
+4. As a builder, I can promote mature work into a project so ongoing work has stable context.
+5. As a builder, I can control which artifacts are in thread context so AI responses stay relevant.
+6. As a builder, I can accept or reject AI-proposed edits so my saved docs do not change unexpectedly.
 
-- Test external behavior, not implementation details.
-- Test project creation from an idea: source idea remains accessible, project is created, PRD is linked or created, and future chat context points at the project.
-- Test loose ideas: ideas can exist without a project and later be promoted.
-- Test PRD editing: manual edits persist as the canonical draft.
-- Test PRD versioning: snapshots are immutable and do not overwrite the editable draft.
-- Test AI draft application: suggested updates do not mutate saved records until explicitly applied.
-- Test chat context: project chats include project-linked artifacts; idea chats include idea context; inbox chats do not accidentally attach to the wrong object.
-- Test dashboard/sidebar behavior: recent projects, loose ideas, and active contexts appear in the expected places.
-- Test research plan generation as structured artifact content, without depending on live web access in v1.
+# Data / Domain Model
+- **ChatThread**
+  - `id`, `title`, `scopeType` (`general` | `project`), optional `projectId`, timestamps
+- **Message**
+  - `threadId`, `role`, `content`, timestamps
+- **Artifact**
+  - `id`, `type` (`idea` | `prd`), `title`, `content`, optional `projectId`, optional `sourceThreadId`, timestamps
+- **Project**
+  - `id`, `name`, `summary`, timestamps
+- **ThreadArtifactLink**
+  - Links artifacts that are created in, referenced in, or explicitly attached to a thread
+- **ArtifactDraftChange**
+  - `artifactId`, proposed patch/content, status (`pending` | `applied` | `discarded`), timestamps
 
-## Out Of Scope
+Relationship rules:
+- A loose idea is an artifact with no `projectId`.
+- Promoting creates a Project and links existing artifacts via `projectId` (no forced duplication).
+- Project chats have `scopeType=project` and a `projectId`.
+- Thread context is derived from ThreadArtifactLink + explicit imports.
 
-- Live web search, automated competitor scanning, automated pain-point scraping, and long-running research jobs.
-- Workflow SDK integration.
-- Full task management or project execution tracking.
-- Multi-user collaboration.
-- Public sharing.
-- Complex artifact branching or merge flows.
-- Generic creative-project support beyond builder/software project workflows.
+# Key Interaction Rules
+1. **Thread artifact visibility rule**
+   - Show in a thread only artifacts that were:
+     - created in that thread,
+     - referenced in that thread, or
+     - explicitly attached/imported to that thread.
 
-## Further Notes
+2. **Project memory visibility rule**
+   - Project artifact sidebar shows all artifacts linked to the project.
+   - This does not automatically place all project artifacts into active thread context.
 
-The core product move is not "add more tools." It is to make chat the primary interface and make Projects, Ideas, PRDs, research plans, and test lists structured memory that the chat can create, update, and reuse.
+3. **Context loading rule**
+   - General chat: no project context loaded.
+   - Project chat: load project baseline context (project summary + linked PRD and linked ideas).
+   - Additional artifacts require explicit attach/import.
 
-V1 should stay intentionally small: chat-first dashboard, projects, loose ideas, editable PRDs, MVP/test sections, project promotion, and AI draft/apply behavior.
+4. **Artifact edit rule**
+   - Artifacts are directly editable by users at any time.
+   - Saving manual edits updates canonical artifact content immediately.
+
+5. **AI update rule (draft-then-apply)**
+   - For existing artifacts, AI writes proposals to `ArtifactDraftChange`.
+   - Canonical artifact content changes only when user selects Apply.
+   - Discard leaves canonical content unchanged.
+
+6. **PRD structure rule**
+   - PRD is a single editable document type for MVP.
+   - MVP scope, test scenarios, and research plan are sections in PRD, not separate artifact types.
+
+7. **Promotion rule**
+   - “Create Project from this” creates a project and links source artifacts.
+   - Source idea remains accessible as historical input; it is not deleted.
+
+8. **No automation rule (v1)**
+   - Research output is planning text only.
+   - No live web research, autonomous workflows, or long-running background agents.
+
+# Testing Decisions
+Focus tests on product behavior:
+- Chat scope behavior:
+  - General chat does not load project context.
+  - Project chat loads baseline project context.
+- Thread vs project memory behavior:
+  - Thread shows only thread-linked artifacts.
+  - Project sidebar shows all project artifacts.
+  - Import/attach adds artifact to thread context.
+- Artifact lifecycle behavior:
+  - Create idea from chat.
+  - Generate PRD from chat/idea.
+  - Promote to project without duplicating or losing links.
+- Editing and AI updates:
+  - Manual edits persist immediately.
+  - AI-proposed edits require apply to affect canonical content.
+  - Discard keeps canonical content unchanged.
+- PRD completeness checks:
+  - PRD creation includes all required sections.
+
+# Out of Scope
+- Live web browsing, competitor scraping, or automated external research.
+- Workflow SDK, background jobs, or long-running agent orchestration.
+- Multi-user collaboration, comments, permissions, or workspace admin.
+- Artifact branching, merge flows, or version-control-like document workflows.
+- Turning every artifact subtype into a first-class object in v1.
+- Generic non-software project planning.
+
+# Open Questions
+1. Should project baseline context include full PRD text by default, or a compressed summary + on-demand section retrieval?
+2. Should one project have a single canonical PRD in v1, or allow multiple PRDs per project from day one?
