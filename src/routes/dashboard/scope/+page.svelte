@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { dashboardScopeSearchParamsSchema } from '$lib/dashboard-search-params';
 	import ScopeWorkspace from '$lib/components/workspaces/ScopeWorkspace.svelte';
+	import { useSearchParams } from 'runed/kit';
 
-	const selectedPrdId = $derived($page.url.searchParams.get('prd'));
+	const routeParams = useSearchParams(dashboardScopeSearchParamsSchema);
+	const selectedPrdId = $derived(routeParams.prd || null);
 </script>
 
 <svelte:head>

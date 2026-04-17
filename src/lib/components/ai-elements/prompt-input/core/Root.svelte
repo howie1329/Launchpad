@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { FileUIPart } from "ai";
 	import { cn } from "$lib/utils";
-	import { watch } from "runed";
+	import { BROWSER } from "esm-env";
+	import { useEventListener, watch } from "runed";
 	import { onDestroy } from "svelte";
 	import { AttachmentsContext, setAttachmentsContext } from "../context/attachments.svelte.js";
 	import { getPromptInputProvider } from "../context/provider.svelte.js";
@@ -107,67 +108,30 @@
 		}
 	});
 
-	// Attach drop handlers on nearest form
-	watch(
-		() => formRef,
-		(formRef) => {
-			if (!formRef) return;
-
-			let onDragOver = (e: DragEvent) => {
-				if (e.dataTransfer?.types?.includes("Files")) {
-					e.preventDefault();
-				}
-			};
-
-			let onDrop = (e: DragEvent) => {
-				if (e.dataTransfer?.types?.includes("Files")) {
-					e.preventDefault();
-				}
-				if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-					attachmentsContext.add(e.dataTransfer.files);
-				}
-			};
-
-			formRef.addEventListener("dragover", onDragOver);
-			formRef.addEventListener("drop", onDrop);
-
-			return () => {
-				formRef?.removeEventListener("dragover", onDragOver);
-				formRef?.removeEventListener("drop", onDrop);
-			};
+	let handleDragOver = (event: DragEvent) => {
+		if (event.dataTransfer?.types?.includes("Files")) {
+			event.preventDefault();
 		}
-	);
+	};
 
-	// Global drop handlers
-	watch(
-		() => globalDrop,
-		(globalDrop) => {
-			if (!globalDrop) return;
-
-			let onDragOver = (e: DragEvent) => {
-				if (e.dataTransfer?.types?.includes("Files")) {
-					e.preventDefault();
-				}
-			};
-
-			let onDrop = (e: DragEvent) => {
-				if (e.dataTransfer?.types?.includes("Files")) {
-					e.preventDefault();
-				}
-				if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-					attachmentsContext.add(e.dataTransfer.files);
-				}
-			};
-
-			document.addEventListener("dragover", onDragOver);
-			document.addEventListener("drop", onDrop);
-
-			return () => {
-				document.removeEventListener("dragover", onDragOver);
-				document.removeEventListener("drop", onDrop);
-			};
+	let handleDrop = (event: DragEvent) => {
+		if (event.dataTransfer?.types?.includes("Files")) {
+			event.preventDefault();
 		}
+
+		if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+			attachmentsContext.add(event.dataTransfer.files);
+		}
+	};
+
+	useEventListener(() => formRef, "dragover", handleDragOver);
+	useEventListener(() => formRef, "drop", handleDrop);
+	useEventListener(
+		() => (BROWSER && globalDrop ? document : null),
+		"dragover",
+		handleDragOver
 	);
+	useEventListener(() => (BROWSER && globalDrop ? document : null), "drop", handleDrop);
 
 	// Note: File input cannot be programmatically set for security reasons
 	// The syncHiddenInput prop is no longer functional

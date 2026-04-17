@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { dashboardIdeasSearchParamsSchema } from '$lib/dashboard-search-params';
 	import IdeasWorkspace from '$lib/components/workspaces/IdeasWorkspace.svelte';
+	import { useSearchParams } from 'runed/kit';
 
-	const selectedIdeaId = $derived($page.url.searchParams.get('idea'));
-	const startInitialResponse = $derived($page.url.searchParams.get('start') === '1');
+	const routeParams = useSearchParams(dashboardIdeasSearchParamsSchema);
+	const selectedIdeaId = $derived(routeParams.idea || null);
+	const startInitialResponse = $derived(routeParams.start === '1');
 </script>
 
 <svelte:head>

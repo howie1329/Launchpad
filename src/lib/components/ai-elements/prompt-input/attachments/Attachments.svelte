@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from "$lib/utils";
-	import { watch } from "runed";
+	import { ElementSize } from "runed";
 	import { getAttachmentsContext } from "../context/attachments.svelte.js";
 	import type { PromptInputAttachment } from "../context/types.js";
 
@@ -12,8 +12,8 @@
 	let { class: className, children, ...props }: Props = $props();
 
 	let attachmentsContext = getAttachmentsContext();
-	let height = $state(0);
 	let contentRef = $state<HTMLDivElement | null>(null);
+	let contentSize = new ElementSize(() => contentRef);
 
 	// Separate files and images for grouped rendering
 	let nonImageFiles = $derived(
@@ -28,27 +28,8 @@
 		)
 	);
 
-	// Watch for resize changes using ResizeObserver
-	watch(
-		() => contentRef,
-		(contentRef) => {
-			if (!contentRef) return;
-
-			let ro = new ResizeObserver(() => {
-				if (contentRef) {
-					height = contentRef.getBoundingClientRect().height;
-				}
-			});
-
-			ro.observe(contentRef);
-			height = contentRef.getBoundingClientRect().height;
-
-			return () => ro.disconnect();
-		}
-	);
-
 	let computedHeight = $derived.by(() => {
-		return attachmentsContext.attachments.length ? height : 0;
+		return attachmentsContext.attachments.length ? contentSize.height : 0;
 	});
 </script>
 
