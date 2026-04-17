@@ -11,7 +11,15 @@
 
 	type Flow = 'signIn' | 'signUp';
 	type Status = 'idle' | 'loading' | 'error';
-	type RedirectRoute = '/' | '/dashboard' | '/ideas' | '/scope' | '/settings';
+	type RedirectRoute =
+		| '/'
+		| '/dashboard'
+		| '/dashboard/ideas'
+		| '/dashboard/scope'
+		| '/dashboard/settings'
+		| '/ideas'
+		| '/scope'
+		| '/settings';
 
 	let flow = $state<Flow>('signIn');
 	let status = $state<Status>('idle');
@@ -22,6 +30,9 @@
 		const value = page.url.searchParams.get('redirectTo');
 		return value === '/' ||
 			value === '/dashboard' ||
+			value === '/dashboard/ideas' ||
+			value === '/dashboard/scope' ||
+			value === '/dashboard/settings' ||
 			value === '/ideas' ||
 			value === '/scope' ||
 			value === '/settings'
