@@ -7,6 +7,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Separator } from '$lib/components/ui/separator';
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { auth, signIn } from '$lib/auth.svelte';
 
 	type Flow = 'signIn' | 'signUp';
@@ -84,7 +85,10 @@
 		<a href={resolve('/')} aria-label="Launchpad home">
 			<LaunchpadLogo />
 		</a>
-		<Button href={resolve('/')} variant="ghost" size="sm">Home</Button>
+		<div class="flex items-center gap-2">
+			<ThemeMenu variant="icon" />
+			<Button href={resolve('/')} variant="ghost" size="sm">Home</Button>
+		</div>
 	</header>
 
 	<section class="flex flex-1 items-center px-5 py-12 sm:px-8">

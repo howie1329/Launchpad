@@ -9,6 +9,7 @@
 	import * as Kbd from '$lib/components/ui/kbd';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { listIdeasQuery } from '$lib/ideas';
 	import { listPrdsQuery } from '$lib/prds';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -161,6 +162,7 @@
 
 				<Sidebar.Footer>
 					<Sidebar.Menu>
+						<ThemeMenu variant="sidebar" />
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								tooltipContent="Sign out"
