@@ -24,7 +24,7 @@
 		"@hugeicons/core-free-icons": "^4.1.1",
 		"@hugeicons/svelte": "^1.1.2",
 		"@internationalized/date": "^3.12.0",
-		"@lucide/svelte": "^0.577.0",
+		"@lucide/svelte": "^1.8.0",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
@@ -32,7 +32,7 @@
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.2.2",
 		"@types/node": "^24",
-		"ai": "^6.0.158",
+		"ai": "^6.0.168",
 		"bits-ui": "^2.17.3",
 		"clsx": "^2.1.1",
 		"concurrently": "^9.2.1",
@@ -60,9 +60,11 @@
 	"dependencies": {
 		"@auth/core": "^0.37.0",
 		"@convex-dev/auth": "^0.0.91",
+		"@shikijs/themes": "^4.0.2",
 		"convex": "^1.35.1",
 		"convex-svelte": "^0.0.12",
 		"mode-watcher": "^1.1.0",
+		"runed": "^0.37.1",
 		"svelte-streamdown": "^3.0.1"
 	}
 }

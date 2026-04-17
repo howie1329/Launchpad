@@ -1,4 +1,5 @@
 import { makeFunctionReference } from 'convex/server';
+import type { Id } from '../convex/_generated/dataModel';
 
 export type PrdOutput = {
 	problemStatement: string;
@@ -13,7 +14,7 @@ export type PrdOutput = {
 export type SavedPrd = {
 	_id: string;
 	_creationTime: number;
-	ownerId: string;
+	ownerId: Id<'users'>;
 	title: string;
 	latestVersion: number;
 	latestIdea: string;
@@ -28,7 +29,7 @@ export type PrdGeneration = {
 	_id: string;
 	_creationTime: number;
 	prdId: string;
-	ownerId: string;
+	ownerId: Id<'users'>;
 	version: number;
 	schemaVersion: number;
 	idea: string;

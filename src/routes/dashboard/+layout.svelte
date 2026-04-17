@@ -3,11 +3,13 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { auth, signOut } from '$lib/auth.svelte';
+	import { dashboardSearchParamsSchema } from '$lib/dashboard-search-params';
 	import { LaunchpadMark } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Kbd from '$lib/components/ui/kbd';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { listIdeasQuery } from '$lib/ideas';
 	import { listPrdsQuery } from '$lib/prds';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
@@ -16,6 +18,7 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { useQuery } from 'convex-svelte';
+	import { useSearchParams } from 'runed/kit';
 
 	let { children } = $props();
 
@@ -46,10 +49,11 @@
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
 	let hasAutoCollapsedForSettings = $state(false);
+	const routeParams = useSearchParams(dashboardSearchParamsSchema);
 
 	const pathname = $derived($page.url.pathname);
-	const selectedIdeaId = $derived($page.url.searchParams.get('idea'));
-	const selectedPrdId = $derived($page.url.searchParams.get('prd'));
+	const selectedIdeaId = $derived(routeParams.idea || null);
+	const selectedPrdId = $derived(routeParams.prd || null);
 	const isScopeRoute = $derived(pathname.includes('/scope'));
 	const isIdeasRoute = $derived(pathname.includes('/ideas'));
 	const isSettingsRoute = $derived(pathname.includes('/settings'));
@@ -158,6 +162,7 @@
 
 				<Sidebar.Footer>
 					<Sidebar.Menu>
+						<ThemeMenu variant="sidebar" />
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								tooltipContent="Sign out"
@@ -188,7 +193,7 @@
 							</div>
 							<Sidebar.Menu>
 								<Sidebar.MenuItem>
-									<Sidebar.MenuButton isActive={!$page.url.searchParams.has('prd')} class="min-w-0">
+									<Sidebar.MenuButton isActive={!selectedPrdId} class="min-w-0">
 										{#snippet child({ props })}
 											<a href={resolve('/dashboard/scope')} {...props}>
 												<PlusIcon />
@@ -249,11 +254,11 @@
 							</div>
 							<Sidebar.Menu>
 								<Sidebar.MenuItem>
-									<Sidebar.MenuButton class="min-w-0">
+									<Sidebar.MenuButton isActive={!selectedIdeaId} class="min-w-0">
 										{#snippet child({ props })}
-											<a href={resolve('/dashboard/scope')} {...props}>
-												<FileTextIcon />
-												<span class="min-w-0 truncate">Start scoping</span>
+											<a href={resolve('/dashboard/ideas')} {...props}>
+												<PlusIcon />
+												<span class="min-w-0 truncate">New idea chat</span>
 											</a>
 										{/snippet}
 									</Sidebar.MenuButton>

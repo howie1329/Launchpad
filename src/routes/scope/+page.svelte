@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import AuthControls from '$lib/components/AuthControls.svelte';
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { LaunchpadLogo } from '$lib/components/brand';
 	import ScopeWorkspace from '$lib/components/workspaces/ScopeWorkspace.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -22,6 +23,7 @@
 		<div class="flex items-center gap-2">
 			<Badge variant="secondary">MVP scope</Badge>
 			<Button href={resolve('/')} variant="ghost" size="sm">Home</Button>
+			<ThemeMenu variant="icon" />
 			<AuthControls />
 		</div>
 	</header>

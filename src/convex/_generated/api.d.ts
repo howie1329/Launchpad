@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as authHelpers from "../authHelpers.js";
 import type * as http from "../http.js";
 import type * as ideas from "../ideas.js";
 import type * as prds from "../prds.js";
@@ -21,6 +22,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  authHelpers: typeof authHelpers;
   http: typeof http;
   ideas: typeof ideas;
   prds: typeof prds;

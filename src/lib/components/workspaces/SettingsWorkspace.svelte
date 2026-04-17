@@ -1,3 +1,7 @@
+<script lang="ts">
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
+</script>
+
 <section class="h-full min-h-0 overflow-y-auto bg-background px-5 py-6 text-foreground sm:px-8">
 	<div class="mx-auto w-full max-w-3xl">
 		<div class="border-b border-border/70 pb-5">
@@ -11,6 +15,19 @@
 		</div>
 
 		<div class="divide-y divide-border/60 border-b border-border/70">
+			<section class="grid gap-3 py-5 sm:grid-cols-[10rem_1fr]">
+				<div>
+					<h2 class="text-sm font-semibold tracking-tight">Appearance</h2>
+					<p class="mt-1 text-[11px] leading-4 text-muted-foreground">Color theme</p>
+				</div>
+				<div class="flex flex-wrap items-center gap-3">
+					<ThemeMenu />
+					<p class="text-xs leading-5 text-muted-foreground">
+						Choose light, dark, or match your device. Your choice is saved on this browser.
+					</p>
+				</div>
+			</section>
+
 			<section class="grid gap-3 py-5 sm:grid-cols-[10rem_1fr]">
 				<div>
 					<h2 class="text-sm font-semibold tracking-tight">Profile</h2>

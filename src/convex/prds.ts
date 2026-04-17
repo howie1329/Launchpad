@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
+import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
 import { mutation, query } from './_generated/server';
-import type { MutationCtx, QueryCtx } from './_generated/server';
 
 const schemaVersion = 1;
 
@@ -25,7 +25,7 @@ const saveArgs = {
 export const listPrds = query({
 	args: {},
 	handler: async (ctx) => {
-		const ownerId = await getOwnerId(ctx);
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return [];
 
 		return await ctx.db
@@ -41,7 +41,7 @@ export const getPrd = query({
 		prdId: v.id('prds')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOwnerId(ctx);
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return null;
 
 		const prd = await ctx.db.get(args.prdId);
@@ -66,7 +66,7 @@ export const listPrdGenerations = query({
 		prdId: v.id('prds')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOwnerId(ctx);
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return [];
 
 		const prd = await ctx.db.get(args.prdId);
@@ -85,7 +85,7 @@ export const getPrdGeneration = query({
 		generationId: v.id('prdGenerations')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOwnerId(ctx);
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return null;
 
 		const generation = await ctx.db.get(args.generationId);
@@ -98,7 +98,7 @@ export const getPrdGeneration = query({
 export const saveNewPrd = mutation({
 	args: saveArgs,
 	handler: async (ctx, args) => {
-		const ownerId = await requireOwnerId(ctx);
+		const ownerId = await requireAuthUserId(ctx);
 		const now = Date.now();
 		const version = 1;
 		const title = createTitle(args.idea);
@@ -142,7 +142,7 @@ export const savePrdGeneration = mutation({
 		...saveArgs
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireOwnerId(ctx);
+		const ownerId = await requireAuthUserId(ctx);
 		const prd = await ctx.db.get(args.prdId);
 
 		if (!prd || prd.ownerId !== ownerId) {
@@ -182,17 +182,6 @@ export const savePrdGeneration = mutation({
 		};
 	}
 });
-
-async function getOwnerId(ctx: QueryCtx | MutationCtx) {
-	const identity = await ctx.auth.getUserIdentity();
-	return identity?.tokenIdentifier ?? null;
-}
-
-async function requireOwnerId(ctx: MutationCtx) {
-	const ownerId = await getOwnerId(ctx);
-	if (!ownerId) throw new Error('Authentication required');
-	return ownerId;
-}
 
 function createTitle(idea: string) {
 	const firstLine = idea.trim().split('\n')[0]?.trim() ?? '';
