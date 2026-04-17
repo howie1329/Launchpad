@@ -415,17 +415,17 @@
 				{#if selectedIdea.data === undefined}
 					<Skeleton class="mt-2 h-5 w-48" />
 				{:else if selectedIdea.data}
-					<h1 class="mt-0.5 truncate text-sm font-semibold tracking-tight">
+					<h1 class="mt-0.5 truncate text-base font-semibold tracking-tight">
 						{selectedIdea.data.title}
 					</h1>
 				{:else}
-					<h1 class="mt-0.5 text-sm font-semibold tracking-tight">Idea not found</h1>
+					<h1 class="mt-0.5 text-base font-semibold tracking-tight">Idea not found</h1>
 				{/if}
 			</div>
 			{#if selectedIdea.data && hasArtifactContent}
 				<Button
 					type="button"
-					variant="outline"
+					variant="ghost"
 					size="sm"
 					class="h-8 shrink-0 gap-1.5 text-xs"
 					onclick={() => (artifactCollapsed = !artifactCollapsed)}
@@ -475,7 +475,10 @@
 													<div class="flex w-full min-w-0 flex-col gap-3">
 														{#each segments as segment, segIdx (segIdx)}
 															{#if segment.kind === 'text'}
-																<MessageResponse content={segment.text} class="text-sm leading-6" />
+																<MessageResponse
+																	content={segment.text}
+																	class="text-xs leading-relaxed"
+																/>
 															{:else}
 																<IdeaChatToolSteps tools={segment.tools} />
 															{/if}
@@ -484,7 +487,7 @@
 												{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages, chat.status)}
 													<MessageResponse
 														content="Thinking..."
-														class="text-sm leading-6 text-muted-foreground"
+														class="text-xs leading-relaxed text-muted-foreground"
 													/>
 												{:else}
 													<p class="text-xs text-muted-foreground">No response yet.</p>
@@ -580,21 +583,23 @@
 
 				{#if hasArtifactContent && !artifactCollapsed && selectedIdea.data}
 					<aside
-						class="flex max-h-[min(52vh,28rem)] min-h-0 w-full shrink-0 flex-col border-t border-border/50 bg-muted/10 lg:h-auto lg:max-h-none lg:w-[min(100%,22rem)] lg:border-t-0 lg:border-l xl:w-96"
+						class="flex max-h-[min(52vh,28rem)] min-h-0 w-full shrink-0 flex-col border-t border-border/50 bg-background lg:h-auto lg:max-h-none lg:w-[min(100%,22rem)] lg:border-t-0 lg:border-l xl:w-96"
 					>
 						<Artifact
 							class="flex h-full min-h-0 flex-1 flex-col overflow-hidden shadow-none lg:rounded-none lg:border-0 lg:shadow-none"
 						>
-							<ArtifactHeader>
+							<ArtifactHeader class="border-b border-border/50 bg-transparent px-4 py-3">
 								<div class="min-w-0">
-									<ArtifactTitle>Idea outline</ArtifactTitle>
+									<ArtifactTitle class="text-base font-semibold tracking-tight">
+										Idea outline
+									</ArtifactTitle>
 									<ArtifactDescription class="mt-0.5 text-xs">
 										Structured snapshot — updated as you chat.
 									</ArtifactDescription>
 								</div>
 								<ArtifactClose onclick={() => (artifactCollapsed = true)} />
 							</ArtifactHeader>
-							<ArtifactContent class="space-y-4 text-sm leading-6">
+							<ArtifactContent class="space-y-4 text-xs leading-relaxed">
 								{#if selectedIdea.data.oneLiner?.trim()}
 									<div>
 										<p
@@ -656,14 +661,13 @@
 											{/if}
 										</p>
 										{#if src.url?.trim()}
-											<a
-												href={src.url}
-												class="mt-1 inline-block text-xs text-primary underline-offset-4 hover:underline"
-												target="_blank"
-												rel="noreferrer"
+											<button
+												type="button"
+												class="mt-1 inline-block cursor-pointer text-left text-xs text-primary underline-offset-4 hover:underline"
+												onclick={() => window.open(src.url, '_blank', 'noopener,noreferrer')}
 											>
 												{src.url}
-											</a>
+											</button>
 										{/if}
 									</div>
 								{/if}
