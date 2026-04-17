@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
 import { mutation, query } from './_generated/server';
 import type { Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
@@ -49,7 +50,7 @@ type StoredUIMessage = {
 export const listIdeas = query({
 	args: {},
 	handler: async (ctx) => {
-		const ownerId = await getOwnerId(ctx);
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return [];
 
 		return await ctx.db
@@ -65,7 +66,7 @@ export const getIdea = query({
 		ideaId: v.id('ideas')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOwnerId(ctx);
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return null;
 
 		const idea = await ctx.db.get(args.ideaId);
@@ -80,7 +81,7 @@ export const listIdeaMessages = query({
 		ideaId: v.id('ideas')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOwnerId(ctx);
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return [];
 
 		const idea = await ctx.db.get(args.ideaId);
@@ -100,7 +101,7 @@ export const createIdeaWithInitialMessage = mutation({
 		modelId: v.optional(v.string())
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireOwnerId(ctx);
+		const ownerId = await requireAuthUserId(ctx);
 		const text = args.text.trim();
 
 		if (!text) {
@@ -148,7 +149,7 @@ export const saveIdeaMessages = mutation({
 		modelId: v.optional(v.string())
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireOwnerId(ctx);
+		const ownerId = await requireAuthUserId(ctx);
 		const idea = await getOwnedIdea(ctx, args.ideaId, ownerId);
 		const now = Date.now();
 
@@ -205,7 +206,7 @@ export const updateIdeaStructured = mutation({
 		score: v.optional(ideaScoreValue)
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireOwnerId(ctx);
+		const ownerId = await requireAuthUserId(ctx);
 		const idea = await getOwnedIdea(ctx, args.ideaId, ownerId);
 		const now = Date.now();
 
@@ -251,7 +252,7 @@ export const updateIdeaTitle = mutation({
 		modelId: v.optional(v.string())
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireOwnerId(ctx);
+		const ownerId = await requireAuthUserId(ctx);
 		const idea = await getOwnedIdea(ctx, args.ideaId, ownerId);
 		const title = args.title.trim();
 
@@ -271,24 +272,13 @@ export const updateIdeaTitle = mutation({
 	}
 });
 
-async function getOwnedIdea(ctx: QueryCtx | MutationCtx, ideaId: Id<'ideas'>, ownerId: string) {
+async function getOwnedIdea(ctx: QueryCtx | MutationCtx, ideaId: Id<'ideas'>, ownerId: Id<'users'>) {
 	const idea = await ctx.db.get(ideaId);
 	if (!idea || idea.ownerId !== ownerId) {
 		throw new Error('Idea not found');
 	}
 
 	return idea;
-}
-
-async function getOwnerId(ctx: QueryCtx | MutationCtx) {
-	const identity = await ctx.auth.getUserIdentity();
-	return identity?.tokenIdentifier ?? null;
-}
-
-async function requireOwnerId(ctx: MutationCtx) {
-	const ownerId = await getOwnerId(ctx);
-	if (!ownerId) throw new Error('Authentication required');
-	return ownerId;
 }
 
 function createTitle(text: string) {

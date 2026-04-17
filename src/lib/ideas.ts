@@ -1,5 +1,6 @@
 import { makeFunctionReference } from 'convex/server';
 import type { UIMessage } from 'ai';
+import type { Id } from '../convex/_generated/dataModel';
 
 export type IdeaStatus = 'inbox' | 'exploring' | 'prdReady' | 'archived';
 
@@ -23,7 +24,7 @@ export type IdeaScore = {
 export type SavedIdea = {
 	_id: string;
 	_creationTime: number;
-	ownerId: string;
+	ownerId: Id<'users'>;
 	title: string;
 	prompt: string;
 	titleGeneratedAt?: number;
@@ -41,7 +42,7 @@ export type SavedIdea = {
 export type SavedIdeaChatMessage = {
 	_id: string;
 	_creationTime: number;
-	ownerId: string;
+	ownerId: Id<'users'>;
 	ideaId: string;
 	messageId: string;
 	role: UIMessage['role'];
