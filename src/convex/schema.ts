@@ -25,6 +25,13 @@ export default defineSchema({
 		createdAt: v.number(),
 		updatedAt: v.number()
 	}).index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt']),
+	ideas: defineTable({
+		ownerId: v.string(),
+		title: v.string(),
+		prompt: v.string(),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	}).index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt']),
 	prdGenerations: defineTable({
 		prdId: v.id('prds'),
 		ownerId: v.string(),
