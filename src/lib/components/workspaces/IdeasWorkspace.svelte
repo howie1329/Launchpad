@@ -48,7 +48,6 @@
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
-	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import TargetIcon from '@lucide/svelte/icons/target';
 	import { Chat } from '@ai-sdk/svelte';
 	import { DefaultChatTransport, type UIMessage } from 'ai';
@@ -328,20 +327,21 @@
 
 {#if selectedIdeaId}
 	<section class="flex h-full min-h-0 flex-col bg-background text-foreground">
-		<header class="flex shrink-0 items-center justify-between border-b border-border/60 px-4 py-3 sm:px-6">
+		<header class="flex h-12 shrink-0 items-center border-b border-border/50 px-4 sm:px-6">
 			<div class="min-w-0">
-				<p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">Idea chat</p>
+				<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+					Idea chat
+				</p>
 				{#if selectedIdea.data === undefined}
 					<Skeleton class="mt-2 h-5 w-48" />
 				{:else if selectedIdea.data}
-					<h1 class="truncate text-base font-semibold tracking-tight sm:text-lg">
+					<h1 class="mt-0.5 truncate text-sm font-semibold tracking-tight">
 						{selectedIdea.data.title}
 					</h1>
 				{:else}
-					<h1 class="text-base font-semibold tracking-tight sm:text-lg">Idea not found</h1>
+					<h1 class="mt-0.5 text-sm font-semibold tracking-tight">Idea not found</h1>
 				{/if}
 			</div>
-			<Button href={resolve('/dashboard/ideas')} variant="ghost" size="sm">New idea</Button>
 		</header>
 
 		{#if selectedIdea.data === undefined || ideaMessages.data === undefined}
@@ -361,15 +361,18 @@
 			</div>
 		{:else}
 			<Conversation class="min-h-0 flex-1">
-				<ConversationContent class="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-6 sm:px-6">
+				<ConversationContent class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
 					{#if chat}
 						{#each chat.messages as message (message.id)}
 							<Message from={message.role}>
 								<MessageContent>
 									{#if message.role === 'assistant'}
-										<MessageResponse content={messageText(message) || 'Thinking...'} />
+										<MessageResponse
+											content={messageText(message) || 'Thinking...'}
+											class="text-sm leading-6"
+										/>
 									{:else}
-										<p class="whitespace-pre-wrap leading-6">{messageText(message)}</p>
+										<p class="whitespace-pre-wrap text-xs leading-5">{messageText(message)}</p>
 									{/if}
 								</MessageContent>
 							</Message>
@@ -377,8 +380,8 @@
 
 						{#if chat.status === 'submitted'}
 							<Message from="assistant">
-								<MessageContent class="flex-row items-center gap-2 text-sm text-muted-foreground">
-									<LoaderCircleIcon class="size-4 animate-spin" />
+								<MessageContent class="flex-row items-center gap-2 text-xs text-muted-foreground">
+									<LoaderCircleIcon class="size-3.5 animate-spin" />
 									Thinking...
 								</MessageContent>
 							</Message>
@@ -388,13 +391,13 @@
 				<ConversationScrollButton />
 			</Conversation>
 
-			<div class="shrink-0 border-t border-border/60 bg-background/95 px-4 py-4 backdrop-blur sm:px-6">
+			<div class="shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
 				<div class="mx-auto max-w-3xl space-y-2">
 					{#if chatError || saveError}
 						<p class="text-xs text-destructive">{chatError || saveError}</p>
 					{/if}
 					<PromptInput
-						class="rounded-2xl border-border/70 bg-card shadow-lg shadow-foreground/5"
+						class="rounded-lg border-border/70 bg-background shadow-none"
 						clearOnSubmit={false}
 						onSubmit={submitChatMessage}
 					>
@@ -404,7 +407,7 @@
 							class="min-h-20 px-4 py-4 text-sm"
 							placeholder="Continue shaping this idea..."
 						/>
-						<PromptInputToolbar class="border-t border-border/60 px-2 py-2">
+						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 							<PromptInputTools>
 								<Button type="button" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground">
 									<SearchIcon data-icon="inline-start" />
@@ -452,33 +455,23 @@
 	</section>
 {:else}
 	<section
-		class="relative flex h-full min-h-0 items-center overflow-y-auto bg-background px-4 py-10 text-foreground sm:px-6 lg:px-8"
+		class="flex h-full min-h-0 items-center overflow-y-auto bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8"
 	>
-		<div
-			class="pointer-events-none absolute inset-x-0 top-0 h-64 bg-radial-[ellipse_at_top] from-muted/70 via-background to-background"
-		></div>
-
-		<div class="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-5">
-			<div class="flex flex-col items-center text-center">
-				<div
-					class="mb-5 flex size-12 items-center justify-center rounded-full border border-border/70 bg-background shadow-sm"
-					aria-hidden="true"
-				>
-					<SparklesIcon class="size-5 text-muted-foreground" />
-				</div>
-				<p class="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+		<div class="mx-auto flex w-full max-w-2xl flex-col gap-4">
+			<div class="text-center">
+				<p class="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 					Idea workspace
 				</p>
-				<h1 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+				<h1 class="text-xl font-semibold tracking-tight text-balance">
 					What idea are you thinking about?
 				</h1>
-				<p class="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+				<p class="mx-auto mt-2 max-w-md text-xs leading-5 text-muted-foreground">
 					Dump a rough thought. Launchpad will help shape it into something clear.
 				</p>
 			</div>
 
 			<PromptInput
-				class="w-full rounded-2xl border-border/70 bg-card shadow-lg shadow-foreground/5"
+				class="w-full rounded-lg border-border/70 bg-background shadow-none"
 				clearOnSubmit={false}
 				onSubmit={submitIdea}
 			>
@@ -488,7 +481,7 @@
 					class="min-h-28 px-4 py-4 text-sm sm:min-h-32"
 					placeholder="Paste a thought, rant, tweet, customer quote, or half-formed idea..."
 				/>
-				<PromptInputToolbar class="border-t border-border/60 px-2 py-2">
+				<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 					<PromptInputTools>
 						<Button type="button" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground">
 							<SearchIcon data-icon="inline-start" />
@@ -537,32 +530,41 @@
 
 			<Suggestions class="py-1" scrollbarXClasses="hidden">
 				{#each tools as tool (tool.label)}
-					<Suggestion suggestion={tool.label} onclick={() => fillComposer(tool.prompt)}>
+					<Suggestion
+						suggestion={tool.label}
+						variant="ghost"
+						class="h-7 rounded-full px-3 text-xs text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+						onclick={() => fillComposer(tool.prompt)}
+					>
 						{tool.label}
 					</Suggestion>
 				{/each}
 			</Suggestions>
 
 			<div class="w-full pt-2">
-				<div class="mb-3 flex items-center justify-between gap-3">
-					<p class="text-xs font-medium text-muted-foreground">Get started with an example</p>
+				<div class="mb-2 flex items-center justify-between gap-3">
+					<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+						Examples
+					</p>
 					{#if submittedText}
-						<p class="hidden text-xs text-muted-foreground sm:block">Starting idea chat...</p>
+						<p class="hidden text-[11px] text-muted-foreground sm:block">Starting idea chat...</p>
 					{/if}
 				</div>
 
-				<div class="grid gap-3 sm:grid-cols-3">
+				<div class="grid gap-1.5 sm:grid-cols-3">
 					{#each examples as example (example.title)}
 						<button
 							type="button"
-							class="group flex min-h-32 flex-col items-start rounded-xl border border-border/70 bg-card p-4 text-left shadow-sm transition-colors hover:border-border hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							class="group flex min-h-24 flex-col items-start rounded-md border border-transparent p-3 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 							onclick={() => fillComposer(example.prompt)}
 						>
 							<example.icon
-								class="mb-7 size-4 text-muted-foreground transition-colors group-hover:text-foreground"
+								class="mb-4 size-3.5 text-muted-foreground transition-colors group-hover:text-foreground"
 							/>
-							<span class="text-sm font-semibold tracking-tight">{example.title}</span>
-							<span class="mt-1 text-xs leading-5 text-muted-foreground">{example.description}</span>
+							<span class="text-xs font-medium tracking-tight">{example.title}</span>
+							<span class="mt-1 text-[11px] leading-4 text-muted-foreground">
+								{example.description}
+							</span>
 						</button>
 					{/each}
 				</div>
