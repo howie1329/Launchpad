@@ -26,6 +26,8 @@ export type SavedIdea = {
 	ownerId: string;
 	title: string;
 	prompt: string;
+	titleGeneratedAt?: number;
+	titleModelId?: string;
 	status?: IdeaStatus;
 	oneLiner?: string;
 	problem?: string;
@@ -51,6 +53,65 @@ export type SavedIdeaChatMessage = {
 	updatedAt: number;
 };
 
+export type CreateIdeaWithInitialMessageArgs = {
+	text: string;
+	modelId?: string;
+};
+
+export type CreateIdeaWithInitialMessageResult = {
+	ideaId: string;
+};
+
+export type SaveIdeaMessagesArgs = {
+	ideaId: string;
+	messages: UIMessage[];
+	modelId?: string;
+};
+
+export type SaveIdeaMessagesResult = {
+	saved: number;
+};
+
+export type UpdateIdeaTitleArgs = {
+	ideaId: string;
+	title: string;
+	modelId?: string;
+};
+
+export type UpdateIdeaTitleResult = {
+	title: string;
+};
+
 export const listIdeasQuery = makeFunctionReference<'query', Record<string, never>, SavedIdea[]>(
 	'ideas:listIdeas'
 );
+
+export const getIdeaQuery = makeFunctionReference<
+	'query',
+	{ ideaId: string },
+	SavedIdea | null
+>('ideas:getIdea');
+
+export const listIdeaMessagesQuery = makeFunctionReference<
+	'query',
+	{ ideaId: string },
+	SavedIdeaChatMessage[]
+>('ideas:listIdeaMessages');
+
+export const createIdeaWithInitialMessageMutation = makeFunctionReference<
+	'mutation',
+	CreateIdeaWithInitialMessageArgs,
+	CreateIdeaWithInitialMessageResult
+>('ideas:createIdeaWithInitialMessage');
+
+export const saveIdeaMessagesMutation = makeFunctionReference<
+	'mutation',
+	SaveIdeaMessagesArgs,
+	SaveIdeaMessagesResult
+>('ideas:saveIdeaMessages');
+
+export const updateIdeaTitleMutation = makeFunctionReference<
+	'mutation',
+	UpdateIdeaTitleArgs,
+	UpdateIdeaTitleResult
+>('ideas:updateIdeaTitle');

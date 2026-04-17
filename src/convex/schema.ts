@@ -61,6 +61,8 @@ export default defineSchema({
 		ownerId: v.string(),
 		title: v.string(),
 		prompt: v.string(),
+		titleGeneratedAt: v.optional(v.number()),
+		titleModelId: v.optional(v.string()),
 		status: v.optional(ideaStatus),
 		oneLiner: v.optional(v.string()),
 		problem: v.optional(v.string()),
