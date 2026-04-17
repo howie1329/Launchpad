@@ -32,19 +32,36 @@
 		ModelSelectorTrigger
 	} from '$lib/components/ai-elements/model-selector';
 	import { Suggestion, Suggestions } from '$lib/components/ai-elements/suggestion';
+	import {
+		Artifact,
+		ArtifactClose,
+		ArtifactContent,
+		ArtifactDescription,
+		ArtifactHeader,
+		ArtifactTitle
+	} from '$lib/components/ai-elements/artifact';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { defaultIdeaAiModelId, ideaAiModels, type IdeaAiModelId } from '$lib/idea-ai-models';
+	import {
+		extractLatestStructuredPatch,
+		ideaHasArtifactContent,
+		ideaScoreHasContent,
+		ideaSourceHasContent
+	} from '$lib/idea-structured';
 	import {
 		createIdeaWithInitialMessageMutation,
 		getIdeaQuery,
 		listIdeaMessagesQuery,
 		saveIdeaMessagesMutation,
-		updateIdeaTitleMutation
+		updateIdeaStructuredMutation,
+		updateIdeaTitleMutation,
+		type UpdateIdeaStructuredArgs
 	} from '$lib/ideas';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import SearchIcon from '@lucide/svelte/icons/search';
@@ -124,6 +141,8 @@
 	let chatKey = $state('');
 	let startedIdeaId = $state<string | null>(null);
 	let titleRequestedIdeaId = $state<string | null>(null);
+	let artifactCollapsed = $state(true);
+	let artifactContentSeenForIdea = $state(false);
 
 	const selectedModel = $derived(
 		ideaAiModels.find((model) => model.id === selectedModelId) ?? ideaAiModels[0]
@@ -137,6 +156,25 @@
 	const isChatBusy = $derived(chat?.status === 'submitted' || chat?.status === 'streaming');
 	const canSubmitLanding = $derived(Boolean(ideaText.trim()) && landingStatus !== 'saving');
 	const canSubmitChat = $derived(Boolean(chatText.trim()) && Boolean(chat) && !isChatBusy);
+	const hasArtifactContent = $derived(ideaHasArtifactContent(selectedIdea.data ?? null));
+
+	$effect(() => {
+		if (!selectedIdeaId) {
+			artifactCollapsed = true;
+			artifactContentSeenForIdea = false;
+			return;
+		}
+		artifactCollapsed = true;
+		artifactContentSeenForIdea = false;
+	});
+
+	$effect(() => {
+		if (!selectedIdeaId || !hasArtifactContent) return;
+		if (!artifactContentSeenForIdea) {
+			artifactCollapsed = false;
+			artifactContentSeenForIdea = true;
+		}
+	});
 
 	$effect(() => {
 		if (!selectedIdeaId || !ideaMessages.data) {
@@ -256,6 +294,7 @@
 				if (isError) return;
 				void persistMessages(ideaId, messages);
 				void maybeGenerateTitle(ideaId, messages);
+				void persistStructuredFromMessages(ideaId, messages);
 			}
 		});
 	}
@@ -285,6 +324,27 @@
 		} catch (error) {
 			console.error(error);
 			saveError = 'Chat saved locally for now. Send another message to retry syncing.';
+		}
+	}
+
+	async function persistStructuredFromMessages(ideaId: string, messages: UIMessage[]) {
+		const patch = extractLatestStructuredPatch(messages);
+		if (!patch) return;
+
+		const payload: Record<string, unknown> = { ideaId };
+		for (const key of Object.keys(patch) as (keyof typeof patch)[]) {
+			const val = patch[key];
+			if (val !== undefined) payload[key] = val;
+		}
+		if (Object.keys(payload).length <= 1) return;
+
+		try {
+			await getConvexClient().mutation(
+				updateIdeaStructuredMutation,
+				payload as UpdateIdeaStructuredArgs
+			);
+		} catch (error) {
+			console.error(error);
 		}
 	}
 
@@ -323,6 +383,14 @@
 			.join('\n')
 			.trim();
 	}
+
+	function assistantHasCompletedToolCall(message: UIMessage) {
+		return message.parts.some((p) => {
+			if (typeof p !== 'object' || p === null || !('type' in p)) return false;
+			const part = p as { type: string; state?: string };
+			return part.type.startsWith('tool-') && part.state === 'output-available';
+		});
+	}
 </script>
 
 {#if selectedIdeaId}
@@ -360,6 +428,156 @@
 				</div>
 			</div>
 		{:else}
+			{#if hasArtifactContent}
+				<div
+					class="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-4 py-2 sm:px-6"
+				>
+					<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+						Idea outline
+					</p>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						class="h-8 gap-1 text-xs text-muted-foreground"
+						onclick={() => (artifactCollapsed = !artifactCollapsed)}
+					>
+						{#if artifactCollapsed}
+							Show
+							<ChevronDownIcon class="size-3.5" />
+						{:else}
+							Hide
+							<ChevronUpIcon class="size-3.5" />
+						{/if}
+					</Button>
+				</div>
+			{/if}
+
+			{#if hasArtifactContent && !artifactCollapsed && selectedIdea.data}
+				<div class="shrink-0 border-b border-border/50 px-4 pb-3 sm:px-6">
+					<Artifact class="max-h-[min(40vh,22rem)] shadow-none">
+						<ArtifactHeader>
+							<div class="min-w-0">
+								<ArtifactTitle>Snapshot</ArtifactTitle>
+								<ArtifactDescription class="mt-0.5 text-xs">
+									Structured fields saved on this idea. The assistant updates them as you chat.
+								</ArtifactDescription>
+							</div>
+							<ArtifactClose onclick={() => (artifactCollapsed = true)} />
+						</ArtifactHeader>
+						<ArtifactContent class="space-y-4 text-sm leading-6">
+							{#if selectedIdea.data.oneLiner?.trim()}
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										One-liner
+									</p>
+									<p class="mt-1 text-foreground">{selectedIdea.data.oneLiner}</p>
+								</div>
+							{/if}
+							{#if selectedIdea.data.problem?.trim()}
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Problem
+									</p>
+									<p class="mt-1 whitespace-pre-wrap text-foreground">{selectedIdea.data.problem}</p>
+								</div>
+							{/if}
+							{#if selectedIdea.data.audience?.trim()}
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Audience
+									</p>
+									<p class="mt-1 whitespace-pre-wrap text-foreground">{selectedIdea.data.audience}</p>
+								</div>
+							{/if}
+							{#if selectedIdea.data.status}
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Status
+									</p>
+									<p class="mt-1 capitalize text-foreground">{selectedIdea.data.status}</p>
+								</div>
+							{/if}
+							{#if ideaSourceHasContent(selectedIdea.data.source)}
+								{@const src = selectedIdea.data.source!}
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Source
+									</p>
+									<p class="mt-1 text-foreground">
+										<span class="capitalize">{src.type}</span>
+										{#if src.label?.trim()}
+											<span class="text-muted-foreground">
+												— {src.label}
+											</span>
+										{/if}
+									</p>
+									{#if src.url?.trim()}
+										<a
+											href={src.url}
+											class="mt-1 inline-block text-xs text-primary underline-offset-4 hover:underline"
+											target="_blank"
+											rel="noreferrer"
+										>
+											{src.url}
+										</a>
+									{/if}
+								</div>
+							{/if}
+							{#if ideaScoreHasContent(selectedIdea.data.score)}
+								{@const scr = selectedIdea.data.score!}
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Score
+									</p>
+									<dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
+										{#if scr.pain !== undefined}
+											<div class="flex justify-between gap-2">
+												<dt class="text-muted-foreground">Pain</dt>
+												<dd>{scr.pain}</dd>
+											</div>
+										{/if}
+										{#if scr.urgency !== undefined}
+											<div class="flex justify-between gap-2">
+												<dt class="text-muted-foreground">Urgency</dt>
+												<dd>{scr.urgency}</dd>
+											</div>
+										{/if}
+										{#if scr.monetization !== undefined}
+											<div class="flex justify-between gap-2">
+												<dt class="text-muted-foreground">Monetization</dt>
+												<dd>{scr.monetization}</dd>
+											</div>
+										{/if}
+										{#if scr.distribution !== undefined}
+											<div class="flex justify-between gap-2">
+												<dt class="text-muted-foreground">Distribution</dt>
+												<dd>{scr.distribution}</dd>
+											</div>
+										{/if}
+										{#if scr.buildEffort !== undefined}
+											<div class="flex justify-between gap-2">
+												<dt class="text-muted-foreground">Build effort</dt>
+												<dd>{scr.buildEffort}</dd>
+											</div>
+										{/if}
+										{#if scr.founderFit !== undefined}
+											<div class="flex justify-between gap-2">
+												<dt class="text-muted-foreground">Founder fit</dt>
+												<dd>{scr.founderFit}</dd>
+											</div>
+										{/if}
+									</dl>
+									{#if scr.summary?.trim()}
+										<p class="mt-2 text-xs text-muted-foreground">{scr.summary}</p>
+									{/if}
+								</div>
+							{/if}
+						</ArtifactContent>
+					</Artifact>
+				</div>
+			{/if}
+
 			<Conversation class="min-h-0 flex-1">
 				<ConversationContent class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
 					{#if chat}
@@ -367,10 +585,19 @@
 							<Message from={message.role}>
 								<MessageContent>
 									{#if message.role === 'assistant'}
-										<MessageResponse
-											content={messageText(message) || 'Thinking...'}
-											class="text-sm leading-6"
-										/>
+										{#if messageText(message)}
+											<MessageResponse
+												content={messageText(message)}
+												class="text-sm leading-6"
+											/>
+										{:else if assistantHasCompletedToolCall(message)}
+											<p class="text-xs text-muted-foreground">Updated idea outline.</p>
+										{:else}
+											<MessageResponse
+												content="Thinking..."
+												class="text-sm leading-6 text-muted-foreground"
+											/>
+										{/if}
 									{:else}
 										<p class="whitespace-pre-wrap text-xs leading-5">{messageText(message)}</p>
 									{/if}

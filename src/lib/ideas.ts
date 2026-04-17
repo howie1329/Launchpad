@@ -82,6 +82,20 @@ export type UpdateIdeaTitleResult = {
 	title: string;
 };
 
+export type UpdateIdeaStructuredArgs = {
+	ideaId: string;
+	oneLiner?: string;
+	problem?: string;
+	audience?: string;
+	status?: IdeaStatus;
+	source?: IdeaSource;
+	score?: IdeaScore;
+};
+
+export type UpdateIdeaStructuredResult = {
+	ok: true;
+};
+
 export const listIdeasQuery = makeFunctionReference<'query', Record<string, never>, SavedIdea[]>(
 	'ideas:listIdeas'
 );
@@ -115,3 +129,9 @@ export const updateIdeaTitleMutation = makeFunctionReference<
 	UpdateIdeaTitleArgs,
 	UpdateIdeaTitleResult
 >('ideas:updateIdeaTitle');
+
+export const updateIdeaStructuredMutation = makeFunctionReference<
+	'mutation',
+	UpdateIdeaStructuredArgs,
+	UpdateIdeaStructuredResult
+>('ideas:updateIdeaStructured');

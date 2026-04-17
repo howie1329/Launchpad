@@ -3,6 +3,36 @@ import { mutation, query } from './_generated/server';
 import type { Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 
+const ideaStatusValue = v.union(
+	v.literal('inbox'),
+	v.literal('exploring'),
+	v.literal('prdReady'),
+	v.literal('archived')
+);
+
+const ideaSourceValue = v.object({
+	type: v.union(
+		v.literal('ownPain'),
+		v.literal('tweet'),
+		v.literal('clientRequest'),
+		v.literal('research'),
+		v.literal('other')
+	),
+	label: v.optional(v.string()),
+	url: v.optional(v.string())
+});
+
+const ideaScoreValue = v.object({
+	pain: v.optional(v.number()),
+	urgency: v.optional(v.number()),
+	monetization: v.optional(v.number()),
+	distribution: v.optional(v.number()),
+	buildEffort: v.optional(v.number()),
+	founderFit: v.optional(v.number()),
+	summary: v.optional(v.string()),
+	scoredAt: v.optional(v.number())
+});
+
 type IdeaChatRole = 'system' | 'user' | 'assistant';
 
 type TextPart = {
@@ -161,6 +191,56 @@ export const saveIdeaMessages = mutation({
 		});
 
 		return { saved: args.messages.length };
+	}
+});
+
+export const updateIdeaStructured = mutation({
+	args: {
+		ideaId: v.id('ideas'),
+		oneLiner: v.optional(v.string()),
+		problem: v.optional(v.string()),
+		audience: v.optional(v.string()),
+		status: v.optional(ideaStatusValue),
+		source: v.optional(ideaSourceValue),
+		score: v.optional(ideaScoreValue)
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireOwnerId(ctx);
+		const idea = await getOwnedIdea(ctx, args.ideaId, ownerId);
+		const now = Date.now();
+
+		const patch: Record<string, unknown> = { updatedAt: now };
+
+		if (args.oneLiner !== undefined) {
+			const t = args.oneLiner.trim();
+			patch.oneLiner = t.length ? t : undefined;
+		}
+		if (args.problem !== undefined) {
+			const t = args.problem.trim();
+			patch.problem = t.length ? t : undefined;
+		}
+		if (args.audience !== undefined) {
+			const t = args.audience.trim();
+			patch.audience = t.length ? t : undefined;
+		}
+		if (args.status !== undefined) {
+			patch.status = args.status;
+		}
+		if (args.source !== undefined) {
+			const s = args.source;
+			patch.source = {
+				type: s.type,
+				...(s.label !== undefined ? { label: s.label.trim() || undefined } : {}),
+				...(s.url !== undefined ? { url: s.url.trim() || undefined } : {})
+			};
+		}
+		if (args.score !== undefined) {
+			patch.score = { ...args.score };
+		}
+
+		await ctx.db.patch(idea._id, patch);
+
+		return { ok: true as const };
 	}
 });
 
