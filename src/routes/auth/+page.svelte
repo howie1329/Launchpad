@@ -9,6 +9,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { auth, signIn } from '$lib/auth.svelte';
+	import { isFeatureEnabled } from '$lib/feature-flags';
 
 	type Flow = 'signIn' | 'signUp';
 	type Status = 'idle' | 'loading' | 'error';
@@ -17,6 +18,7 @@
 		| '/dashboard'
 		| '/dashboard/ideas'
 		| '/dashboard/scope'
+		| '/dashboard/workspace'
 		| '/dashboard/settings'
 		| '/ideas'
 		| '/scope'
@@ -33,6 +35,7 @@
 			value === '/dashboard' ||
 			value === '/dashboard/ideas' ||
 			value === '/dashboard/scope' ||
+			(value === '/dashboard/workspace' && isFeatureEnabled('workspace')) ||
 			value === '/dashboard/settings' ||
 			value === '/ideas' ||
 			value === '/scope' ||
