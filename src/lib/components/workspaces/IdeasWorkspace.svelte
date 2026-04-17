@@ -40,8 +40,13 @@
 		ArtifactHeader,
 		ArtifactTitle
 	} from '$lib/components/ai-elements/artifact';
+	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import {
+		assistantSegmentsHaveContent,
+		buildAssistantSegments
+	} from '$lib/idea-chat-assistant-parts';
 	import { defaultIdeaAiModelId, ideaAiModels, type IdeaAiModelId } from '$lib/idea-ai-models';
 	import {
 		extractLatestStructuredPatch,
@@ -199,7 +204,8 @@
 	});
 
 	$effect(() => {
-		if (!startInitialResponse || !selectedIdeaId || !chat || startedIdeaId === selectedIdeaId) return;
+		if (!startInitialResponse || !selectedIdeaId || !chat || startedIdeaId === selectedIdeaId)
+			return;
 		if (!ideaMessages.data || ideaMessages.data.length !== 1) return;
 		if (chat.status !== 'ready') return;
 
@@ -384,12 +390,16 @@
 			.trim();
 	}
 
-	function assistantHasCompletedToolCall(message: UIMessage) {
-		return message.parts.some((p) => {
-			if (typeof p !== 'object' || p === null || !('type' in p)) return false;
-			const part = p as { type: string; state?: string };
-			return part.type.startsWith('tool-') && part.state === 'output-available';
-		});
+	function assistantAwaitingStreamContent(
+		message: UIMessage,
+		messageIndex: number,
+		messages: UIMessage[],
+		chatStatus: Chat<UIMessage>['status'] | undefined
+	) {
+		if (message.role !== 'assistant') return false;
+		if (messageIndex !== messages.length - 1) return false;
+		if (chatStatus !== 'submitted' && chatStatus !== 'streaming') return false;
+		return !assistantSegmentsHaveContent(buildAssistantSegments(message));
 	}
 </script>
 
@@ -443,34 +453,44 @@
 			<div class="flex flex-1 items-center justify-center px-4 text-center">
 				<div>
 					<p class="text-sm font-semibold tracking-tight">This idea is not available.</p>
-					<p class="mt-2 text-xs text-muted-foreground">It may have been removed or belongs to another workspace.</p>
+					<p class="mt-2 text-xs text-muted-foreground">
+						It may have been removed or belongs to another workspace.
+					</p>
 				</div>
 			</div>
 		{:else}
-			<div class="flex min-h-0 flex-1 flex-col lg:flex-row lg:items-stretch lg:min-h-0">
+			<div class="flex min-h-0 flex-1 flex-col lg:min-h-0 lg:flex-row lg:items-stretch">
 				<div class="flex min-h-0 min-w-0 flex-1 flex-col">
 					<Conversation class="min-h-0 flex-1">
-						<ConversationContent class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
+						<ConversationContent
+							class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6"
+						>
 							{#if chat}
-								{#each chat.messages as message (message.id)}
+								{#each chat.messages as message, messageIndex (message.id)}
 									<Message from={message.role}>
 										<MessageContent>
 											{#if message.role === 'assistant'}
-												{#if messageText(message)}
-													<MessageResponse
-														content={messageText(message)}
-														class="text-sm leading-6"
-													/>
-												{:else if assistantHasCompletedToolCall(message)}
-													<p class="text-xs text-muted-foreground">Updated idea outline.</p>
-												{:else}
+												{@const segments = buildAssistantSegments(message)}
+												{#if assistantSegmentsHaveContent(segments)}
+													<div class="flex w-full min-w-0 flex-col gap-3">
+														{#each segments as segment, segIdx (segIdx)}
+															{#if segment.kind === 'text'}
+																<MessageResponse content={segment.text} class="text-sm leading-6" />
+															{:else}
+																<IdeaChatToolSteps tools={segment.tools} />
+															{/if}
+														{/each}
+													</div>
+												{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages, chat.status)}
 													<MessageResponse
 														content="Thinking..."
 														class="text-sm leading-6 text-muted-foreground"
 													/>
+												{:else}
+													<p class="text-xs text-muted-foreground">No response yet.</p>
 												{/if}
 											{:else}
-												<p class="whitespace-pre-wrap text-xs leading-5">{messageText(message)}</p>
+												<p class="text-xs leading-5 whitespace-pre-wrap">{messageText(message)}</p>
 											{/if}
 										</MessageContent>
 									</Message>
@@ -478,7 +498,9 @@
 
 								{#if chat.status === 'submitted'}
 									<Message from="assistant">
-										<MessageContent class="flex-row items-center gap-2 text-xs text-muted-foreground">
+										<MessageContent
+											class="flex-row items-center gap-2 text-xs text-muted-foreground"
+										>
 											<LoaderCircleIcon class="size-3.5 animate-spin" />
 											Thinking...
 										</MessageContent>
@@ -507,7 +529,12 @@
 								/>
 								<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 									<PromptInputTools>
-										<Button type="button" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											class="gap-1.5 text-muted-foreground"
+										>
 											<SearchIcon data-icon="inline-start" />
 											Tools
 											<ChevronDownIcon data-icon="inline-end" />
@@ -553,7 +580,7 @@
 
 				{#if hasArtifactContent && !artifactCollapsed && selectedIdea.data}
 					<aside
-						class="flex max-h-[min(52vh,28rem)] min-h-0 w-full shrink-0 flex-col border-t border-border/50 bg-muted/10 lg:max-h-none lg:h-auto lg:w-[min(100%,22rem)] lg:border-t-0 lg:border-l xl:w-96"
+						class="flex max-h-[min(52vh,28rem)] min-h-0 w-full shrink-0 flex-col border-t border-border/50 bg-muted/10 lg:h-auto lg:max-h-none lg:w-[min(100%,22rem)] lg:border-t-0 lg:border-l xl:w-96"
 					>
 						<Artifact
 							class="flex h-full min-h-0 flex-1 flex-col overflow-hidden shadow-none lg:rounded-none lg:border-0 lg:shadow-none"
@@ -568,117 +595,133 @@
 								<ArtifactClose onclick={() => (artifactCollapsed = true)} />
 							</ArtifactHeader>
 							<ArtifactContent class="space-y-4 text-sm leading-6">
-							{#if selectedIdea.data.oneLiner?.trim()}
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										One-liner
-									</p>
-									<p class="mt-1 text-foreground">{selectedIdea.data.oneLiner}</p>
-								</div>
-							{/if}
-							{#if selectedIdea.data.problem?.trim()}
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										Problem
-									</p>
-									<p class="mt-1 whitespace-pre-wrap text-foreground">{selectedIdea.data.problem}</p>
-								</div>
-							{/if}
-							{#if selectedIdea.data.audience?.trim()}
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										Audience
-									</p>
-									<p class="mt-1 whitespace-pre-wrap text-foreground">{selectedIdea.data.audience}</p>
-								</div>
-							{/if}
-							{#if selectedIdea.data.status}
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										Status
-									</p>
-									<p class="mt-1 capitalize text-foreground">{selectedIdea.data.status}</p>
-								</div>
-							{/if}
-							{#if ideaSourceHasContent(selectedIdea.data.source)}
-								{@const src = selectedIdea.data.source!}
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										Source
-									</p>
-									<p class="mt-1 text-foreground">
-										<span class="capitalize">{src.type}</span>
-										{#if src.label?.trim()}
-											<span class="text-muted-foreground">
-												— {src.label}
-											</span>
-										{/if}
-									</p>
-									{#if src.url?.trim()}
-										<a
-											href={src.url}
-											class="mt-1 inline-block text-xs text-primary underline-offset-4 hover:underline"
-											target="_blank"
-											rel="noreferrer"
+								{#if selectedIdea.data.oneLiner?.trim()}
+									<div>
+										<p
+											class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
 										>
-											{src.url}
-										</a>
-									{/if}
-								</div>
-							{/if}
-							{#if ideaScoreHasContent(selectedIdea.data.score)}
-								{@const scr = selectedIdea.data.score!}
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										Score
-									</p>
-									<dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
-										{#if scr.pain !== undefined}
-											<div class="flex justify-between gap-2">
-												<dt class="text-muted-foreground">Pain</dt>
-												<dd>{scr.pain}</dd>
-											</div>
+											One-liner
+										</p>
+										<p class="mt-1 text-foreground">{selectedIdea.data.oneLiner}</p>
+									</div>
+								{/if}
+								{#if selectedIdea.data.problem?.trim()}
+									<div>
+										<p
+											class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+										>
+											Problem
+										</p>
+										<p class="mt-1 whitespace-pre-wrap text-foreground">
+											{selectedIdea.data.problem}
+										</p>
+									</div>
+								{/if}
+								{#if selectedIdea.data.audience?.trim()}
+									<div>
+										<p
+											class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+										>
+											Audience
+										</p>
+										<p class="mt-1 whitespace-pre-wrap text-foreground">
+											{selectedIdea.data.audience}
+										</p>
+									</div>
+								{/if}
+								{#if selectedIdea.data.status}
+									<div>
+										<p
+											class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+										>
+											Status
+										</p>
+										<p class="mt-1 text-foreground capitalize">{selectedIdea.data.status}</p>
+									</div>
+								{/if}
+								{#if ideaSourceHasContent(selectedIdea.data.source)}
+									{@const src = selectedIdea.data.source!}
+									<div>
+										<p
+											class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+										>
+											Source
+										</p>
+										<p class="mt-1 text-foreground">
+											<span class="capitalize">{src.type}</span>
+											{#if src.label?.trim()}
+												<span class="text-muted-foreground">
+													— {src.label}
+												</span>
+											{/if}
+										</p>
+										{#if src.url?.trim()}
+											<a
+												href={src.url}
+												class="mt-1 inline-block text-xs text-primary underline-offset-4 hover:underline"
+												target="_blank"
+												rel="noreferrer"
+											>
+												{src.url}
+											</a>
 										{/if}
-										{#if scr.urgency !== undefined}
-											<div class="flex justify-between gap-2">
-												<dt class="text-muted-foreground">Urgency</dt>
-												<dd>{scr.urgency}</dd>
-											</div>
+									</div>
+								{/if}
+								{#if ideaScoreHasContent(selectedIdea.data.score)}
+									{@const scr = selectedIdea.data.score!}
+									<div>
+										<p
+											class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+										>
+											Score
+										</p>
+										<dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
+											{#if scr.pain !== undefined}
+												<div class="flex justify-between gap-2">
+													<dt class="text-muted-foreground">Pain</dt>
+													<dd>{scr.pain}</dd>
+												</div>
+											{/if}
+											{#if scr.urgency !== undefined}
+												<div class="flex justify-between gap-2">
+													<dt class="text-muted-foreground">Urgency</dt>
+													<dd>{scr.urgency}</dd>
+												</div>
+											{/if}
+											{#if scr.monetization !== undefined}
+												<div class="flex justify-between gap-2">
+													<dt class="text-muted-foreground">Monetization</dt>
+													<dd>{scr.monetization}</dd>
+												</div>
+											{/if}
+											{#if scr.distribution !== undefined}
+												<div class="flex justify-between gap-2">
+													<dt class="text-muted-foreground">Distribution</dt>
+													<dd>{scr.distribution}</dd>
+												</div>
+											{/if}
+											{#if scr.buildEffort !== undefined}
+												<div class="flex justify-between gap-2">
+													<dt class="text-muted-foreground">Build effort</dt>
+													<dd>{scr.buildEffort}</dd>
+												</div>
+											{/if}
+											{#if scr.founderFit !== undefined}
+												<div class="flex justify-between gap-2">
+													<dt class="text-muted-foreground">Founder fit</dt>
+													<dd>{scr.founderFit}</dd>
+												</div>
+											{/if}
+										</dl>
+										{#if scr.summary?.trim()}
+											<p class="mt-2 text-xs text-muted-foreground">{scr.summary}</p>
 										{/if}
-										{#if scr.monetization !== undefined}
-											<div class="flex justify-between gap-2">
-												<dt class="text-muted-foreground">Monetization</dt>
-												<dd>{scr.monetization}</dd>
-											</div>
-										{/if}
-										{#if scr.distribution !== undefined}
-											<div class="flex justify-between gap-2">
-												<dt class="text-muted-foreground">Distribution</dt>
-												<dd>{scr.distribution}</dd>
-											</div>
-										{/if}
-										{#if scr.buildEffort !== undefined}
-											<div class="flex justify-between gap-2">
-												<dt class="text-muted-foreground">Build effort</dt>
-												<dd>{scr.buildEffort}</dd>
-											</div>
-										{/if}
-										{#if scr.founderFit !== undefined}
-											<div class="flex justify-between gap-2">
-												<dt class="text-muted-foreground">Founder fit</dt>
-												<dd>{scr.founderFit}</dd>
-											</div>
-										{/if}
-									</dl>
-									{#if scr.summary?.trim()}
-										<p class="mt-2 text-xs text-muted-foreground">{scr.summary}</p>
-									{/if}
-								</div>
-							{/if}
-						</ArtifactContent>
-					</Artifact>
-				</aside>
-			{/if}
+									</div>
+								{/if}
+							</ArtifactContent>
+						</Artifact>
+					</aside>
+				{/if}
 			</div>
 		{/if}
 	</section>
