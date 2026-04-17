@@ -395,7 +395,9 @@
 
 {#if selectedIdeaId}
 	<section class="flex h-full min-h-0 flex-col bg-background text-foreground">
-		<header class="flex h-12 shrink-0 items-center border-b border-border/50 px-4 sm:px-6">
+		<header
+			class="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-border/50 px-4 sm:px-6"
+		>
 			<div class="min-w-0">
 				<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 					Idea chat
@@ -410,6 +412,23 @@
 					<h1 class="mt-0.5 text-sm font-semibold tracking-tight">Idea not found</h1>
 				{/if}
 			</div>
+			{#if selectedIdea.data && hasArtifactContent}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					class="h-8 shrink-0 gap-1.5 text-xs"
+					onclick={() => (artifactCollapsed = !artifactCollapsed)}
+				>
+					{#if artifactCollapsed}
+						Show outline
+						<ChevronDownIcon class="size-3.5" />
+					{:else}
+						Hide outline
+						<ChevronUpIcon class="size-3.5" />
+					{/if}
+				</Button>
+			{/if}
 		</header>
 
 		{#if selectedIdea.data === undefined || ideaMessages.data === undefined}
@@ -428,44 +447,127 @@
 				</div>
 			</div>
 		{:else}
-			{#if hasArtifactContent}
-				<div
-					class="flex shrink-0 items-center justify-between gap-3 border-b border-border/50 px-4 py-2 sm:px-6"
-				>
-					<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-						Idea outline
-					</p>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						class="h-8 gap-1 text-xs text-muted-foreground"
-						onclick={() => (artifactCollapsed = !artifactCollapsed)}
-					>
-						{#if artifactCollapsed}
-							Show
-							<ChevronDownIcon class="size-3.5" />
-						{:else}
-							Hide
-							<ChevronUpIcon class="size-3.5" />
-						{/if}
-					</Button>
-				</div>
-			{/if}
+			<div class="flex min-h-0 flex-1 flex-col lg:flex-row lg:items-stretch lg:min-h-0">
+				<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+					<Conversation class="min-h-0 flex-1">
+						<ConversationContent class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
+							{#if chat}
+								{#each chat.messages as message (message.id)}
+									<Message from={message.role}>
+										<MessageContent>
+											{#if message.role === 'assistant'}
+												{#if messageText(message)}
+													<MessageResponse
+														content={messageText(message)}
+														class="text-sm leading-6"
+													/>
+												{:else if assistantHasCompletedToolCall(message)}
+													<p class="text-xs text-muted-foreground">Updated idea outline.</p>
+												{:else}
+													<MessageResponse
+														content="Thinking..."
+														class="text-sm leading-6 text-muted-foreground"
+													/>
+												{/if}
+											{:else}
+												<p class="whitespace-pre-wrap text-xs leading-5">{messageText(message)}</p>
+											{/if}
+										</MessageContent>
+									</Message>
+								{/each}
 
-			{#if hasArtifactContent && !artifactCollapsed && selectedIdea.data}
-				<div class="shrink-0 border-b border-border/50 px-4 pb-3 sm:px-6">
-					<Artifact class="max-h-[min(40vh,22rem)] shadow-none">
-						<ArtifactHeader>
-							<div class="min-w-0">
-								<ArtifactTitle>Snapshot</ArtifactTitle>
-								<ArtifactDescription class="mt-0.5 text-xs">
-									Structured fields saved on this idea. The assistant updates them as you chat.
-								</ArtifactDescription>
-							</div>
-							<ArtifactClose onclick={() => (artifactCollapsed = true)} />
-						</ArtifactHeader>
-						<ArtifactContent class="space-y-4 text-sm leading-6">
+								{#if chat.status === 'submitted'}
+									<Message from="assistant">
+										<MessageContent class="flex-row items-center gap-2 text-xs text-muted-foreground">
+											<LoaderCircleIcon class="size-3.5 animate-spin" />
+											Thinking...
+										</MessageContent>
+									</Message>
+								{/if}
+							{/if}
+						</ConversationContent>
+						<ConversationScrollButton />
+					</Conversation>
+
+					<div class="shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
+						<div class="mx-auto max-w-3xl space-y-2">
+							{#if chatError || saveError}
+								<p class="text-xs text-destructive">{chatError || saveError}</p>
+							{/if}
+							<PromptInput
+								class="rounded-lg border-border/70 bg-background shadow-none"
+								clearOnSubmit={false}
+								onSubmit={submitChatMessage}
+							>
+								<PromptInputTextarea
+									bind:ref={chatTextareaRef}
+									bind:value={chatText}
+									class="min-h-20 px-4 py-4 text-sm"
+									placeholder="Continue shaping this idea..."
+								/>
+								<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
+									<PromptInputTools>
+										<Button type="button" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground">
+											<SearchIcon data-icon="inline-start" />
+											Tools
+											<ChevronDownIcon data-icon="inline-end" />
+										</Button>
+										<ModelSelector bind:open={chatModelSelectorOpen}>
+											<ModelSelectorTrigger
+												class="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+											>
+												{selectedModel.label}
+												<ChevronDownIcon class="size-3" />
+											</ModelSelectorTrigger>
+											<ModelSelectorContent class="max-w-sm">
+												<ModelSelectorInput placeholder="Search models..." />
+												<ModelSelectorList>
+													<ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+													<ModelSelectorGroup heading="Models">
+														{#each ideaAiModels as model (model.id)}
+															<ModelSelectorItem
+																value={model.id}
+																data-checked={selectedModelId === model.id}
+																onclick={() => selectModel(model.id, 'chat')}
+															>
+																<ModelSelectorName>{model.label}</ModelSelectorName>
+															</ModelSelectorItem>
+														{/each}
+													</ModelSelectorGroup>
+												</ModelSelectorList>
+											</ModelSelectorContent>
+										</ModelSelector>
+									</PromptInputTools>
+									<PromptInputSubmit class="rounded-full" disabled={!canSubmitChat}>
+										{#if isChatBusy}
+											<LoaderCircleIcon class="size-4 animate-spin" />
+										{:else}
+											<ArrowUpIcon class="size-4" />
+										{/if}
+									</PromptInputSubmit>
+								</PromptInputToolbar>
+							</PromptInput>
+						</div>
+					</div>
+				</div>
+
+				{#if hasArtifactContent && !artifactCollapsed && selectedIdea.data}
+					<aside
+						class="flex max-h-[min(52vh,28rem)] min-h-0 w-full shrink-0 flex-col border-t border-border/50 bg-muted/10 lg:max-h-none lg:h-auto lg:w-[min(100%,22rem)] lg:border-t-0 lg:border-l xl:w-96"
+					>
+						<Artifact
+							class="flex h-full min-h-0 flex-1 flex-col overflow-hidden shadow-none lg:rounded-none lg:border-0 lg:shadow-none"
+						>
+							<ArtifactHeader>
+								<div class="min-w-0">
+									<ArtifactTitle>Idea outline</ArtifactTitle>
+									<ArtifactDescription class="mt-0.5 text-xs">
+										Structured snapshot — updated as you chat.
+									</ArtifactDescription>
+								</div>
+								<ArtifactClose onclick={() => (artifactCollapsed = true)} />
+							</ArtifactHeader>
+							<ArtifactContent class="space-y-4 text-sm leading-6">
 							{#if selectedIdea.data.oneLiner?.trim()}
 								<div>
 									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
@@ -575,108 +677,8 @@
 							{/if}
 						</ArtifactContent>
 					</Artifact>
-				</div>
+				</aside>
 			{/if}
-
-			<Conversation class="min-h-0 flex-1">
-				<ConversationContent class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
-					{#if chat}
-						{#each chat.messages as message (message.id)}
-							<Message from={message.role}>
-								<MessageContent>
-									{#if message.role === 'assistant'}
-										{#if messageText(message)}
-											<MessageResponse
-												content={messageText(message)}
-												class="text-sm leading-6"
-											/>
-										{:else if assistantHasCompletedToolCall(message)}
-											<p class="text-xs text-muted-foreground">Updated idea outline.</p>
-										{:else}
-											<MessageResponse
-												content="Thinking..."
-												class="text-sm leading-6 text-muted-foreground"
-											/>
-										{/if}
-									{:else}
-										<p class="whitespace-pre-wrap text-xs leading-5">{messageText(message)}</p>
-									{/if}
-								</MessageContent>
-							</Message>
-						{/each}
-
-						{#if chat.status === 'submitted'}
-							<Message from="assistant">
-								<MessageContent class="flex-row items-center gap-2 text-xs text-muted-foreground">
-									<LoaderCircleIcon class="size-3.5 animate-spin" />
-									Thinking...
-								</MessageContent>
-							</Message>
-						{/if}
-					{/if}
-				</ConversationContent>
-				<ConversationScrollButton />
-			</Conversation>
-
-			<div class="shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
-				<div class="mx-auto max-w-3xl space-y-2">
-					{#if chatError || saveError}
-						<p class="text-xs text-destructive">{chatError || saveError}</p>
-					{/if}
-					<PromptInput
-						class="rounded-lg border-border/70 bg-background shadow-none"
-						clearOnSubmit={false}
-						onSubmit={submitChatMessage}
-					>
-						<PromptInputTextarea
-							bind:ref={chatTextareaRef}
-							bind:value={chatText}
-							class="min-h-20 px-4 py-4 text-sm"
-							placeholder="Continue shaping this idea..."
-						/>
-						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
-							<PromptInputTools>
-								<Button type="button" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground">
-									<SearchIcon data-icon="inline-start" />
-									Tools
-									<ChevronDownIcon data-icon="inline-end" />
-								</Button>
-								<ModelSelector bind:open={chatModelSelectorOpen}>
-									<ModelSelectorTrigger
-										class="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-									>
-										{selectedModel.label}
-										<ChevronDownIcon class="size-3" />
-									</ModelSelectorTrigger>
-									<ModelSelectorContent class="max-w-sm">
-										<ModelSelectorInput placeholder="Search models..." />
-										<ModelSelectorList>
-											<ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-											<ModelSelectorGroup heading="Models">
-												{#each ideaAiModels as model (model.id)}
-													<ModelSelectorItem
-														value={model.id}
-														data-checked={selectedModelId === model.id}
-														onclick={() => selectModel(model.id, 'chat')}
-													>
-														<ModelSelectorName>{model.label}</ModelSelectorName>
-													</ModelSelectorItem>
-												{/each}
-											</ModelSelectorGroup>
-										</ModelSelectorList>
-									</ModelSelectorContent>
-								</ModelSelector>
-							</PromptInputTools>
-							<PromptInputSubmit class="rounded-full" disabled={!canSubmitChat}>
-								{#if isChatBusy}
-									<LoaderCircleIcon class="size-4 animate-spin" />
-								{:else}
-									<ArrowUpIcon class="size-4" />
-								{/if}
-							</PromptInputSubmit>
-						</PromptInputToolbar>
-					</PromptInput>
-				</div>
 			</div>
 		{/if}
 	</section>
