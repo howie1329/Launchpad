@@ -249,11 +249,11 @@
 							</div>
 							<Sidebar.Menu>
 								<Sidebar.MenuItem>
-									<Sidebar.MenuButton class="min-w-0">
+									<Sidebar.MenuButton isActive={!selectedIdeaId} class="min-w-0">
 										{#snippet child({ props })}
-											<a href={resolve('/dashboard/scope')} {...props}>
-												<FileTextIcon />
-												<span class="min-w-0 truncate">Start scoping</span>
+											<a href={resolve('/dashboard/ideas')} {...props}>
+												<PlusIcon />
+												<span class="min-w-0 truncate">New idea chat</span>
 											</a>
 										{/snippet}
 									</Sidebar.MenuButton>
