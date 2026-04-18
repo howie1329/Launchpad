@@ -1,5 +1,14 @@
 <script lang="ts">
 	import {
+		Context,
+		ContextContent,
+		ContextContentBody,
+		ContextContentFooter,
+		ContextContentHeader,
+		ContextInputUsage,
+		ContextTrigger
+	} from '$lib/components/ai-elements/context';
+	import {
 		ModelSelector,
 		ModelSelectorContent,
 		ModelSelectorEmpty,
@@ -73,6 +82,8 @@
 		ideaAiModels.find((model) => model.id === selectedModelId) ?? ideaAiModels[0]
 	);
 	const canSubmit = $derived(Boolean(text.trim()));
+	const estimatedInputTokens = $derived(Math.ceil(text.trim().length / 4));
+	const maxContextTokens = $derived(selectedModel.maxContextTokens);
 
 	const focusComposer = () => {
 		requestAnimationFrame(() => textareaRef?.focus());
@@ -162,6 +173,21 @@
 							</ModelSelectorList>
 						</ModelSelectorContent>
 					</ModelSelector>
+					<Context
+						usedTokens={estimatedInputTokens}
+						maxTokens={maxContextTokens}
+						usage={{ inputTokens: estimatedInputTokens }}
+						modelId={selectedModelId}
+					>
+						<ContextTrigger size="sm" class="h-6 gap-1 px-2 text-xs text-muted-foreground" />
+						<ContextContent align="start">
+							<ContextContentHeader />
+							<ContextContentBody>
+								<ContextInputUsage />
+							</ContextContentBody>
+							<ContextContentFooter />
+						</ContextContent>
+					</Context>
 				</PromptInputTools>
 				<PromptInputSubmit class="rounded-full" disabled={!canSubmit}>
 					<ArrowUpIcon class="size-4" />
