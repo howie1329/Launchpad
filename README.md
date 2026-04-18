@@ -79,7 +79,7 @@ Experimental product surfaces are controlled with public environment flags. Flag
 PUBLIC_FEATURE_WORKSPACE=true
 ```
 
-`PUBLIC_FEATURE_WORKSPACE=true` enables the chat-first Workspace route at `/dashboard/workspace` and switches the dashboard to the Workspace sidebar. Any other value keeps the legacy dashboard sidebar and hides the Workspace route.
+`PUBLIC_FEATURE_WORKSPACE=true` enables the chat-first Workspace route at `/workspace`. Any other value redirects `/workspace` back to `/dashboard`. The legacy dashboard remains available either way.
 
 ---
 

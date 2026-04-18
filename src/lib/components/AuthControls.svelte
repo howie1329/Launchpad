@@ -2,11 +2,13 @@
 	import { resolve } from '$app/paths';
 	import { auth, signOut } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { isFeatureEnabled } from '$lib/feature-flags';
 
-	let { redirectTo = '/dashboard', size = 'sm' } = $props<{
-		redirectTo?: string;
-		size?: 'sm' | 'lg';
-	}>();
+	let { redirectTo = isFeatureEnabled('workspace') ? '/workspace' : '/dashboard', size = 'sm' } =
+		$props<{
+			redirectTo?: string;
+			size?: 'sm' | 'lg';
+		}>();
 
 	let isSigningOut = $state(false);
 	const signInHref = $derived(`${resolve('/auth')}?redirectTo=${encodeURIComponent(redirectTo)}`);

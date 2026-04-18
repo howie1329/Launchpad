@@ -1,5 +1,5 @@
 <svelte:head>
-	<title>Workspace | Dashboard | Launchpad</title>
+	<title>Workspace | Launchpad</title>
 	<meta name="description" content="Launchpad workspace." />
 </svelte:head>
 
@@ -10,7 +10,7 @@
 		</p>
 		<h1 class="text-xl font-semibold tracking-tight">Start from the conversation.</h1>
 		<p class="mt-2 text-xs leading-5 text-muted-foreground">
-			Chat-first project planning will live here while Ideas and MVP Creator remain available.
+			Chat-first project planning will live here while the legacy dashboard remains available.
 		</p>
 	</div>
 </section>

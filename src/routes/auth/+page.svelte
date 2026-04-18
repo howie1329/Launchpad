@@ -18,11 +18,10 @@
 		| '/dashboard'
 		| '/dashboard/ideas'
 		| '/dashboard/scope'
-		| '/dashboard/workspace'
 		| '/dashboard/settings'
+		| '/workspace'
 		| '/ideas'
-		| '/scope'
-		| '/settings';
+		| '/scope';
 
 	let flow = $state<Flow>('signIn');
 	let status = $state<Status>('idle');
@@ -30,18 +29,21 @@
 
 	const isSignUp = $derived(flow === 'signUp');
 	const redirectTo = $derived.by<RedirectRoute>(() => {
-		const value = page.url.searchParams.get('redirectTo');
+		const raw = page.url.searchParams.get('redirectTo');
+		const value =
+			raw === '/settings' ? '/dashboard/settings' : raw;
 		return value === '/' ||
 			value === '/dashboard' ||
 			value === '/dashboard/ideas' ||
 			value === '/dashboard/scope' ||
-			(value === '/dashboard/workspace' && isFeatureEnabled('workspace')) ||
 			value === '/dashboard/settings' ||
+			(value === '/workspace' && isFeatureEnabled('workspace')) ||
 			value === '/ideas' ||
-			value === '/scope' ||
-			value === '/settings'
+			value === '/scope'
 			? value
-			: '/dashboard';
+			: isFeatureEnabled('workspace')
+				? '/workspace'
+				: '/dashboard';
 	});
 
 	const toggleFlow = () => {

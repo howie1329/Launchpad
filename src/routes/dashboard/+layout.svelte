@@ -10,16 +10,11 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
-	import { isFeatureEnabled } from '$lib/feature-flags';
 	import { listIdeasQuery } from '$lib/ideas';
 	import { listPrdsQuery } from '$lib/prds';
-	import ClockIcon from '@lucide/svelte/icons/clock';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import FolderIcon from '@lucide/svelte/icons/folder';
-	import InboxIcon from '@lucide/svelte/icons/inbox';
 	import LightbulbIcon from '@lucide/svelte/icons/lightbulb';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
-	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { useQuery } from 'convex-svelte';
@@ -27,7 +22,7 @@
 
 	let { children } = $props();
 
-	const legacyTools = [
+	const tools = [
 		{
 			id: 'scope',
 			label: 'MVP Creator',
@@ -51,51 +46,6 @@
 		}
 	] as const;
 
-	const workspaceTools = [
-		{
-			id: 'new-chat',
-			label: 'New Chat',
-			href: '/dashboard/workspace',
-			icon: MessageSquarePlusIcon,
-			status: 'Start from a rough thought.'
-		},
-		{
-			id: 'inbox',
-			label: 'Inbox',
-			href: '/dashboard/workspace?view=inbox',
-			icon: InboxIcon,
-			status: 'Capture loose thoughts before they become projects.'
-		},
-		{
-			id: 'projects',
-			label: 'Projects',
-			href: '/dashboard/workspace?view=projects',
-			icon: FolderIcon,
-			status: 'Continue scoped project work.'
-		},
-		{
-			id: 'loose-ideas',
-			label: 'Loose Ideas',
-			href: '/dashboard/workspace?view=ideas',
-			icon: LightbulbIcon,
-			status: 'Explore ideas before promoting them.'
-		},
-		{
-			id: 'recent',
-			label: 'Recent',
-			href: '/dashboard/workspace?view=recent',
-			icon: ClockIcon,
-			status: 'Resume recent work.'
-		},
-		{
-			id: 'settings',
-			label: 'Settings',
-			href: '/dashboard/settings',
-			icon: SettingsIcon,
-			status: 'Manage workspace preferences.'
-		}
-	] as const;
-
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
 	let hasAutoCollapsedForSettings = $state(false);
@@ -106,32 +56,9 @@
 	const selectedPrdId = $derived(routeParams.prd || null);
 	const isScopeRoute = $derived(pathname.includes('/scope'));
 	const isIdeasRoute = $derived(pathname.includes('/ideas'));
-	const isWorkspaceRoute = $derived(pathname.includes('/workspace'));
 	const isSettingsRoute = $derived(pathname.includes('/settings'));
-	const workspaceEnabled = isFeatureEnabled('workspace');
-	const workspaceView = $derived($page.url.searchParams.get('view') || '');
 	const activeTool = $derived(
-		workspaceEnabled
-			? isSettingsRoute
-				? workspaceTools[5]
-				: isWorkspaceRoute && workspaceView === 'inbox'
-					? workspaceTools[1]
-					: isWorkspaceRoute && workspaceView === 'projects'
-						? workspaceTools[2]
-						: isWorkspaceRoute && workspaceView === 'ideas'
-							? workspaceTools[3]
-							: isWorkspaceRoute && workspaceView === 'recent'
-								? workspaceTools[4]
-								: isWorkspaceRoute
-									? workspaceTools[0]
-									: null
-			: isScopeRoute
-				? legacyTools[0]
-				: isIdeasRoute
-					? legacyTools[1]
-					: isSettingsRoute
-						? legacyTools[2]
-						: null
+		isScopeRoute ? tools[0] : isIdeasRoute ? tools[1] : isSettingsRoute ? tools[2] : null
 	);
 	const activeStatus = $derived(activeTool?.status ?? 'Choose a tool from the sidebar.');
 	const savedIdeas = useQuery(listIdeasQuery, () => (auth.isAuthenticated ? {} : 'skip'));
@@ -207,7 +134,7 @@
 					<Sidebar.Group>
 						<Sidebar.GroupContent class="px-1.5 md:px-0">
 							<Sidebar.Menu>
-								{#each workspaceEnabled ? workspaceTools : legacyTools as tool (tool.id)}
+								{#each tools as tool (tool.id)}
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
 											isActive={activeTool?.id === tool.id}
@@ -221,11 +148,9 @@
 											{/snippet}
 											{#snippet tooltipContent()}
 												<span>{tool.label}</span>
-												{#if !workspaceEnabled}
-													<Kbd.Root
-														>{tool.id === 'scope' ? '1' : tool.id === 'ideas' ? '2' : '3'}</Kbd.Root
-													>
-												{/if}
+												<Kbd.Root
+													>{tool.id === 'scope' ? '1' : tool.id === 'ideas' ? '2' : '3'}</Kbd.Root
+												>
 											{/snippet}
 										</Sidebar.MenuButton>
 									</Sidebar.MenuItem>
@@ -253,7 +178,7 @@
 				</Sidebar.Footer>
 			</Sidebar.Root>
 
-			{#if !workspaceEnabled && (isScopeRoute || isIdeasRoute)}
+			{#if isScopeRoute || isIdeasRoute}
 				<Sidebar.Root
 					collapsible="none"
 					class="hidden min-w-0 overflow-hidden border-e md:flex md:!w-[calc(var(--sidebar-width)_-_var(--sidebar-width-icon)_-_1px)]"
