@@ -4,8 +4,10 @@
 	import { page } from '$app/stores';
 	import { auth, signOut } from '$lib/auth.svelte';
 	import { LaunchpadMark } from '$lib/components/brand';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -21,6 +23,12 @@
 
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
+	let openSections = $state({
+		Projects: true,
+		Ideas: true,
+		PRDs: true,
+		Other: true
+	});
 
 	const pathname = $derived($page.url.pathname);
 	const isNewChatActive = $derived(pathname === '/workspace' && !$page.url.search);
@@ -94,18 +102,25 @@
 
 			<Sidebar.Content>
 				{#each sections as section (section.label)}
-					<Sidebar.Group>
-						<Sidebar.GroupLabel>{section.label}</Sidebar.GroupLabel>
-						<Sidebar.GroupContent class="group-data-[collapsible=icon]:hidden">
-							<Sidebar.Menu>
-								<Sidebar.MenuItem>
-									<Sidebar.MenuButton aria-disabled class="min-w-0 text-muted-foreground">
-										<span class="min-w-0 truncate">{section.empty}</span>
-									</Sidebar.MenuButton>
-								</Sidebar.MenuItem>
-							</Sidebar.Menu>
-						</Sidebar.GroupContent>
-					</Sidebar.Group>
+					<Collapsible.Root bind:open={openSections[section.label]}>
+						<Sidebar.Group>
+							<Collapsible.Trigger
+								class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0"
+							>
+								<ChevronRightIcon
+									class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								/>
+								<span class="min-w-0 truncate">{section.label}</span>
+							</Collapsible.Trigger>
+							<Collapsible.Content
+								class="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down group-data-[collapsible=icon]:hidden"
+							>
+								<Sidebar.GroupContent>
+									<p class="px-2 py-1.5 text-xs text-muted-foreground/75">{section.empty}</p>
+								</Sidebar.GroupContent>
+							</Collapsible.Content>
+						</Sidebar.Group>
+					</Collapsible.Root>
 				{/each}
 			</Sidebar.Content>
 
@@ -121,7 +136,7 @@
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
-					<ThemeMenu variant="sidebar" />
+					<ThemeMenu variant="sidebar-label" />
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
 							tooltipContent="Sign out"
