@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
+import { logActivityEvent } from './activityHelpers'
 import { mutation, query } from './_generated/server';
 import type { Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
@@ -65,6 +66,18 @@ export const createThread = mutation({
 			createdAt: now,
 			updatedAt: now
 		});
+
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'thread_created',
+			metadata: {
+				threadId,
+				scopeType: args.projectId ? 'project' : 'general',
+				...(args.projectId ? { projectId: args.projectId } : {}),
+				...(args.modelId ? { modelId: args.modelId } : {})
+			},
+			occurredAtMs: now
+		})
 
 		return { threadId };
 	}

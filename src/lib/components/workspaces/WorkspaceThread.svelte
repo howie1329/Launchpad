@@ -181,9 +181,46 @@
 		} catch (error) {
 			console.error(error)
 			composerText = text
-			chatError = 'Could not send this message. Please try again.'
+			chatError = buildChatErrorMessage(error)
 			throw error
 		}
+	}
+
+	function buildChatErrorMessage(error: unknown) {
+		if (error instanceof Error) {
+			try {
+				const parsed = JSON.parse(error.message) as unknown
+				if (parsed && typeof parsed === 'object') {
+					const data = parsed as {
+						error?: unknown
+						capUsd?: unknown
+						spentUsd?: unknown
+						dateKey?: unknown
+					}
+
+					if (typeof data.error === 'string') {
+						const capUsd = typeof data.capUsd === 'number' ? data.capUsd : undefined
+						const spentUsd = typeof data.spentUsd === 'number' ? data.spentUsd : undefined
+						const dateKey = typeof data.dateKey === 'string' ? data.dateKey : undefined
+
+						if (capUsd !== undefined && spentUsd !== undefined) {
+							const money = new Intl.NumberFormat('en-US', {
+								style: 'currency',
+								currency: 'USD'
+							})
+							const base = `${data.error} (${money.format(spentUsd)} / ${money.format(capUsd)})`
+							return dateKey ? `${base} for ${dateKey}.` : `${base}.`
+						}
+
+						return data.error
+					}
+				}
+			} catch {
+				// Ignore parse failures, fall through.
+			}
+		}
+
+		return 'Could not send this message. Please try again.'
 	}
 
 	const saveThreadAsIdea = async () => {

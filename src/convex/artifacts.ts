@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers'
+import { logActivityEvent } from './activityHelpers'
 import { mutation, query } from './_generated/server'
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
@@ -53,6 +54,18 @@ export const createArtifact = mutation({
 		if (args.sourceThreadId) {
 			await upsertThreadArtifactLink(ctx, ownerId, args.sourceThreadId, artifactId, 'created', now)
 		}
+
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'artifact_created',
+			metadata: {
+				artifactId,
+				artifactType: type,
+				...(projectId ? { projectId } : {}),
+				...(args.sourceThreadId ? { threadId: args.sourceThreadId } : {})
+			},
+			occurredAtMs: now
+		})
 
 		return { artifactId }
 	}
@@ -238,6 +251,17 @@ export const createArtifactDraftChange = mutation({
 			updatedAt: now
 		})
 
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'draft_proposed',
+			metadata: {
+				draftChangeId,
+				artifactId: args.artifactId,
+				...(args.threadId ? { threadId: args.threadId } : {})
+			},
+			occurredAtMs: now
+		})
+
 		return { draftChangeId }
 	}
 })
@@ -324,6 +348,17 @@ export const applyArtifactDraftChange = mutation({
 			updatedAt: now
 		})
 
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'draft_applied',
+			metadata: {
+				draftChangeId: draftChange._id,
+				artifactId: draftChange.artifactId,
+				...(draftChange.threadId ? { threadId: draftChange.threadId } : {})
+			},
+			occurredAtMs: now
+		})
+
 		return { ok: true as const }
 	}
 })
@@ -346,6 +381,17 @@ export const discardArtifactDraftChange = mutation({
 			status: 'discarded',
 			discardedAt: now,
 			updatedAt: now
+		})
+
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'draft_discarded',
+			metadata: {
+				draftChangeId: draftChange._id,
+				artifactId: draftChange.artifactId,
+				...(draftChange.threadId ? { threadId: draftChange.threadId } : {})
+			},
+			occurredAtMs: now
 		})
 
 		return { ok: true as const }

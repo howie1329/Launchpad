@@ -11,6 +11,7 @@ import {
 } from '$lib/artifacts'
 import { isIdeaAiModelId } from '$lib/idea-ai-models'
 import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects'
+import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage'
 import type { RequestHandler } from '@sveltejs/kit'
 import { json } from '@sveltejs/kit'
 import { ConvexHttpClient } from 'convex/browser'
@@ -87,6 +88,20 @@ export const POST: RequestHandler = async ({ request }) => {
 			threadId: thread._id,
 			project: project as WorkspaceProject | null
 		})
+
+		const budget = await convex.query(getAiBudgetStatusQuery, {})
+		if (budget.isOverLimit) {
+			return json(
+				{
+					error: 'Daily AI limit reached',
+					capUsd: budget.capUsd,
+					spentUsd: budget.spentUsd,
+					dateKey: budget.dateKey
+				},
+				{ status: 429 }
+			)
+		}
+
 		const validatedMessages = await safeValidateUIMessages({
 			messages: body.messages
 		})
@@ -102,9 +117,52 @@ export const POST: RequestHandler = async ({ request }) => {
 			stopWhen: stepCountIs(8)
 		})
 
+		const accumulatedUsage = {
+			inputTokens: 0,
+			outputTokens: 0,
+			reasoningTokens: 0,
+			cachedInputTokens: 0
+		}
+		let hasUsage = false
+		let didRecordUsage = false
+
 		return await createAgentUIStreamResponse({
 			agent,
-			uiMessages: validatedMessages.data
+			uiMessages: validatedMessages.data,
+			onStepFinish: async (step) => {
+				const usage = step.usage ?? {}
+
+				const inputTokens = usage.inputTokens ?? 0
+				const outputTokens = usage.outputTokens ?? 0
+				const reasoningTokens = usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0
+				const cachedInputTokens =
+					usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0
+
+				accumulatedUsage.inputTokens += inputTokens
+				accumulatedUsage.outputTokens += outputTokens
+				accumulatedUsage.reasoningTokens += reasoningTokens
+				accumulatedUsage.cachedInputTokens += cachedInputTokens
+
+				if (
+					usage.inputTokens !== undefined ||
+					usage.outputTokens !== undefined ||
+					usage.reasoningTokens !== undefined ||
+					usage.cachedInputTokens !== undefined
+				) {
+					hasUsage = true
+				}
+
+				const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7
+				if (!isFinalStep || didRecordUsage || !hasUsage) return
+
+				didRecordUsage = true
+				await convex.mutation(recordAiRunMutation, {
+					threadId: thread._id,
+					modelId: body.modelId,
+					occurredAt: Date.now(),
+					usage: accumulatedUsage
+				})
+			}
 		})
 	} catch (error) {
 		console.error(error)

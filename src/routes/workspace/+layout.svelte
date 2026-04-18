@@ -6,16 +6,19 @@
 	import { listArtifactsQuery } from '$lib/artifacts'
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display'
 	import { listThreadsQuery } from '$lib/chat'
+	import { getAiBudgetStatusQuery } from '$lib/usage'
 	import { LaunchpadMark } from '$lib/components/brand'
 	import { Button } from '$lib/components/ui/button'
 	import * as Collapsible from '$lib/components/ui/collapsible'
 	import * as Dialog from '$lib/components/ui/dialog'
+	import * as HoverCard from '$lib/components/ui/hover-card/index.js'
 	import { Input } from '$lib/components/ui/input'
 	import { Label } from '$lib/components/ui/label'
 	import * as Sidebar from '$lib/components/ui/sidebar'
 	import { Textarea } from '$lib/components/ui/textarea'
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte'
 	import { createProjectMutation, listProjectsQuery } from '$lib/projects'
+	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign'
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
 	import FileTextIcon from '@lucide/svelte/icons/file-text'
 	import FolderIcon from '@lucide/svelte/icons/folder'
@@ -61,6 +64,7 @@
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
+	const budget = useQuery(getAiBudgetStatusQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const selectedProject = $derived(
 		projects.data?.find((project) => project._id === activeProjectId) ?? null
 	)
@@ -97,6 +101,8 @@
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? []
 	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject)
+
+	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 
 	const createProject = async () => {
 		if (isCreatingProject) return
@@ -445,6 +451,40 @@
 
 			<Sidebar.Footer>
 				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+							<HoverCard.Root openDelay={120} closeDelay={60}>
+								<HoverCard.Trigger>
+								<Sidebar.MenuButton tooltipContent="Usage" class="min-w-0">
+									<CircleDollarSignIcon />
+									<span class="min-w-0 truncate">Usage</span>
+								</Sidebar.MenuButton>
+							</HoverCard.Trigger>
+							<HoverCard.Content align="start" side="right" class="w-64">
+								{#if budget.data}
+									<div class="space-y-1.5 p-0.5">
+										<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+											AI usage
+										</p>
+										<div class="flex items-center justify-between gap-3">
+											<span class="text-xs">Today</span>
+											<span class="text-xs font-medium">
+												{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
+											</span>
+										</div>
+										<div class="flex items-center justify-between gap-3">
+											<span class="text-xs text-muted-foreground">Remaining</span>
+											<span class="text-xs text-muted-foreground">
+												{money.format(budget.data.remainingUsd)}
+											</span>
+										</div>
+										<p class="pt-1 text-[11px] text-muted-foreground">Resets daily ({budget.data.dateKey}).</p>
+									</div>
+								{:else}
+									<p class="p-1 text-xs text-muted-foreground">Loading usage...</p>
+								{/if}
+							</HoverCard.Content>
+						</HoverCard.Root>
+					</Sidebar.MenuItem>
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
 							isActive={isSettingsActive}

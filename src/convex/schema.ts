@@ -19,6 +19,45 @@ const artifactDraftChangeStatus = v.union(
 
 export default defineSchema({
 	...authTables,
+	userSettings: defineTable({
+		ownerId: v.string(),
+		timeZone: v.string(),
+		dailyAiCapUsd: v.number(),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	}).index('by_ownerId', ['ownerId']),
+	aiUsageEvents: defineTable({
+		ownerId: v.string(),
+		threadId: v.id('chatThreads'),
+		modelId: v.string(),
+		dateKey: v.string(),
+		inputTokens: v.optional(v.number()),
+		outputTokens: v.optional(v.number()),
+		reasoningTokens: v.optional(v.number()),
+		cachedInputTokens: v.optional(v.number()),
+		costUsd: v.number(),
+		createdAt: v.number()
+	})
+		.index('by_ownerId_and_createdAt', ['ownerId', 'createdAt'])
+		.index('by_ownerId_and_dateKey_and_createdAt', ['ownerId', 'dateKey', 'createdAt']),
+	aiDailyUsage: defineTable({
+		ownerId: v.string(),
+		dateKey: v.string(),
+		inputTokens: v.number(),
+		outputTokens: v.number(),
+		reasoningTokens: v.number(),
+		cachedInputTokens: v.number(),
+		costUsd: v.number(),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	}).index('by_ownerId_and_dateKey', ['ownerId', 'dateKey']),
+	activityEvents: defineTable({
+		ownerId: v.string(),
+		eventType: v.string(),
+		dateKey: v.string(),
+		metadata: v.optional(v.record(v.string(), v.any())),
+		createdAt: v.number()
+	}).index('by_ownerId_and_createdAt', ['ownerId', 'createdAt']),
 	projects: defineTable({
 		ownerId: v.string(),
 		name: v.string(),

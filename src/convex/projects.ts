@@ -1,5 +1,6 @@
 import { v } from 'convex/values'
 import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers'
+import { logActivityEvent } from './activityHelpers'
 import { mutation, query } from './_generated/server'
 import type { Id } from './_generated/dataModel'
 import type { MutationCtx } from './_generated/server'
@@ -13,6 +14,14 @@ export const createProject = mutation({
 		const ownerId = await requireAuthUserId(ctx)
 
 		const { projectId } = await createProjectRecord(ctx, ownerId, args.name, args.summary)
+
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'project_created',
+			metadata: {
+				projectId
+			}
+		})
 
 		return { projectId }
 	}
@@ -59,6 +68,17 @@ export const createProjectFromThread = mutation({
 			})
 			linkedArtifactCount += 1
 		}
+
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'project_created_from_thread',
+			metadata: {
+				projectId,
+				threadId: args.threadId,
+				linkedArtifactCount
+			},
+			occurredAtMs: now
+		})
 
 		return { projectId, linkedArtifactCount }
 	}
