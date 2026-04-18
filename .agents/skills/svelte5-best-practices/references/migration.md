@@ -38,11 +38,12 @@ Svelte 5 replaces `$:` with `$derived` (for values) and `$effect` (for side effe
   let items = [];
   let filter = 'all';
 
-  $: filteredItems = {
-    if (filter === 'all') return items;
-    if (filter === 'active') return items.filter(i => !i.done);
-    return items.filter(i => i.done);
-  };
+  $: filteredItems =
+    filter === 'all'
+      ? items
+      : filter === 'active'
+        ? items.filter(i => !i.done)
+        : items.filter(i => i.done);
 </script>
 ```
 

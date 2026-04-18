@@ -8,7 +8,7 @@
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import SunIcon from '@lucide/svelte/icons/sun';
 
-	type Variant = 'default' | 'icon' | 'sidebar';
+	type Variant = 'default' | 'icon' | 'sidebar' | 'sidebar-label';
 
 	let {
 		variant = 'default' as Variant,
@@ -58,7 +58,7 @@
 	</DropdownMenu.Item>
 {/snippet}
 
-{#if variant === 'sidebar'}
+{#if variant === 'sidebar' || variant === 'sidebar-label'}
 	<Sidebar.MenuItem>
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
@@ -66,10 +66,12 @@
 					<Sidebar.MenuButton
 						{...props}
 						tooltipContent="Color theme"
-						class="justify-center px-0 md:size-8 md:p-0"
+						class={variant === 'sidebar'
+							? 'justify-center px-0 md:size-8 md:p-0'
+							: 'min-w-0'}
 					>
 						<TriggerIcon class="size-4" />
-						<span class="sr-only">Color theme</span>
+						<span class={variant === 'sidebar' ? 'sr-only' : 'min-w-0 truncate'}>Theme</span>
 					</Sidebar.MenuButton>
 				{/snippet}
 			</DropdownMenu.Trigger>

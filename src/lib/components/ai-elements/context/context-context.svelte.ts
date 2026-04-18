@@ -5,6 +5,16 @@ export const ICON_RADIUS = 10;
 export const ICON_VIEWBOX = 24;
 export const ICON_CENTER = 12;
 export const ICON_STROKE_WIDTH = 2;
+const TOKENS_PER_MILLION = 1_000_000;
+
+const modelCostsPerMillionTokens: Record<
+	string,
+	{ input: number; output: number; reasoning?: number; cacheRead?: number }
+> = {
+	'openai/gpt-5.4-nano': { input: 0.2, output: 1.25, cacheRead: 0.02 },
+	'openai/gpt-5.4-mini': { input: 0.75, output: 4.5, cacheRead: 0.075 },
+	'openai/gpt-5.4': { input: 2.5, output: 15, cacheRead: 0.25 },
+};
 
 export type LanguageModelUsage = {
 	inputTokens?: number;
@@ -93,11 +103,15 @@ export function estimateCost(params: {
 		cacheReads?: number;
 	};
 }) {
-	// Mock implementation - replace with actual tokenlens
-	const inputCost = (params.usage.input || 0) * 0.00001;
-	const outputCost = (params.usage.output || 0) * 0.00003;
-	const reasoningCost = (params.usage.reasoningTokens || 0) * 0.00002;
-	const cacheCost = (params.usage.cacheReads || 0) * 0.000005;
+	const cost = modelCostsPerMillionTokens[params.modelId];
+	if (!cost) return { totalUSD: 0 };
+
+	const inputCost = ((params.usage.input || 0) / TOKENS_PER_MILLION) * cost.input;
+	const outputCost = ((params.usage.output || 0) / TOKENS_PER_MILLION) * cost.output;
+	const reasoningCost =
+		((params.usage.reasoningTokens || 0) / TOKENS_PER_MILLION) * (cost.reasoning ?? cost.output);
+	const cacheCost =
+		((params.usage.cacheReads || 0) / TOKENS_PER_MILLION) * (cost.cacheRead ?? cost.input);
 
 	return {
 		totalUSD: inputCost + outputCost + reasoningCost + cacheCost,

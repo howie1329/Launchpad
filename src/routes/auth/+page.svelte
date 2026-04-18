@@ -12,33 +12,17 @@
 
 	type Flow = 'signIn' | 'signUp';
 	type Status = 'idle' | 'loading' | 'error';
-	type RedirectRoute =
-		| '/'
-		| '/dashboard'
-		| '/dashboard/ideas'
-		| '/dashboard/scope'
-		| '/dashboard/settings'
-		| '/ideas'
-		| '/scope'
-		| '/settings';
+	type PostAuthDestination = '/' | '/workspace';
 
 	let flow = $state<Flow>('signIn');
 	let status = $state<Status>('idle');
 	let errorMessage = $state('');
 
 	const isSignUp = $derived(flow === 'signUp');
-	const redirectTo = $derived.by<RedirectRoute>(() => {
-		const value = page.url.searchParams.get('redirectTo');
-		return value === '/' ||
-			value === '/dashboard' ||
-			value === '/dashboard/ideas' ||
-			value === '/dashboard/scope' ||
-			value === '/dashboard/settings' ||
-			value === '/ideas' ||
-			value === '/scope' ||
-			value === '/settings'
-			? value
-			: '/dashboard';
+	const redirectTo = $derived.by<PostAuthDestination>(() => {
+		const raw = page.url.searchParams.get('redirectTo');
+		if (raw === '/' || raw === null || raw === '') return '/';
+		return '/workspace';
 	});
 
 	const toggleFlow = () => {

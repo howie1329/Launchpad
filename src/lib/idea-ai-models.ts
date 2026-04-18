@@ -1,7 +1,25 @@
 export const ideaAiModels = [
-	{ id: 'openai/gpt-5.4-nano', label: 'GPT-5.4 Nano' },
-	{ id: 'openai/gpt-5.4-mini', label: 'GPT-5.4 Mini' },
-	{ id: 'openai/gpt-5.4', label: 'GPT-5.4' }
+	{
+		id: 'openai/gpt-5.4-nano',
+		label: 'GPT-5.4 Nano',
+		maxContextTokens: 400000,
+		inputCostPerMillionTokens: 0.2,
+		outputCostPerMillionTokens: 1.25
+	},
+	{
+		id: 'openai/gpt-5.4-mini',
+		label: 'GPT-5.4 Mini',
+		maxContextTokens: 400000,
+		inputCostPerMillionTokens: 0.75,
+		outputCostPerMillionTokens: 4.5
+	},
+	{
+		id: 'openai/gpt-5.4',
+		label: 'GPT-5.4',
+		maxContextTokens: 1000000,
+		inputCostPerMillionTokens: 2.5,
+		outputCostPerMillionTokens: 15
+	}
 ] as const;
 
 export type IdeaAiModelId = (typeof ideaAiModels)[number]['id'];

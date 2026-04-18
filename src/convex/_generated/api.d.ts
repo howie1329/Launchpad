@@ -8,11 +8,17 @@
  * @module
  */
 
+import type * as activity from "../activity.js";
+import type * as activityHelpers from "../activityHelpers.js";
+import type * as artifacts from "../artifacts.js";
 import type * as auth from "../auth.js";
 import type * as authHelpers from "../authHelpers.js";
+import type * as chat from "../chat.js";
+import type * as dateKey from "../dateKey.js";
 import type * as http from "../http.js";
-import type * as ideas from "../ideas.js";
-import type * as prds from "../prds.js";
+import type * as projects from "../projects.js";
+import type * as usage from "../usage.js";
+import type * as userSettings from "../userSettings.js";
 
 import type {
   ApiFromModules,
@@ -21,11 +27,17 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  activity: typeof activity;
+  activityHelpers: typeof activityHelpers;
+  artifacts: typeof artifacts;
   auth: typeof auth;
   authHelpers: typeof authHelpers;
+  chat: typeof chat;
+  dateKey: typeof dateKey;
   http: typeof http;
-  ideas: typeof ideas;
-  prds: typeof prds;
+  projects: typeof projects;
+  usage: typeof usage;
+  userSettings: typeof userSettings;
 }>;
 
 /**
