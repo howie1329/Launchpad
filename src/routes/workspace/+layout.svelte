@@ -21,7 +21,6 @@
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text'
 	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close'
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open'
-	import SettingsIcon from '@lucide/svelte/icons/settings'
 	import { useQuery } from 'convex-svelte'
 
 	let { children } = $props()
@@ -407,16 +406,6 @@
 
 			<Sidebar.Footer>
 				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton tooltipContent="Settings" class="min-w-0">
-							{#snippet child({ props })}
-								<a href={resolve('/dashboard/settings')} aria-label="Settings" {...props}>
-									<SettingsIcon />
-									<span class="min-w-0 truncate">Settings</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
 					<ThemeMenu variant="sidebar-label" />
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton

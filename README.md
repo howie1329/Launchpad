@@ -71,15 +71,7 @@ npm run dev -- --open
 
 Configure **Anthropic API credentials** in your environment as required by the server implementation (see `docs/MVP.md` and your `+page.server` code).
 
-### Feature flags
-
-Experimental product surfaces are controlled with public environment flags. Flags are off by default.
-
-```sh
-PUBLIC_FEATURE_WORKSPACE=true
-```
-
-`PUBLIC_FEATURE_WORKSPACE=true` enables the chat-first Workspace route at `/workspace`. Any other value redirects `/workspace` back to `/dashboard`. The legacy dashboard remains available either way.
+The signed-in app lives at `/workspace` (chat-first workspace with projects, threads, and artifacts).
 
 ---
 

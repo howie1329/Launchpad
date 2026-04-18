@@ -63,14 +63,14 @@
 					How it works
 				</a>
 				<a
-					href={resolve('/ideas')}
+					href={resolve('/workspace')}
 					class="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 				>
-					Ideas
+					Workspace
 				</a>
 				<ThemeMenu variant="icon" />
 				<AuthControls />
-				<Button href={resolve('/scope')} size="sm">Start Scoping</Button>
+				<Button href={resolve('/workspace')} size="sm">Open workspace</Button>
 			</div>
 		</nav>
 
@@ -90,7 +90,7 @@
 					one-week build plan.
 				</p>
 				<div class="mt-8 flex flex-wrap items-center gap-3">
-					<Button href={resolve('/scope')} size="lg">Start Scoping</Button>
+					<Button href={resolve('/workspace')} size="lg">Open workspace</Button>
 					<Button href="#how-it-works" variant="ghost" size="lg">See how it works</Button>
 				</div>
 			</div>
@@ -246,8 +246,8 @@
 				</p>
 			</div>
 			<div class="mt-6 flex flex-wrap items-center gap-3 sm:mt-0">
-				<Button href={resolve('/ideas')} variant="ghost" size="lg">Idea Generator</Button>
-				<Button href={resolve('/scope')} size="lg">Start Scoping</Button>
+				<Button href={resolve('/workspace')} variant="ghost" size="lg">Workspace</Button>
+				<Button href={resolve('/workspace')} size="lg">Open workspace</Button>
 			</div>
 		</div>
 	</section>

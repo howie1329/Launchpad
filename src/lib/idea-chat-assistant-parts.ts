@@ -4,7 +4,7 @@ import {
 	STRUCTURED_IDEA_TOOL_NAME,
 	updateIdeaStructuredInputSchema,
 	type UpdateIdeaStructuredInput
-} from '$lib/idea-structured'
+} from '$lib/structured-idea-tool'
 
 export type ToolStepPhase = 'running' | 'done' | 'error' | 'denied'
 

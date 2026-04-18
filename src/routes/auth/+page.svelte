@@ -9,41 +9,20 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { auth, signIn } from '$lib/auth.svelte';
-	import { isFeatureEnabled } from '$lib/feature-flags';
 
 	type Flow = 'signIn' | 'signUp';
 	type Status = 'idle' | 'loading' | 'error';
-	type RedirectRoute =
-		| '/'
-		| '/dashboard'
-		| '/dashboard/ideas'
-		| '/dashboard/scope'
-		| '/dashboard/settings'
-		| '/workspace'
-		| '/ideas'
-		| '/scope';
+	type PostAuthDestination = '/' | '/workspace';
 
 	let flow = $state<Flow>('signIn');
 	let status = $state<Status>('idle');
 	let errorMessage = $state('');
 
 	const isSignUp = $derived(flow === 'signUp');
-	const redirectTo = $derived.by<RedirectRoute>(() => {
+	const redirectTo = $derived.by<PostAuthDestination>(() => {
 		const raw = page.url.searchParams.get('redirectTo');
-		const value =
-			raw === '/settings' ? '/dashboard/settings' : raw;
-		return value === '/' ||
-			value === '/dashboard' ||
-			value === '/dashboard/ideas' ||
-			value === '/dashboard/scope' ||
-			value === '/dashboard/settings' ||
-			(value === '/workspace' && isFeatureEnabled('workspace')) ||
-			value === '/ideas' ||
-			value === '/scope'
-			? value
-			: isFeatureEnabled('workspace')
-				? '/workspace'
-				: '/dashboard';
+		if (raw === '/' || raw === null || raw === '') return '/';
+		return '/workspace';
 	});
 
 	const toggleFlow = () => {
