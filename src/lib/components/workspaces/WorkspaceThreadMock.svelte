@@ -211,7 +211,7 @@
 							class="min-h-20 px-4 py-4 text-sm"
 							placeholder="Continue shaping this thread..."
 						/>
-						<PromptInputToolbar class="border-t border-border/50 px-2 py-1">
+						<PromptInputToolbar class="px-2 py-1">
 							<PromptInputTools>
 								<Button
 									type="button"
