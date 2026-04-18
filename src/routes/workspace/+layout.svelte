@@ -6,77 +6,24 @@
 	import { LaunchpadMark } from '$lib/components/brand';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
-	import ClockIcon from '@lucide/svelte/icons/clock';
-	import FolderIcon from '@lucide/svelte/icons/folder';
-	import InboxIcon from '@lucide/svelte/icons/inbox';
-	import LightbulbIcon from '@lucide/svelte/icons/lightbulb';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 
 	let { children } = $props();
 
-	const tools = [
-		{
-			id: 'new-chat',
-			label: 'New Chat',
-			href: '/workspace',
-			icon: MessageSquarePlusIcon,
-			status: 'Start from a rough thought.'
-		},
-		{
-			id: 'inbox',
-			label: 'Inbox',
-			href: '/workspace?view=inbox',
-			icon: InboxIcon,
-			status: 'Capture loose thoughts before they become projects.'
-		},
-		{
-			id: 'projects',
-			label: 'Projects',
-			href: '/workspace?view=projects',
-			icon: FolderIcon,
-			status: 'Continue scoped project work.'
-		},
-		{
-			id: 'loose-ideas',
-			label: 'Loose Ideas',
-			href: '/workspace?view=ideas',
-			icon: LightbulbIcon,
-			status: 'Explore ideas before promoting them.'
-		},
-		{
-			id: 'recent',
-			label: 'Recent',
-			href: '/workspace?view=recent',
-			icon: ClockIcon,
-			status: 'Resume recent work.'
-		},
-		{
-			id: 'settings',
-			label: 'Settings',
-			href: '/dashboard/settings',
-			icon: SettingsIcon,
-			status: 'Manage workspace preferences.'
-		}
+	const sections = [
+		{ label: 'Projects', empty: 'No projects yet' },
+		{ label: 'Ideas', empty: 'No ideas yet' },
+		{ label: 'PRDs', empty: 'No PRDs yet' },
+		{ label: 'Other', empty: 'Nothing here yet' }
 	] as const;
 
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
 
 	const pathname = $derived($page.url.pathname);
-	const workspaceView = $derived($page.url.searchParams.get('view') || '');
-	const activeTool = $derived(
-		workspaceView === 'inbox'
-			? tools[1]
-			: workspaceView === 'projects'
-				? tools[2]
-				: workspaceView === 'ideas'
-					? tools[3]
-					: workspaceView === 'recent'
-						? tools[4]
-						: tools[0]
-	);
+	const isNewChatActive = $derived(pathname === '/workspace' && !$page.url.search);
 
 	const handleSignOut = async () => {
 		if (isSigningOut) return;
@@ -107,7 +54,11 @@
 		</div>
 	</main>
 {:else}
-	<Sidebar.Provider bind:open={sidebarOpen} class="h-svh overflow-hidden">
+	<Sidebar.Provider
+		bind:open={sidebarOpen}
+		class="h-svh overflow-hidden"
+		style="--sidebar-width: 15rem;"
+	>
 		<Sidebar.Root collapsible="icon" class="overflow-hidden">
 			<Sidebar.Header>
 				<Sidebar.Menu>
@@ -125,35 +76,51 @@
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={isNewChatActive} class="min-w-0">
+							{#snippet child({ props })}
+								<a href={resolve('/workspace')} aria-label="New Chat" {...props}>
+									<MessageSquarePlusIcon />
+									<span class="min-w-0 truncate">New Chat</span>
+								</a>
+							{/snippet}
+							{#snippet tooltipContent()}
+								<span>New Chat</span>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 			</Sidebar.Header>
 
 			<Sidebar.Content>
-				<Sidebar.Group>
-					<Sidebar.GroupContent>
-						<Sidebar.Menu>
-							{#each tools as tool (tool.id)}
+				{#each sections as section (section.label)}
+					<Sidebar.Group>
+						<Sidebar.GroupLabel>{section.label}</Sidebar.GroupLabel>
+						<Sidebar.GroupContent class="group-data-[collapsible=icon]:hidden">
+							<Sidebar.Menu>
 								<Sidebar.MenuItem>
-									<Sidebar.MenuButton isActive={activeTool.id === tool.id} class="min-w-0">
-										{#snippet child({ props })}
-											<a href={resolve(tool.href)} aria-label={tool.label} {...props}>
-												<tool.icon />
-												<span class="min-w-0 truncate">{tool.label}</span>
-											</a>
-										{/snippet}
-										{#snippet tooltipContent()}
-											<span>{tool.label}</span>
-										{/snippet}
+									<Sidebar.MenuButton aria-disabled class="min-w-0 text-muted-foreground">
+										<span class="min-w-0 truncate">{section.empty}</span>
 									</Sidebar.MenuButton>
 								</Sidebar.MenuItem>
-							{/each}
-						</Sidebar.Menu>
-					</Sidebar.GroupContent>
-				</Sidebar.Group>
+							</Sidebar.Menu>
+						</Sidebar.GroupContent>
+					</Sidebar.Group>
+				{/each}
 			</Sidebar.Content>
 
 			<Sidebar.Footer>
 				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton tooltipContent="Settings" class="min-w-0">
+							{#snippet child({ props })}
+								<a href={resolve('/dashboard/settings')} aria-label="Settings" {...props}>
+									<SettingsIcon />
+									<span class="min-w-0 truncate">Settings</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
 					<ThemeMenu variant="sidebar" />
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
@@ -175,8 +142,8 @@
 			>
 				<Sidebar.Trigger class="-ms-1" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-semibold tracking-tight">{activeTool.label}</p>
-					<p class="truncate text-[11px] text-muted-foreground">{activeTool.status}</p>
+					<p class="truncate text-sm font-semibold tracking-tight">New Chat</p>
+					<p class="truncate text-[11px] text-muted-foreground">Start from a rough thought.</p>
 				</div>
 			</header>
 
