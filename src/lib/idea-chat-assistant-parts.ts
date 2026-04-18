@@ -45,6 +45,7 @@ const WORKSPACE_TOOL_TITLES: Record<string, string> = {
 	importProjectArtifactToThread: 'Import project artifact',
 	createIdeaArtifact: 'Create idea artifact',
 	createPrdArtifact: 'Create PRD artifact',
+	createProjectFromThread: 'Create project',
 	proposeArtifactEdit: 'Propose artifact edit'
 }
 
@@ -55,6 +56,7 @@ const WORKSPACE_RUNNING_SUMMARIES: Record<string, string> = {
 	importProjectArtifactToThread: 'Importing artifact…',
 	createIdeaArtifact: 'Creating idea artifact…',
 	createPrdArtifact: 'Creating PRD artifact…',
+	createProjectFromThread: 'Creating project…',
 	proposeArtifactEdit: 'Creating draft change…'
 }
 
@@ -180,6 +182,7 @@ function summarizeWorkspaceTool(
 	const detailJson = JSON.stringify(output ?? {}, null, 2)
 	const out = output && typeof output === 'object' ? (output as Record<string, unknown>) : {}
 	const title = typeof out.title === 'string' ? out.title : ''
+	const name = typeof out.name === 'string' ? out.name : ''
 	const artifactTitle = typeof out.artifactTitle === 'string' ? out.artifactTitle : ''
 	const artifacts = Array.isArray(out.artifacts) ? out.artifacts : null
 
@@ -198,6 +201,16 @@ function summarizeWorkspaceTool(
 			return { summary: title ? `Created idea: ${title}` : 'Created idea artifact.', detailJson }
 		case 'createPrdArtifact':
 			return { summary: title ? `Created PRD: ${title}` : 'Created PRD artifact.', detailJson }
+		case 'createProjectFromThread': {
+			const linkedArtifactCount =
+				typeof out.linkedArtifactCount === 'number' ? out.linkedArtifactCount : 0
+			return {
+				summary: name
+					? `Created project: ${name} with ${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}.`
+					: 'Created project.',
+				detailJson
+			}
+		}
 		case 'proposeArtifactEdit':
 			return {
 				summary: artifactTitle ? `Drafted edits for ${artifactTitle}.` : 'Created draft change.',

@@ -9,7 +9,11 @@
 	import { LaunchpadMark } from '$lib/components/brand'
 	import { Button } from '$lib/components/ui/button'
 	import * as Collapsible from '$lib/components/ui/collapsible'
+	import * as Dialog from '$lib/components/ui/dialog'
+	import { Input } from '$lib/components/ui/input'
+	import { Label } from '$lib/components/ui/label'
 	import * as Sidebar from '$lib/components/ui/sidebar'
+	import { Textarea } from '$lib/components/ui/textarea'
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte'
 	import { createProjectMutation, listProjectsQuery } from '$lib/projects'
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
@@ -21,6 +25,7 @@
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text'
 	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close'
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open'
+	import SettingsIcon from '@lucide/svelte/icons/settings'
 	import { useQuery } from 'convex-svelte'
 
 	let { children } = $props()
@@ -28,6 +33,10 @@
 	let sidebarOpen = $state(true)
 	let isSigningOut = $state(false)
 	let isCreatingProject = $state(false)
+	let projectDialogOpen = $state(false)
+	let projectName = $state('')
+	let projectSummary = $state('')
+	let projectError = $state('')
 	let openSections = $state({
 		Projects: true,
 		Chats: true
@@ -41,6 +50,7 @@
 	})
 
 	const pathname = $derived($page.url.pathname)
+	const isSettingsActive = $derived(pathname === '/workspace/settings')
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
 	const activeArtifactId = $derived($page.url.searchParams.get('artifact')?.trim() ?? '')
@@ -65,40 +75,67 @@
 	)
 	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact))
 	const headerTitle = $derived(
-		selectedThread?.title ??
-			selectedArtifact?.title ??
-			selectedProject?.name ??
-			(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat')
+		isSettingsActive
+			? 'Settings'
+			: selectedThread?.title ??
+					selectedArtifact?.title ??
+					selectedProject?.name ??
+					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat')
 	)
 	const headerDescription = $derived(
-		activeThreadId
-			? 'Active thread with explicit context.'
-			: activeArtifactId
-				? 'Saved workspace artifact.'
-				: activeProjectId
-					? 'Start a new chat in this project.'
-					: 'Start from a rough thought.'
+		isSettingsActive
+			? 'Manage workspace preferences.'
+			: activeThreadId
+				? 'Active thread with explicit context.'
+				: activeArtifactId
+					? 'Saved workspace artifact.'
+					: activeProjectId
+						? 'Start a new chat in this project.'
+						: 'Start from a rough thought.'
 	)
 
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? []
+	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject)
 
 	const createProject = async () => {
 		if (isCreatingProject) return
 
-		const name = window.prompt('Project name')
-		if (!name?.trim()) return
+		const name = projectName.trim()
+		const summary = projectSummary.trim()
+
+		if (!name) {
+			projectError = 'Project name is required.'
+			return
+		}
 
 		isCreatingProject = true
+		projectError = ''
 
 		try {
 			const result = await getConvexClient().mutation(createProjectMutation, {
-				name: name.trim()
+				name,
+				...(summary ? { summary } : {})
 			})
+			projectDialogOpen = false
+			projectName = ''
+			projectSummary = ''
 			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`))
+		} catch (error) {
+			console.error(error)
+			projectError = 'Could not create this project. Please try again.'
 		} finally {
 			isCreatingProject = false
 		}
+	}
+
+	const closeProjectDialog = () => {
+		if (isCreatingProject) return
+
+		projectDialogOpen = false
+		projectName = ''
+		projectSummary = ''
+		projectError = ''
 	}
 
 	const toggleThreadContext = async () => {
@@ -209,7 +246,9 @@
 						<Sidebar.GroupAction
 							aria-label="New project"
 							aria-disabled={isCreatingProject}
-							onclick={createProject}
+							onclick={() => {
+								if (!isCreatingProject) projectDialogOpen = true
+							}}
 						>
 							<FolderPlusIcon />
 						</Sidebar.GroupAction>
@@ -406,6 +445,20 @@
 
 			<Sidebar.Footer>
 				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton
+							isActive={isSettingsActive}
+							tooltipContent="Settings"
+							class="min-w-0"
+						>
+							{#snippet child({ props })}
+								<a href={resolve('/workspace/settings')} aria-label="Settings" {...props}>
+									<SettingsIcon />
+									<span class="min-w-0 truncate">Settings</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
 					<ThemeMenu variant="sidebar-label" />
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
@@ -453,5 +506,65 @@
 				{@render children()}
 			</main>
 		</Sidebar.Inset>
+
+		<Dialog.Root bind:open={projectDialogOpen}>
+			<Dialog.Content class="sm:max-w-md">
+				<form
+					class="space-y-4"
+					onsubmit={(event) => {
+						event.preventDefault()
+						void createProject()
+					}}
+				>
+					<Dialog.Header>
+						<Dialog.Title>Create project</Dialog.Title>
+						<Dialog.Description>
+							Add a workspace for chats and artifacts that belong together.
+						</Dialog.Description>
+					</Dialog.Header>
+
+					<div class="space-y-3">
+						<div class="space-y-1.5">
+							<Label for="project-name">Name</Label>
+							<Input
+								id="project-name"
+								bind:value={projectName}
+								placeholder="Project name"
+								aria-invalid={projectError ? 'true' : undefined}
+								disabled={isCreatingProject}
+							/>
+						</div>
+						<div class="space-y-1.5">
+							<Label for="project-summary">Summary</Label>
+							<Textarea
+								id="project-summary"
+								bind:value={projectSummary}
+								placeholder="Optional project context"
+								class="min-h-20"
+								disabled={isCreatingProject}
+							/>
+						</div>
+					</div>
+
+					{#if projectError}
+						<p class="text-xs text-destructive">{projectError}</p>
+					{/if}
+
+					<Dialog.Footer>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={isCreatingProject}
+							onclick={closeProjectDialog}
+						>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={!canCreateProject}>
+							{isCreatingProject ? 'Creating...' : 'Create project'}
+						</Button>
+					</Dialog.Footer>
+				</form>
+			</Dialog.Content>
+		</Dialog.Root>
 	</Sidebar.Provider>
 {/if}

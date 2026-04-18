@@ -10,7 +10,7 @@ import {
 	type SavedArtifact
 } from '$lib/artifacts'
 import { isIdeaAiModelId } from '$lib/idea-ai-models'
-import { getProjectQuery } from '$lib/projects'
+import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects'
 import type { RequestHandler } from '@sveltejs/kit'
 import { json } from '@sveltejs/kit'
 import { ConvexHttpClient } from 'convex/browser'
@@ -42,9 +42,11 @@ Be concise, practical, and collaborative. Ask sharp questions when context is mi
 You have tools for durable workspace memory:
 - Create new idea and PRD artifacts only after the user explicitly asks or confirms. If you think an artifact would help, suggest it first.
 - New artifacts save directly and are linked to the active thread.
+- Create a project from the active chat only after the user explicitly asks or confirms. This promotes the active thread into the new project and moves thread-linked artifacts into that project.
 - Never overwrite existing artifacts. When asked to revise an existing artifact, use proposeArtifactEdit so the user can apply or discard the draft.
 - Read or import project artifacts only when the user asks or clearly references project memory.
 - Only propose edits for artifacts already linked to this thread.
+- Future artifacts created after project promotion belong to that project automatically through the active thread.
 - PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.`
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -254,6 +256,34 @@ function workspaceTools({
 					title: input.title,
 					summary: 'Created PRD artifact.',
 					contentMarkdown
+				}
+			}
+		}),
+		createProjectFromThread: tool({
+			description:
+				'Create a project from the active chat after the user asks or confirms. Promotes this thread and assigns its linked artifacts to the new project.',
+			inputSchema: z.object({
+				name: z.string().min(1),
+				summary: z.string().optional()
+			}),
+			execute: async ({ name, summary }) => {
+				if (project) {
+					throw new Error('This thread already belongs to a project.')
+				}
+
+				const cleanName = name.trim()
+				const cleanSummary = summary?.trim()
+				const result = await convex.mutation(createProjectFromThreadMutation, {
+					threadId,
+					name: cleanName,
+					...(cleanSummary ? { summary: cleanSummary } : {})
+				})
+
+				return {
+					projectId: result.projectId,
+					name: cleanName,
+					...(cleanSummary ? { summary: cleanSummary } : {}),
+					linkedArtifactCount: result.linkedArtifactCount
 				}
 			}
 		}),
