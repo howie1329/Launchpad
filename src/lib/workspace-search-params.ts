@@ -12,5 +12,9 @@ export const workspaceSearchParamsSchema = createSearchParamsSchema({
 	context: {
 		type: 'string',
 		default: ''
+	},
+	start: {
+		type: 'string',
+		default: ''
 	}
 })

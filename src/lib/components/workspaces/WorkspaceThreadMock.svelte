@@ -2,6 +2,8 @@
 	import { goto } from '$app/navigation'
 	import { resolve } from '$app/paths'
 	import { page } from '$app/stores'
+	import { auth, getConvexClient } from '$lib/auth.svelte'
+	import { createArtifactMutation, listThreadArtifactsQuery } from '$lib/artifacts'
 	import {
 		Context,
 		ContextContent,
@@ -49,6 +51,8 @@
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text'
 	import SearchIcon from '@lucide/svelte/icons/search'
 	import XIcon from '@lucide/svelte/icons/x'
+	import { useQuery } from 'convex-svelte'
+	import type { Id } from '../../../convex/_generated/dataModel'
 
 	type MockMessage = {
 		id: string
@@ -90,7 +94,7 @@
 		}
 	]
 
-	const threadArtifacts: ThreadArtifact[] = [
+	const mockThreadArtifacts: ThreadArtifact[] = [
 		{
 			title: 'Problem sketch',
 			type: 'Loose idea',
@@ -117,6 +121,8 @@
 	let modelSelectorOpen = $state(false)
 	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId)
 	let isAdding = $state(false)
+	let isSavingIdea = $state(false)
+	let artifactError = $state('')
 
 	const selectedModel = $derived(
 		ideaAiModels.find((model) => model.id === selectedModelId) ?? ideaAiModels[0]
@@ -127,7 +133,14 @@
 	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4))
 	const canSubmit = $derived(Boolean(composerText.trim()) && !isAdding)
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() || 'demo')
+	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
+	const canSaveIdea = $derived(activeThreadId !== 'demo' && !isSavingIdea)
+	const threadArtifacts = useQuery(listThreadArtifactsQuery, () =>
+		auth.isAuthenticated && activeThreadId && activeThreadId !== 'demo'
+			? { threadId: activeThreadId as Id<'chatThreads'> }
+			: 'skip'
+	)
 
 	const focusComposer = () => {
 		requestAnimationFrame(() => textareaRef?.focus())
@@ -156,15 +169,82 @@
 		isAdding = false
 	}
 
+	const saveThreadAsIdea = async () => {
+		if (!canSaveIdea) return
+
+		artifactError = ''
+		isSavingIdea = true
+
+		try {
+			await getConvexClient().mutation(createArtifactMutation, {
+				type: 'idea',
+				title: createArtifactTitle(),
+				contentMarkdown: createArtifactMarkdown(),
+				sourceThreadId: activeThreadId as Id<'chatThreads'>,
+				metadata: {
+					source: 'workspace-thread'
+				}
+			})
+		} catch (error) {
+			console.error(error)
+			artifactError = 'Could not save this idea. Please try again.'
+		} finally {
+			isSavingIdea = false
+		}
+	}
+
 	const closeContextPanel = async () => {
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+
 		await goto(
-			resolve(`/workspace?thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`),
+			resolve(
+				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
+			),
 			{
 				noScroll: true,
 				keepFocus: true
 			}
 		)
 	}
+
+	const artifactTypeLabel = (type: string) => {
+		if (type === 'prd') return 'PRD'
+		if (type === 'idea') return 'Idea'
+		if (type === 'research') return 'Research'
+		if (type === 'markdown') return 'Markdown'
+		return type
+	}
+
+	const linkReasonLabel = (reason: 'created' | 'referenced' | 'imported') => {
+		if (reason === 'created') return 'Created in this thread'
+		if (reason === 'referenced') return 'Referenced here'
+		return 'Imported to this thread'
+	}
+
+	const artifactPreview = (contentMarkdown: string) => {
+		const firstLine = contentMarkdown
+			.split('\n')
+			.map((line) => line.trim())
+			.find(Boolean)
+
+		if (!firstLine) return 'No content yet.'
+		return firstLine.length > 140 ? `${firstLine.slice(0, 137)}...` : firstLine
+	}
+
+	const createArtifactTitle = () => {
+		const firstUserMessage = messages.find((message) => message.role === 'user')?.content.trim() ?? ''
+		if (!firstUserMessage) return 'Untitled idea'
+		const firstLine = firstUserMessage.split('\n')[0]?.trim() ?? ''
+		return firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine
+	}
+
+	const createArtifactMarkdown = () =>
+		messages
+			.map((message) => {
+				const speaker = message.role === 'user' ? 'User' : 'Assistant'
+				return `## ${speaker}\n\n${message.content.trim()}`
+			})
+			.join('\n\n')
 </script>
 
 <section class="flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -306,40 +386,87 @@
 
 				<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 					<div class="space-y-1">
-						{#each threadArtifacts as artifact (artifact.title)}
-							<button
-								type="button"
-								class="group flex w-full gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-							>
-								<div
-									class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent text-muted-foreground group-hover:text-foreground"
+						{#if activeThreadId === 'demo'}
+							{#each mockThreadArtifacts as artifact (artifact.title)}
+								<button
+									type="button"
+									class="group flex w-full gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 								>
-									{#if artifact.type === 'Context'}
-										<MessageSquareTextIcon class="size-3.5" />
-									{:else}
+									<div
+										class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent text-muted-foreground group-hover:text-foreground"
+									>
+										{#if artifact.type === 'Context'}
+											<MessageSquareTextIcon class="size-3.5" />
+										{:else}
+											<FileTextIcon class="size-3.5" />
+										{/if}
+									</div>
+									<span class="min-w-0 flex-1">
+										<span class="flex items-center justify-between gap-2">
+											<span class="truncate text-xs font-medium tracking-tight">{artifact.title}</span>
+											<span class="shrink-0 text-[10px] text-muted-foreground">{artifact.type}</span>
+										</span>
+										<span class="mt-1 block text-[11px] leading-4 text-muted-foreground">
+											{artifact.status}
+										</span>
+										<span class="mt-1 block text-xs leading-5 text-foreground">
+											{artifact.description}
+										</span>
+									</span>
+								</button>
+							{/each}
+						{:else if threadArtifacts.data === undefined}
+							<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
+						{:else if threadArtifacts.data.length === 0}
+							<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+								No artifacts attached to this thread yet.
+							</p>
+						{:else}
+							{#each threadArtifacts.data as item (item.link._id)}
+								<button
+									type="button"
+									class="group flex w-full gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								>
+									<div
+										class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent text-muted-foreground group-hover:text-foreground"
+									>
 										<FileTextIcon class="size-3.5" />
-									{/if}
-								</div>
-								<span class="min-w-0 flex-1">
-									<span class="flex items-center justify-between gap-2">
-										<span class="truncate text-xs font-medium tracking-tight">{artifact.title}</span>
-										<span class="shrink-0 text-[10px] text-muted-foreground">{artifact.type}</span>
+									</div>
+									<span class="min-w-0 flex-1">
+										<span class="flex items-center justify-between gap-2">
+											<span class="truncate text-xs font-medium tracking-tight">
+												{item.artifact.title}
+											</span>
+											<span class="shrink-0 text-[10px] text-muted-foreground">
+												{artifactTypeLabel(item.artifact.type)}
+											</span>
+										</span>
+										<span class="mt-1 block text-[11px] leading-4 text-muted-foreground">
+											{linkReasonLabel(item.link.reason)}
+										</span>
+										<span class="mt-1 line-clamp-2 block text-xs leading-5 text-foreground">
+											{artifactPreview(item.artifact.contentMarkdown)}
+										</span>
 									</span>
-									<span class="mt-1 block text-[11px] leading-4 text-muted-foreground">
-										{artifact.status}
-									</span>
-									<span class="mt-1 block text-xs leading-5 text-foreground">
-										{artifact.description}
-									</span>
-								</span>
-							</button>
-						{/each}
+								</button>
+							{/each}
+						{/if}
 					</div>
 				</div>
 
 				<div class="shrink-0 border-t border-border/50 px-4 py-3">
-					<Button type="button" variant="secondary" size="sm" class="w-full justify-center text-xs">
-						Save as idea
+					{#if artifactError}
+						<p class="mb-2 text-xs text-destructive">{artifactError}</p>
+					{/if}
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						class="w-full justify-center text-xs"
+						disabled={!canSaveIdea}
+						onclick={saveThreadAsIdea}
+					>
+						{isSavingIdea ? 'Saving idea...' : 'Save as idea'}
 					</Button>
 				</div>
 			</aside>

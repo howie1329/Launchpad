@@ -5,7 +5,7 @@
 	import { createThreadMutation } from '$lib/chat';
 	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params';
 	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte';
-	import WorkspaceThreadMock from '$lib/components/workspaces/WorkspaceThreadMock.svelte';
+	import WorkspaceThread from '$lib/components/workspaces/WorkspaceThread.svelte';
 	import type { Id } from '../../convex/_generated/dataModel';
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
@@ -75,7 +75,9 @@
 			: '';
 
 		await goto(
-			resolve(`/workspace?${projectQuery}thread=${encodeURIComponent(result.threadId)}` as `/workspace?${string}`)
+			resolve(
+				`/workspace?${projectQuery}thread=${encodeURIComponent(result.threadId)}&start=1` as `/workspace?${string}`
+			)
 		);
 	};
 </script>
@@ -86,7 +88,7 @@
 </svelte:head>
 
 {#if activeThreadId}
-	<WorkspaceThreadMock />
+	<WorkspaceThread />
 {:else}
 	<WorkspaceChatLanding
 		title="What are we building?"
