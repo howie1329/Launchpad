@@ -1,77 +1,84 @@
 # Launchpad
 
-Launchpad helps solo developers and indie hackers go from “I have an idea” to a clear, prioritized scope **before** writing code — so they validate faster instead of over-building or stalling.
+Launchpad helps solo developers and indie hackers turn rough ideas into scoped work **before** over-building. The product is a **chat-first workspace**: you think in threads, persist decisions as **artifacts** (ideas, PRDs, and other markdown), and organize work under **projects** when it matures.
 
-**Full product spec:** [docs/MVP.md](docs/MVP.md)
+**Where things stand in the repo:** [docs/current-state.md](docs/current-state.md)
 
----
-
-## MVP — must have
-
-1. **Idea intake form** — Single page: idea description (textarea), preferred stack (text), app type (dropdown: web app, SaaS, mobile, CLI, API). Live character count; submit runs a SvelteKit form action.
-2. **AI PRD generation** — Server action posts to `+page.server.js`, calls Anthropic, returns a structured PRD (problem, target user, must-haves, out-of-scope, suggested stack, 1-week build plan) with **streaming** to the client.
-3. **Formatted PRD output** — Labeled sections fill in as the stream arrives; **copy-to-markdown** at the bottom.
+**Product direction (north star):** [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md)
 
 ---
 
-## Stretch (nice to have)
+## Routes
 
-- **PRD history** — SQLite via Turso; `/history` lists past PRDs by idea name and date.
+- **`/`** — Marketing home (still describes a PRD-oriented workflow for visitors).
+- **`/auth`** — Sign in and sign up (Convex Auth).
+- **`/workspace`** — Signed-in app: sidebar (projects, chats, artifacts), thread UI, artifact reader, and AI chat. Navigation uses query params such as `project`, `thread`, `artifact`, and `context`.
 
-**Explicitly out of scope for MVP:** auth, accounts, sharing/collaboration, inline PRD editing, multiple AI models, billing, PDF export.
-
----
-
-## Stack (MVP)
-
-| Layer        | Choice                          |
-| ------------ | ------------------------------- |
-| App          | SvelteKit + TypeScript          |
-| Styling      | Tailwind CSS                    |
-| AI           | Anthropic SDK                   |
-| Data (stretch) | Turso / SQLite              |
-| Deploy       | Vercel (target)                 |
+There is no separate dashboard, ideas, scope, or settings route; the workspace is the app shell.
 
 ---
 
-## SvelteKit concepts this project exercises
+## Stack
 
-| Concept            | Role |
-| ------------------ | ---- |
-| `+page.server.js`  | Form actions + server-side Anthropic call |
-| Streaming          | Progressive AI output in the UI |
-| Svelte stores      | Loading + result state |
-| File-based routing | `/` intake, `/history` when history ships |
+- **App:** SvelteKit, Svelte 5, TypeScript
+- **UI:** Tailwind CSS v4, [shadcn-svelte](https://www.shadcn-svelte.com/) (Bits UI primitives)
+- **Backend:** [Convex](https://convex.dev) — data, realtime queries, and Convex Auth (`@convex-dev/auth`)
+- **Client:** `convex-svelte`
+- **AI:** Vercel AI SDK (`ai`, `@ai-sdk/svelte`), models via [Vercel AI Gateway](https://vercel.com/docs/ai-gateway); workspace streaming in `src/routes/api/workspace/chat/+server.ts`
 
 ---
 
-## Rough timeline
+## Documentation
 
-| Day   | Goal |
-| ----- | ---- |
-| Day 1 | Form + server action + AI + streamed output |
-| Day 2 | UI polish, copy button, Vercel deploy; stretch: history |
+| Doc | Purpose |
+| --- | --- |
+| [docs/current-state.md](docs/current-state.md) | Maintainer snapshot: architecture, data model, env vars |
+| [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md) | Product vision and MVP scope |
+| [docs/design-system.md](docs/design-system.md) | Visual and interaction principles (tokens live in `src/routes/layout.css`) |
+| [docs/shadcn-svelte.md](docs/shadcn-svelte.md) | Index of shadcn-svelte docs |
+| [docs/artifact-schema-plan.md](docs/artifact-schema-plan.md) | Rationale for artifact fields and markdown-first storage |
+| [docs/tech-debt-followup.md](docs/tech-debt-followup.md) | Optional cleanup notes |
 
 ---
 
 ## Developing
 
-Install dependencies, then run the dev server:
+Install dependencies:
 
 ```sh
 npm install
+```
+
+Run the Vite dev server (frontend only):
+
+```sh
 npm run dev
 ```
 
-Open the app (or pass `--open`):
+Open the app (optional):
 
 ```sh
 npm run dev -- --open
 ```
 
-Configure **Anthropic API credentials** in your environment as required by the server implementation (see `docs/MVP.md` and your `+page.server` code).
+When you need Convex (auth, data, workspace):
 
-The signed-in app lives at `/workspace` (chat-first workspace with projects, threads, and artifacts).
+```sh
+npm run dev:all
+```
+
+That runs Vite and `convex dev` together. You can also run `npx convex dev` in a second terminal alongside `npm run dev`.
+
+---
+
+## Environment
+
+Set variables in `.env.local` or your host environment (names must match what SvelteKit and Convex expect):
+
+- **`PUBLIC_CONVEX_URL`** — Convex deployment URL (required for auth and client queries; see `src/lib/auth.svelte.ts`).
+- **`AI_GATEWAY_API_KEY`** — Private key for Vercel AI Gateway (required for workspace chat streaming; see `src/routes/api/workspace/chat/+server.ts`).
+
+Configure the Convex project with `npx convex dev` and follow [Convex environment variables](https://docs.convex.dev/production/environment-variables) for deployment. For AI Gateway, see [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).
 
 ---
 
@@ -87,13 +94,13 @@ Preview the production build:
 npm run preview
 ```
 
-Deployment uses a SvelteKit adapter appropriate for your host (e.g. [Vercel adapter](https://svelte.dev/docs/kit/adapters) for Vercel).
+Use a SvelteKit adapter suited to your host (for example the [Vercel adapter](https://svelte.dev/docs/kit/adapters) on Vercel).
 
 ---
 
 ## Project tooling
 
-This repo was bootstrapped with [`sv`](https://github.com/sveltejs/cli). Quality checks:
+Bootstrapped with [`sv`](https://github.com/sveltejs/cli). Quality checks:
 
 ```sh
 npm run check    # svelte-check + sync
