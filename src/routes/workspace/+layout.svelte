@@ -69,9 +69,9 @@
 	>
 		<Sidebar.Root collapsible="icon" class="overflow-hidden">
 			<Sidebar.Header>
-				<Sidebar.Menu>
+				<Sidebar.Menu class="gap-4">
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton size="lg" class="md:h-8 md:p-0">
+						<Sidebar.MenuButton size="lg" class=" md:h-8 md:p-0">
 							{#snippet child({ props })}
 								<a href={resolve('/workspace')} aria-label="Workspace home" {...props}>
 									<div
@@ -105,7 +105,7 @@
 					<Collapsible.Root bind:open={openSections[section.label]}>
 						<Sidebar.Group>
 							<Collapsible.Trigger
-								class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0"
+								class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
 							>
 								<ChevronRightIcon
 									class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
@@ -113,7 +113,7 @@
 								<span class="min-w-0 truncate">{section.label}</span>
 							</Collapsible.Trigger>
 							<Collapsible.Content
-								class="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down group-data-[collapsible=icon]:hidden"
+								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 							>
 								<Sidebar.GroupContent>
 									<p class="px-2 py-1.5 text-xs text-muted-foreground/75">{section.empty}</p>
