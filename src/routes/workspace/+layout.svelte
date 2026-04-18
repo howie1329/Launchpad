@@ -2,45 +2,82 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
-	import { auth, signOut } from '$lib/auth.svelte';
+	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
+	import { listThreadsQuery } from '$lib/chat';
 	import { LaunchpadMark } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
+	import { createProjectMutation, listProjectsQuery } from '$lib/projects';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import FolderIcon from '@lucide/svelte/icons/folder';
+	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
+	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
 	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import { useQuery } from 'convex-svelte';
 
 	let { children } = $props();
 
-	const sections = [
-		{ label: 'Projects', empty: 'No projects yet' },
-		{ label: 'Ideas', empty: 'No ideas yet' },
-		{ label: 'PRDs', empty: 'No PRDs yet' },
-		{ label: 'Other', empty: 'Nothing here yet' }
-	] as const;
-
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
+	let isCreatingProject = $state(false);
 	let openSections = $state({
 		Projects: true,
-		Ideas: true,
-		PRDs: true,
-		Other: true
+		Chats: true
 	});
 
 	const pathname = $derived($page.url.pathname);
+	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
-	const isNewChatActive = $derived(pathname === '/workspace' && !$page.url.search);
-	const headerTitle = $derived(activeThreadId ? 'Customer notes into buildable scope' : 'New Chat');
-	const headerDescription = $derived(
-		activeThreadId ? 'Active thread with explicit context.' : 'Start from a rough thought.'
+	const isNewChatActive = $derived(pathname === '/workspace' && !activeProjectId && !activeThreadId);
+	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const selectedProject = $derived(
+		projects.data?.find((project) => project._id === activeProjectId) ?? null
 	);
+	const selectedThread = $derived(
+		threads.data?.find((thread) => thread._id === activeThreadId) ?? null
+	);
+	const generalThreads = $derived(
+		threads.data?.filter((thread) => thread.scopeType === 'general') ?? []
+	);
+	const headerTitle = $derived(
+		selectedThread?.title ?? selectedProject?.name ?? (activeProjectId ? 'Project' : 'New Chat')
+	);
+	const headerDescription = $derived(
+		activeThreadId
+			? 'Active thread with explicit context.'
+			: activeProjectId
+				? 'Start a new chat in this project.'
+				: 'Start from a rough thought.'
+	);
+
+	const projectThreads = (projectId: string) =>
+		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
+
+	const createProject = async () => {
+		if (isCreatingProject) return;
+
+		const name = window.prompt('Project name');
+		if (!name?.trim()) return;
+
+		isCreatingProject = true;
+
+		try {
+			const result = await getConvexClient().mutation(createProjectMutation, {
+				name: name.trim()
+			});
+			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`));
+		} finally {
+			isCreatingProject = false;
+		}
+	};
 
 	const toggleThreadContext = async () => {
 		if (contextPanelOpen) {
@@ -133,27 +170,151 @@
 			</Sidebar.Header>
 
 			<Sidebar.Content>
-				{#each sections as section (section.label)}
-					<Collapsible.Root bind:open={openSections[section.label]}>
-						<Sidebar.Group>
-							<Collapsible.Trigger
-								class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-							>
-								<ChevronRightIcon
-									class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-								/>
-								<span class="min-w-0 truncate">{section.label}</span>
-							</Collapsible.Trigger>
-							<Collapsible.Content
-								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
-							>
-								<Sidebar.GroupContent>
-									<p class="px-2 py-1.5 text-xs text-muted-foreground/75">{section.empty}</p>
-								</Sidebar.GroupContent>
-							</Collapsible.Content>
-						</Sidebar.Group>
-					</Collapsible.Root>
-				{/each}
+				<Collapsible.Root bind:open={openSections.Projects}>
+					<Sidebar.Group>
+						<Collapsible.Trigger
+							class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+						>
+							<ChevronRightIcon
+								class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+							/>
+							<span class="min-w-0 truncate">Projects</span>
+						</Collapsible.Trigger>
+						<Sidebar.GroupAction
+							aria-label="New project"
+							aria-disabled={isCreatingProject}
+							onclick={createProject}
+						>
+							<FolderPlusIcon />
+						</Sidebar.GroupAction>
+						<Collapsible.Content
+							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+						>
+							<Sidebar.GroupContent>
+								<Sidebar.Menu>
+									{#if projects.data === undefined}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">Loading projects...</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else if projects.data.length === 0}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">No projects yet</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else}
+										{#each projects.data as project (project._id)}
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton
+													isActive={activeProjectId === project._id && !activeThreadId}
+													class="min-w-0"
+												>
+													{#snippet child({ props })}
+														<a
+															href={resolve(
+																`/workspace?project=${encodeURIComponent(project._id)}`
+															)}
+															{...props}
+														>
+															<FolderIcon />
+															<span class="min-w-0 truncate">{project.name}</span>
+														</a>
+													{/snippet}
+												</Sidebar.MenuButton>
+												<Sidebar.MenuSub>
+													{@const threadsForProject = projectThreads(project._id)}
+													{#if threads.data === undefined}
+														<Sidebar.MenuSubItem>
+															<Sidebar.MenuSubButton aria-disabled>
+																<span>Loading chats...</span>
+															</Sidebar.MenuSubButton>
+														</Sidebar.MenuSubItem>
+													{:else if threadsForProject.length === 0}
+														<Sidebar.MenuSubItem>
+															<Sidebar.MenuSubButton aria-disabled>
+																<span>No chats yet</span>
+															</Sidebar.MenuSubButton>
+														</Sidebar.MenuSubItem>
+													{:else}
+														{#each threadsForProject as thread (thread._id)}
+															<Sidebar.MenuSubItem>
+																<Sidebar.MenuSubButton isActive={activeThreadId === thread._id}>
+																	{#snippet child({ props })}
+																		<a
+																			href={resolve(
+																				`/workspace?project=${encodeURIComponent(project._id)}&thread=${encodeURIComponent(thread._id)}`
+																			)}
+																			{...props}
+																		>
+																			<MessageSquareTextIcon />
+																			<span>{thread.title}</span>
+																		</a>
+																	{/snippet}
+																</Sidebar.MenuSubButton>
+															</Sidebar.MenuSubItem>
+														{/each}
+													{/if}
+												</Sidebar.MenuSub>
+											</Sidebar.MenuItem>
+										{/each}
+									{/if}
+								</Sidebar.Menu>
+							</Sidebar.GroupContent>
+						</Collapsible.Content>
+					</Sidebar.Group>
+				</Collapsible.Root>
+
+				<Collapsible.Root bind:open={openSections.Chats}>
+					<Sidebar.Group>
+						<Collapsible.Trigger
+							class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+						>
+							<ChevronRightIcon
+								class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+							/>
+							<span class="min-w-0 truncate">General chats</span>
+						</Collapsible.Trigger>
+						<Collapsible.Content
+							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+						>
+							<Sidebar.GroupContent>
+								<Sidebar.Menu>
+									{#if threads.data === undefined}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">Loading chats...</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else if generalThreads.length === 0}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">No chats yet</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else}
+										{#each generalThreads as thread (thread._id)}
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton isActive={activeThreadId === thread._id} class="min-w-0">
+													{#snippet child({ props })}
+														<a
+															href={resolve(`/workspace?thread=${encodeURIComponent(thread._id)}`)}
+															{...props}
+														>
+															<MessageSquareTextIcon />
+															<span class="min-w-0 truncate">{thread.title}</span>
+														</a>
+													{/snippet}
+												</Sidebar.MenuButton>
+											</Sidebar.MenuItem>
+										{/each}
+									{/if}
+								</Sidebar.Menu>
+							</Sidebar.GroupContent>
+						</Collapsible.Content>
+					</Sidebar.Group>
+				</Collapsible.Root>
 			</Sidebar.Content>
 
 			<Sidebar.Footer>

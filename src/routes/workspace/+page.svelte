@@ -1,15 +1,19 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { auth, getConvexClient } from '$lib/auth.svelte';
+	import { createThreadMutation } from '$lib/chat';
 	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params';
 	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte';
 	import WorkspaceThreadMock from '$lib/components/workspaces/WorkspaceThreadMock.svelte';
+	import type { Id } from '../../convex/_generated/dataModel';
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
 	import TargetIcon from '@lucide/svelte/icons/target';
 	import { useSearchParams } from 'runed/kit';
 
 	const routeParams = useSearchParams(workspaceSearchParamsSchema);
+	const activeProjectId = $derived(routeParams.project.trim());
 	const activeThreadId = $derived(routeParams.thread.trim());
 
 	const suggestions = [
@@ -55,8 +59,24 @@
 		}
 	] as const;
 
-	const openMockThread = async () => {
-		await goto(resolve('/workspace?thread=demo'));
+	const startThread = async ({ text, modelId }: { text: string; modelId: string }) => {
+		if (!auth.isAuthenticated) {
+			await goto(resolve('/auth?redirectTo=/workspace'));
+			return;
+		}
+
+		const result = await getConvexClient().mutation(createThreadMutation, {
+			text,
+			modelId,
+			...(activeProjectId ? { projectId: activeProjectId as Id<'projects'> } : {})
+		});
+		const projectQuery = activeProjectId
+			? `project=${encodeURIComponent(activeProjectId)}&`
+			: '';
+
+		await goto(
+			resolve(`/workspace?${projectQuery}thread=${encodeURIComponent(result.threadId)}` as `/workspace?${string}`)
+		);
 	};
 </script>
 
@@ -74,6 +94,6 @@
 		placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
 		{suggestions}
 		{examples}
-		onSubmit={openMockThread}
+		onSubmit={startThread}
 	/>
 {/if}

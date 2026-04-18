@@ -45,6 +45,18 @@ const ideaScore = v.object({
 const ideaChatMessageRole = v.union(v.literal('system'), v.literal('user'), v.literal('assistant'));
 const chatThreadScopeType = v.union(v.literal('general'), v.literal('project'));
 const chatMessageRole = v.union(v.literal('system'), v.literal('user'), v.literal('assistant'));
+const artifactContentFormat = v.literal('markdown');
+const artifactMetadata = v.record(v.string(), v.any());
+const threadArtifactLinkReason = v.union(
+	v.literal('created'),
+	v.literal('referenced'),
+	v.literal('imported')
+);
+const artifactDraftChangeStatus = v.union(
+	v.literal('pending'),
+	v.literal('applied'),
+	v.literal('discarded')
+);
 
 export default defineSchema({
 	...authTables,
@@ -81,6 +93,49 @@ export default defineSchema({
 		.index('by_threadId_and_sequence', ['threadId', 'sequence'])
 		.index('by_threadId_and_messageId', ['threadId', 'messageId'])
 		.index('by_ownerId_and_createdAt', ['ownerId', 'createdAt']),
+	artifacts: defineTable({
+		ownerId: v.string(),
+		type: v.string(),
+		title: v.string(),
+		contentMarkdown: v.string(),
+		contentFormat: artifactContentFormat,
+		metadata: v.optional(artifactMetadata),
+		projectId: v.optional(v.id('projects')),
+		sourceThreadId: v.optional(v.id('chatThreads')),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt'])
+		.index('by_projectId_and_updatedAt', ['projectId', 'updatedAt'])
+		.index('by_sourceThreadId_and_updatedAt', ['sourceThreadId', 'updatedAt'])
+		.index('by_ownerId_and_type_and_updatedAt', ['ownerId', 'type', 'updatedAt']),
+	threadArtifactLinks: defineTable({
+		ownerId: v.string(),
+		threadId: v.id('chatThreads'),
+		artifactId: v.id('artifacts'),
+		reason: threadArtifactLinkReason,
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_threadId_and_updatedAt', ['threadId', 'updatedAt'])
+		.index('by_artifactId_and_updatedAt', ['artifactId', 'updatedAt'])
+		.index('by_threadId_and_artifactId', ['threadId', 'artifactId']),
+	artifactDraftChanges: defineTable({
+		ownerId: v.string(),
+		artifactId: v.id('artifacts'),
+		threadId: v.optional(v.id('chatThreads')),
+		proposedTitle: v.string(),
+		proposedContentMarkdown: v.string(),
+		summary: v.optional(v.string()),
+		status: artifactDraftChangeStatus,
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		appliedAt: v.optional(v.number()),
+		discardedAt: v.optional(v.number())
+	})
+		.index('by_artifactId_and_updatedAt', ['artifactId', 'updatedAt'])
+		.index('by_artifactId_and_status_and_updatedAt', ['artifactId', 'status', 'updatedAt'])
+		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt']),
 	prds: defineTable({
 		ownerId: v.string(),
 		title: v.string(),
