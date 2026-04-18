@@ -10,9 +10,11 @@
 
 import type * as auth from "../auth.js";
 import type * as authHelpers from "../authHelpers.js";
+import type * as chat from "../chat.js";
 import type * as http from "../http.js";
 import type * as ideas from "../ideas.js";
 import type * as prds from "../prds.js";
+import type * as projects from "../projects.js";
 
 import type {
   ApiFromModules,
@@ -23,9 +25,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authHelpers: typeof authHelpers;
+  chat: typeof chat;
   http: typeof http;
   ideas: typeof ideas;
   prds: typeof prds;
+  projects: typeof projects;
 }>;
 
 /**

@@ -43,9 +43,44 @@ const ideaScore = v.object({
 });
 
 const ideaChatMessageRole = v.union(v.literal('system'), v.literal('user'), v.literal('assistant'));
+const chatThreadScopeType = v.union(v.literal('general'), v.literal('project'));
+const chatMessageRole = v.union(v.literal('system'), v.literal('user'), v.literal('assistant'));
 
 export default defineSchema({
 	...authTables,
+	projects: defineTable({
+		ownerId: v.string(),
+		name: v.string(),
+		summary: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	}).index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt']),
+	chatThreads: defineTable({
+		ownerId: v.string(),
+		title: v.string(),
+		scopeType: chatThreadScopeType,
+		projectId: v.optional(v.id('projects')),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt'])
+		.index('by_ownerId_and_scopeType_and_updatedAt', ['ownerId', 'scopeType', 'updatedAt'])
+		.index('by_projectId_and_updatedAt', ['projectId', 'updatedAt']),
+	chatMessages: defineTable({
+		ownerId: v.string(),
+		threadId: v.id('chatThreads'),
+		messageId: v.string(),
+		role: chatMessageRole,
+		message: v.any(),
+		text: v.string(),
+		modelId: v.optional(v.string()),
+		sequence: v.number(),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_threadId_and_sequence', ['threadId', 'sequence'])
+		.index('by_threadId_and_messageId', ['threadId', 'messageId'])
+		.index('by_ownerId_and_createdAt', ['ownerId', 'createdAt']),
 	prds: defineTable({
 		ownerId: v.string(),
 		title: v.string(),
