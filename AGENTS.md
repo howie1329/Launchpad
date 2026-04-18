@@ -34,5 +34,5 @@ When working on Convex code, **always read `src/convex/_generated/ai/guidelines.
 
 Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
 
-**Ownership:** For app data keyed by user (`ownerId` on ideas, PRDs, etc.), use `getAuthUserId` from `@convex-dev/auth/server` via [`src/convex/authHelpers.ts`](src/convex/authHelpers.ts). Do not use `getUserIdentity().tokenIdentifier` for ownership — it includes the session id and changes on new sessions.
+**Ownership:** For app data keyed by user (`ownerId` on projects, threads, messages, artifacts, etc.), use `getAuthUserId` from `@convex-dev/auth/server` via [`src/convex/authHelpers.ts`](src/convex/authHelpers.ts). Do not use `getUserIdentity().tokenIdentifier` for ownership — it includes the session id and changes on new sessions.
 <!-- convex-ai-end -->

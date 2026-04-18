@@ -9,7 +9,7 @@ Paste into a GitHub issue when ready. Not blocking the surgical cleanup PR.
 
 ## Layout deduplication
 
-- Extract a shared authenticated shell (sidebar provider, nav structure, sign-out) from `src/routes/workspace/+layout.svelte` and `src/routes/dashboard/+layout.svelte` to reduce duplicated sidebar wiring. Do this only when touching those files for a feature, to keep diffs reviewable.
+- If a second authenticated shell is added later, extract shared sidebar provider / nav / sign-out from `src/routes/workspace/+layout.svelte` into a shared layout or component to avoid duplication.
 
 ## Dependency cleanup
 

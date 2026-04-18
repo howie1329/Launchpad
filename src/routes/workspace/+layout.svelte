@@ -6,12 +6,19 @@
 	import { listArtifactsQuery } from '$lib/artifacts'
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display'
 	import { listThreadsQuery } from '$lib/chat'
+	import { getAiBudgetStatusQuery } from '$lib/usage'
 	import { LaunchpadMark } from '$lib/components/brand'
 	import { Button } from '$lib/components/ui/button'
 	import * as Collapsible from '$lib/components/ui/collapsible'
+	import * as Dialog from '$lib/components/ui/dialog'
+	import * as HoverCard from '$lib/components/ui/hover-card/index.js'
+	import { Input } from '$lib/components/ui/input'
+	import { Label } from '$lib/components/ui/label'
 	import * as Sidebar from '$lib/components/ui/sidebar'
+	import { Textarea } from '$lib/components/ui/textarea'
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte'
 	import { createProjectMutation, listProjectsQuery } from '$lib/projects'
+	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign'
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
 	import FileTextIcon from '@lucide/svelte/icons/file-text'
 	import FolderIcon from '@lucide/svelte/icons/folder'
@@ -29,6 +36,10 @@
 	let sidebarOpen = $state(true)
 	let isSigningOut = $state(false)
 	let isCreatingProject = $state(false)
+	let projectDialogOpen = $state(false)
+	let projectName = $state('')
+	let projectSummary = $state('')
+	let projectError = $state('')
 	let openSections = $state({
 		Projects: true,
 		Chats: true
@@ -42,6 +53,7 @@
 	})
 
 	const pathname = $derived($page.url.pathname)
+	const isSettingsActive = $derived(pathname === '/workspace/settings')
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
 	const activeArtifactId = $derived($page.url.searchParams.get('artifact')?.trim() ?? '')
@@ -52,6 +64,7 @@
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
+	const budget = useQuery(getAiBudgetStatusQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const selectedProject = $derived(
 		projects.data?.find((project) => project._id === activeProjectId) ?? null
 	)
@@ -66,40 +79,69 @@
 	)
 	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact))
 	const headerTitle = $derived(
-		selectedThread?.title ??
-			selectedArtifact?.title ??
-			selectedProject?.name ??
-			(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat')
+		isSettingsActive
+			? 'Settings'
+			: selectedThread?.title ??
+					selectedArtifact?.title ??
+					selectedProject?.name ??
+					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat')
 	)
 	const headerDescription = $derived(
-		activeThreadId
-			? 'Active thread with explicit context.'
-			: activeArtifactId
-				? 'Saved workspace artifact.'
-				: activeProjectId
-					? 'Start a new chat in this project.'
-					: 'Start from a rough thought.'
+		isSettingsActive
+			? 'Manage workspace preferences.'
+			: activeThreadId
+				? 'Active thread with explicit context.'
+				: activeArtifactId
+					? 'Saved workspace artifact.'
+					: activeProjectId
+						? 'Start a new chat in this project.'
+						: 'Start from a rough thought.'
 	)
 
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? []
+	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject)
+
+	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 
 	const createProject = async () => {
 		if (isCreatingProject) return
 
-		const name = window.prompt('Project name')
-		if (!name?.trim()) return
+		const name = projectName.trim()
+		const summary = projectSummary.trim()
+
+		if (!name) {
+			projectError = 'Project name is required.'
+			return
+		}
 
 		isCreatingProject = true
+		projectError = ''
 
 		try {
 			const result = await getConvexClient().mutation(createProjectMutation, {
-				name: name.trim()
+				name,
+				...(summary ? { summary } : {})
 			})
+			projectDialogOpen = false
+			projectName = ''
+			projectSummary = ''
 			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`))
+		} catch (error) {
+			console.error(error)
+			projectError = 'Could not create this project. Please try again.'
 		} finally {
 			isCreatingProject = false
 		}
+	}
+
+	const closeProjectDialog = () => {
+		if (isCreatingProject) return
+
+		projectDialogOpen = false
+		projectName = ''
+		projectSummary = ''
+		projectError = ''
 	}
 
 	const toggleThreadContext = async () => {
@@ -210,7 +252,9 @@
 						<Sidebar.GroupAction
 							aria-label="New project"
 							aria-disabled={isCreatingProject}
-							onclick={createProject}
+							onclick={() => {
+								if (!isCreatingProject) projectDialogOpen = true
+							}}
 						>
 							<FolderPlusIcon />
 						</Sidebar.GroupAction>
@@ -408,9 +452,47 @@
 			<Sidebar.Footer>
 				<Sidebar.Menu>
 					<Sidebar.MenuItem>
-						<Sidebar.MenuButton tooltipContent="Settings" class="min-w-0">
+							<HoverCard.Root openDelay={120} closeDelay={60}>
+								<HoverCard.Trigger>
+								<Sidebar.MenuButton tooltipContent="Usage" class="min-w-0">
+									<CircleDollarSignIcon />
+									<span class="min-w-0 truncate">Usage</span>
+								</Sidebar.MenuButton>
+							</HoverCard.Trigger>
+							<HoverCard.Content align="start" side="right" class="w-64">
+								{#if budget.data}
+									<div class="space-y-1.5 p-0.5">
+										<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+											AI usage
+										</p>
+										<div class="flex items-center justify-between gap-3">
+											<span class="text-xs">Today</span>
+											<span class="text-xs font-medium">
+												{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
+											</span>
+										</div>
+										<div class="flex items-center justify-between gap-3">
+											<span class="text-xs text-muted-foreground">Remaining</span>
+											<span class="text-xs text-muted-foreground">
+												{money.format(budget.data.remainingUsd)}
+											</span>
+										</div>
+										<p class="pt-1 text-[11px] text-muted-foreground">Resets daily ({budget.data.dateKey}).</p>
+									</div>
+								{:else}
+									<p class="p-1 text-xs text-muted-foreground">Loading usage...</p>
+								{/if}
+							</HoverCard.Content>
+						</HoverCard.Root>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton
+							isActive={isSettingsActive}
+							tooltipContent="Settings"
+							class="min-w-0"
+						>
 							{#snippet child({ props })}
-								<a href={resolve('/dashboard/settings')} aria-label="Settings" {...props}>
+								<a href={resolve('/workspace/settings')} aria-label="Settings" {...props}>
 									<SettingsIcon />
 									<span class="min-w-0 truncate">Settings</span>
 								</a>
@@ -464,5 +546,65 @@
 				{@render children()}
 			</main>
 		</Sidebar.Inset>
+
+		<Dialog.Root bind:open={projectDialogOpen}>
+			<Dialog.Content class="sm:max-w-md">
+				<form
+					class="space-y-4"
+					onsubmit={(event) => {
+						event.preventDefault()
+						void createProject()
+					}}
+				>
+					<Dialog.Header>
+						<Dialog.Title>Create project</Dialog.Title>
+						<Dialog.Description>
+							Add a workspace for chats and artifacts that belong together.
+						</Dialog.Description>
+					</Dialog.Header>
+
+					<div class="space-y-3">
+						<div class="space-y-1.5">
+							<Label for="project-name">Name</Label>
+							<Input
+								id="project-name"
+								bind:value={projectName}
+								placeholder="Project name"
+								aria-invalid={projectError ? 'true' : undefined}
+								disabled={isCreatingProject}
+							/>
+						</div>
+						<div class="space-y-1.5">
+							<Label for="project-summary">Summary</Label>
+							<Textarea
+								id="project-summary"
+								bind:value={projectSummary}
+								placeholder="Optional project context"
+								class="min-h-20"
+								disabled={isCreatingProject}
+							/>
+						</div>
+					</div>
+
+					{#if projectError}
+						<p class="text-xs text-destructive">{projectError}</p>
+					{/if}
+
+					<Dialog.Footer>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={isCreatingProject}
+							onclick={closeProjectDialog}
+						>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={!canCreateProject}>
+							{isCreatingProject ? 'Creating...' : 'Create project'}
+						</Button>
+					</Dialog.Footer>
+				</form>
+			</Dialog.Content>
+		</Dialog.Root>
 	</Sidebar.Provider>
 {/if}

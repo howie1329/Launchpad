@@ -2,9 +2,8 @@
 	import { resolve } from '$app/paths';
 	import { auth, signOut } from '$lib/auth.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { isFeatureEnabled } from '$lib/feature-flags';
 
-	let { redirectTo = isFeatureEnabled('workspace') ? '/workspace' : '/dashboard', size = 'sm' } =
+	let { redirectTo = '/workspace', size = 'sm' } =
 		$props<{
 			redirectTo?: string;
 			size?: 'sm' | 'lg';

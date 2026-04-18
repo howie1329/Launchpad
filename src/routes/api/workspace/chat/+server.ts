@@ -10,7 +10,8 @@ import {
 	type SavedArtifact
 } from '$lib/artifacts'
 import { isIdeaAiModelId } from '$lib/idea-ai-models'
-import { getProjectQuery } from '$lib/projects'
+import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects'
+import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage'
 import type { RequestHandler } from '@sveltejs/kit'
 import { json } from '@sveltejs/kit'
 import { ConvexHttpClient } from 'convex/browser'
@@ -42,9 +43,11 @@ Be concise, practical, and collaborative. Ask sharp questions when context is mi
 You have tools for durable workspace memory:
 - Create new idea and PRD artifacts only after the user explicitly asks or confirms. If you think an artifact would help, suggest it first.
 - New artifacts save directly and are linked to the active thread.
+- Create a project from the active chat only after the user explicitly asks or confirms. This promotes the active thread into the new project and moves thread-linked artifacts into that project.
 - Never overwrite existing artifacts. When asked to revise an existing artifact, use proposeArtifactEdit so the user can apply or discard the draft.
 - Read or import project artifacts only when the user asks or clearly references project memory.
 - Only propose edits for artifacts already linked to this thread.
+- Future artifacts created after project promotion belong to that project automatically through the active thread.
 - PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.`
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -85,6 +88,20 @@ export const POST: RequestHandler = async ({ request }) => {
 			threadId: thread._id,
 			project: project as WorkspaceProject | null
 		})
+
+		const budget = await convex.query(getAiBudgetStatusQuery, {})
+		if (budget.isOverLimit) {
+			return json(
+				{
+					error: 'Daily AI limit reached',
+					capUsd: budget.capUsd,
+					spentUsd: budget.spentUsd,
+					dateKey: budget.dateKey
+				},
+				{ status: 429 }
+			)
+		}
+
 		const validatedMessages = await safeValidateUIMessages({
 			messages: body.messages
 		})
@@ -100,9 +117,52 @@ export const POST: RequestHandler = async ({ request }) => {
 			stopWhen: stepCountIs(8)
 		})
 
+		const accumulatedUsage = {
+			inputTokens: 0,
+			outputTokens: 0,
+			reasoningTokens: 0,
+			cachedInputTokens: 0
+		}
+		let hasUsage = false
+		let didRecordUsage = false
+
 		return await createAgentUIStreamResponse({
 			agent,
-			uiMessages: validatedMessages.data
+			uiMessages: validatedMessages.data,
+			onStepFinish: async (step) => {
+				const usage = step.usage ?? {}
+
+				const inputTokens = usage.inputTokens ?? 0
+				const outputTokens = usage.outputTokens ?? 0
+				const reasoningTokens = usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0
+				const cachedInputTokens =
+					usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0
+
+				accumulatedUsage.inputTokens += inputTokens
+				accumulatedUsage.outputTokens += outputTokens
+				accumulatedUsage.reasoningTokens += reasoningTokens
+				accumulatedUsage.cachedInputTokens += cachedInputTokens
+
+				if (
+					usage.inputTokens !== undefined ||
+					usage.outputTokens !== undefined ||
+					usage.reasoningTokens !== undefined ||
+					usage.cachedInputTokens !== undefined
+				) {
+					hasUsage = true
+				}
+
+				const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7
+				if (!isFinalStep || didRecordUsage || !hasUsage) return
+
+				didRecordUsage = true
+				await convex.mutation(recordAiRunMutation, {
+					threadId: thread._id,
+					modelId: body.modelId,
+					occurredAt: Date.now(),
+					usage: accumulatedUsage
+				})
+			}
 		})
 	} catch (error) {
 		console.error(error)
@@ -254,6 +314,34 @@ function workspaceTools({
 					title: input.title,
 					summary: 'Created PRD artifact.',
 					contentMarkdown
+				}
+			}
+		}),
+		createProjectFromThread: tool({
+			description:
+				'Create a project from the active chat after the user asks or confirms. Promotes this thread and assigns its linked artifacts to the new project.',
+			inputSchema: z.object({
+				name: z.string().min(1),
+				summary: z.string().optional()
+			}),
+			execute: async ({ name, summary }) => {
+				if (project) {
+					throw new Error('This thread already belongs to a project.')
+				}
+
+				const cleanName = name.trim()
+				const cleanSummary = summary?.trim()
+				const result = await convex.mutation(createProjectFromThreadMutation, {
+					threadId,
+					name: cleanName,
+					...(cleanSummary ? { summary: cleanSummary } : {})
+				})
+
+				return {
+					projectId: result.projectId,
+					name: cleanName,
+					...(cleanSummary ? { summary: cleanSummary } : {}),
+					linkedArtifactCount: result.linkedArtifactCount
 				}
 			}
 		}),
