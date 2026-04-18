@@ -1,20 +1,29 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { auth, getConvexClient } from '$lib/auth.svelte';
-	import { createThreadMutation } from '$lib/chat';
-	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params';
-	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte';
-	import WorkspaceThread from '$lib/components/workspaces/WorkspaceThread.svelte';
-	import type { Id } from '../../convex/_generated/dataModel';
-	import BoxIcon from '@lucide/svelte/icons/box';
-	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
-	import TargetIcon from '@lucide/svelte/icons/target';
-	import { useSearchParams } from 'runed/kit';
+	import { goto } from '$app/navigation'
+	import { resolve } from '$app/paths'
+	import { auth, getConvexClient } from '$lib/auth.svelte'
+	import { getArtifactQuery } from '$lib/artifacts'
+	import { createThreadMutation } from '$lib/chat'
+	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params'
+	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte'
+	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte'
+	import WorkspaceThread from '$lib/components/workspaces/WorkspaceThread.svelte'
+	import type { Id } from '../../convex/_generated/dataModel'
+	import BoxIcon from '@lucide/svelte/icons/box'
+	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list'
+	import TargetIcon from '@lucide/svelte/icons/target'
+	import { useQuery } from 'convex-svelte'
+	import { useSearchParams } from 'runed/kit'
 
-	const routeParams = useSearchParams(workspaceSearchParamsSchema);
-	const activeProjectId = $derived(routeParams.project.trim());
-	const activeThreadId = $derived(routeParams.thread.trim());
+	const routeParams = useSearchParams(workspaceSearchParamsSchema)
+	const activeProjectId = $derived(routeParams.project.trim())
+	const activeThreadId = $derived(routeParams.thread.trim())
+	const activeArtifactId = $derived(routeParams.artifact.trim())
+	const selectedArtifact = useQuery(getArtifactQuery, () =>
+		auth.isAuthenticated && activeArtifactId
+			? { artifactId: activeArtifactId as Id<'artifacts'> }
+			: 'skip'
+	)
 
 	const suggestions = [
 		{
@@ -33,7 +42,7 @@
 			label: 'Scope MVP',
 			prompt: 'Reduce this to the smallest useful MVP scope.'
 		}
-	] as const;
+	] as const
 
 	const examples = [
 		{
@@ -57,29 +66,27 @@
 				'This project feels promising. Help me shape it into a practical first-version PRD with clear must-haves and non-goals.',
 			icon: ClipboardListIcon
 		}
-	] as const;
+	] as const
 
 	const startThread = async ({ text, modelId }: { text: string; modelId: string }) => {
 		if (!auth.isAuthenticated) {
-			await goto(resolve('/auth?redirectTo=/workspace'));
-			return;
+			await goto(resolve('/auth?redirectTo=/workspace'))
+			return
 		}
 
 		const result = await getConvexClient().mutation(createThreadMutation, {
 			text,
 			modelId,
 			...(activeProjectId ? { projectId: activeProjectId as Id<'projects'> } : {})
-		});
-		const projectQuery = activeProjectId
-			? `project=${encodeURIComponent(activeProjectId)}&`
-			: '';
+		})
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
 
 		await goto(
 			resolve(
 				`/workspace?${projectQuery}thread=${encodeURIComponent(result.threadId)}&start=1` as `/workspace?${string}`
 			)
-		);
-	};
+		)
+	}
 </script>
 
 <svelte:head>
@@ -89,6 +96,8 @@
 
 {#if activeThreadId}
 	<WorkspaceThread />
+{:else if activeArtifactId}
+	<WorkspaceArtifactReader artifact={selectedArtifact.data} />
 {:else}
 	<WorkspaceChatLanding
 		title="What are we building?"

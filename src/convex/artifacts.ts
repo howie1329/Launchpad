@@ -58,6 +58,20 @@ export const createArtifact = mutation({
 	}
 })
 
+export const listArtifacts = query({
+	args: {},
+	handler: async (ctx) => {
+		const ownerId = await getOptionalAuthUserId(ctx)
+		if (!ownerId) return []
+
+		return await ctx.db
+			.query('artifacts')
+			.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
+			.order('desc')
+			.take(200)
+	}
+})
+
 export const listProjectArtifacts = query({
 	args: {
 		projectId: v.id('projects')

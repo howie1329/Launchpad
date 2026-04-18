@@ -1,126 +1,153 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
-	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
-	import { listThreadsQuery } from '$lib/chat';
-	import { LaunchpadMark } from '$lib/components/brand';
-	import { Button } from '$lib/components/ui/button';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Sidebar from '$lib/components/ui/sidebar';
-	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
-	import { createProjectMutation, listProjectsQuery } from '$lib/projects';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import FolderIcon from '@lucide/svelte/icons/folder';
-	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
-	import LogOutIcon from '@lucide/svelte/icons/log-out';
-	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
-	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
-	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
-	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import { useQuery } from 'convex-svelte';
+	import { goto } from '$app/navigation'
+	import { resolve } from '$app/paths'
+	import { page } from '$app/stores'
+	import { auth, getConvexClient, signOut } from '$lib/auth.svelte'
+	import { listArtifactsQuery } from '$lib/artifacts'
+	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display'
+	import { listThreadsQuery } from '$lib/chat'
+	import { LaunchpadMark } from '$lib/components/brand'
+	import { Button } from '$lib/components/ui/button'
+	import * as Collapsible from '$lib/components/ui/collapsible'
+	import * as Sidebar from '$lib/components/ui/sidebar'
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte'
+	import { createProjectMutation, listProjectsQuery } from '$lib/projects'
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
+	import FileTextIcon from '@lucide/svelte/icons/file-text'
+	import FolderIcon from '@lucide/svelte/icons/folder'
+	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus'
+	import LogOutIcon from '@lucide/svelte/icons/log-out'
+	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus'
+	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text'
+	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close'
+	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open'
+	import SettingsIcon from '@lucide/svelte/icons/settings'
+	import { useQuery } from 'convex-svelte'
 
-	let { children } = $props();
+	let { children } = $props()
 
-	let sidebarOpen = $state(true);
-	let isSigningOut = $state(false);
-	let isCreatingProject = $state(false);
+	let sidebarOpen = $state(true)
+	let isSigningOut = $state(false)
+	let isCreatingProject = $state(false)
 	let openSections = $state({
 		Projects: true,
 		Chats: true
-	});
+	})
+	let artifactSectionsOpen = $state({
+		idea: true,
+		prd: true,
+		research: false,
+		markdown: false,
+		other: false
+	})
 
-	const pathname = $derived($page.url.pathname);
-	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
-	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
-	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
-	const isNewChatActive = $derived(pathname === '/workspace' && !activeProjectId && !activeThreadId);
-	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
-	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const pathname = $derived($page.url.pathname)
+	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
+	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
+	const activeArtifactId = $derived($page.url.searchParams.get('artifact')?.trim() ?? '')
+	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
+	const isNewChatActive = $derived(
+		pathname === '/workspace' && !activeProjectId && !activeThreadId && !activeArtifactId
+	)
+	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
+	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
+	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const selectedProject = $derived(
 		projects.data?.find((project) => project._id === activeProjectId) ?? null
-	);
+	)
 	const selectedThread = $derived(
 		threads.data?.find((thread) => thread._id === activeThreadId) ?? null
-	);
+	)
+	const selectedArtifact = $derived(
+		artifacts.data?.find((artifact) => artifact._id === activeArtifactId) ?? null
+	)
 	const generalThreads = $derived(
 		threads.data?.filter((thread) => thread.scopeType === 'general') ?? []
-	);
+	)
+	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact))
 	const headerTitle = $derived(
-		selectedThread?.title ?? selectedProject?.name ?? (activeProjectId ? 'Project' : 'New Chat')
-	);
+		selectedThread?.title ??
+			selectedArtifact?.title ??
+			selectedProject?.name ??
+			(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat')
+	)
 	const headerDescription = $derived(
 		activeThreadId
 			? 'Active thread with explicit context.'
-			: activeProjectId
-				? 'Start a new chat in this project.'
-				: 'Start from a rough thought.'
-	);
+			: activeArtifactId
+				? 'Saved workspace artifact.'
+				: activeProjectId
+					? 'Start a new chat in this project.'
+					: 'Start from a rough thought.'
+	)
 
 	const projectThreads = (projectId: string) =>
-		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
+		threads.data?.filter((thread) => thread.projectId === projectId) ?? []
 
 	const createProject = async () => {
-		if (isCreatingProject) return;
+		if (isCreatingProject) return
 
-		const name = window.prompt('Project name');
-		if (!name?.trim()) return;
+		const name = window.prompt('Project name')
+		if (!name?.trim()) return
 
-		isCreatingProject = true;
+		isCreatingProject = true
 
 		try {
 			const result = await getConvexClient().mutation(createProjectMutation, {
 				name: name.trim()
-			});
-			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`));
+			})
+			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`))
 		} finally {
-			isCreatingProject = false;
+			isCreatingProject = false
 		}
-	};
+	}
 
 	const toggleThreadContext = async () => {
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+
 		if (contextPanelOpen) {
 			await goto(
-				resolve(`/workspace?thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`),
+				resolve(
+					`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
+				),
 				{
 					noScroll: true,
 					keepFocus: true
 				}
-			);
-			return;
+			)
+			return
 		}
 
 		await goto(
 			resolve(
-				`/workspace?thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
+				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
 			),
 			{
 				noScroll: true,
 				keepFocus: true
 			}
-		);
-	};
+		)
+	}
 
 	const handleSignOut = async () => {
-		if (isSigningOut) return;
+		if (isSigningOut) return
 
-		isSigningOut = true;
+		isSigningOut = true
 
 		try {
-			await signOut();
-			await goto(resolve('/'));
+			await signOut()
+			await goto(resolve('/'))
 		} finally {
-			isSigningOut = false;
+			isSigningOut = false
 		}
-	};
+	}
 
 	$effect(() => {
 		if (!auth.isLoading && !auth.isAuthenticated) {
-			const nextPath = pathname.startsWith('/workspace') ? pathname : '/workspace';
-			void goto(resolve(`/auth?redirectTo=${encodeURIComponent(nextPath)}`));
+			const nextPath = pathname.startsWith('/workspace') ? pathname : '/workspace'
+			void goto(resolve(`/auth?redirectTo=${encodeURIComponent(nextPath)}`))
 		}
-	});
+	})
 </script>
 
 {#if auth.isLoading || !auth.isAuthenticated}
@@ -296,7 +323,10 @@
 									{:else}
 										{#each generalThreads as thread (thread._id)}
 											<Sidebar.MenuItem>
-												<Sidebar.MenuButton isActive={activeThreadId === thread._id} class="min-w-0">
+												<Sidebar.MenuButton
+													isActive={activeThreadId === thread._id}
+													class="min-w-0"
+												>
 													{#snippet child({ props })}
 														<a
 															href={resolve(`/workspace?thread=${encodeURIComponent(thread._id)}`)}
@@ -315,6 +345,64 @@
 						</Collapsible.Content>
 					</Sidebar.Group>
 				</Collapsible.Root>
+
+				{#each artifactGroups as group (group.key)}
+					<Collapsible.Root bind:open={artifactSectionsOpen[group.key]}>
+						<Sidebar.Group>
+							<Collapsible.Trigger
+								class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+							>
+								<ChevronRightIcon
+									class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								/>
+								<span class="min-w-0 truncate">{group.label}</span>
+							</Collapsible.Trigger>
+							<Collapsible.Content
+								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+							>
+								<Sidebar.GroupContent>
+									<Sidebar.Menu>
+										{#if artifacts.data === undefined}
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton aria-disabled class="min-w-0">
+													<span class="min-w-0 truncate">Loading artifacts...</span>
+												</Sidebar.MenuButton>
+											</Sidebar.MenuItem>
+										{:else if group.artifacts.length === 0}
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton aria-disabled class="min-w-0">
+													<span class="min-w-0 truncate">No artifacts yet</span>
+												</Sidebar.MenuButton>
+											</Sidebar.MenuItem>
+										{:else}
+											{#each group.artifacts as artifact (artifact._id)}
+												<Sidebar.MenuItem>
+													<Sidebar.MenuButton
+														isActive={activeArtifactId === artifact._id && !activeThreadId}
+														class="min-w-0"
+													>
+														{#snippet child({ props })}
+															<a
+																href={resolve(
+																	`/workspace?artifact=${encodeURIComponent(artifact._id)}` as `/workspace?${string}`
+																)}
+																{...props}
+															>
+																<FileTextIcon />
+																<span class="min-w-0 truncate">{artifact.title}</span>
+																<span class="sr-only">{artifactTypeLabel(artifact.type)}</span>
+															</a>
+														{/snippet}
+													</Sidebar.MenuButton>
+												</Sidebar.MenuItem>
+											{/each}
+										{/if}
+									</Sidebar.Menu>
+								</Sidebar.GroupContent>
+							</Collapsible.Content>
+						</Sidebar.Group>
+					</Collapsible.Root>
+				{/each}
 			</Sidebar.Content>
 
 			<Sidebar.Footer>

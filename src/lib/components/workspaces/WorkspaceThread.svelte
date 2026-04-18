@@ -3,15 +3,17 @@
 	import { resolve } from '$app/paths'
 	import { page } from '$app/stores'
 	import { auth, getConvexClient } from '$lib/auth.svelte'
+	import { createArtifactMutation, listThreadArtifactsQuery } from '$lib/artifacts'
 	import {
-		applyArtifactDraftChangeMutation,
-		createArtifactMutation,
-		discardArtifactDraftChangeMutation,
-		listThreadArtifactsQuery,
-		listThreadDraftChangesQuery
-	} from '$lib/artifacts'
+		artifactPreview,
+		artifactTypeLabel,
+		groupArtifacts,
+		linkReasonLabel,
+		threadArtifactDoc
+	} from '$lib/artifact-display'
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat'
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte'
+	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte'
 	import {
 		Context,
 		ContextContent,
@@ -76,14 +78,13 @@
 	let modelSelectorOpen = $state(false)
 	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId)
 	let isSavingIdea = $state(false)
-	let busyDraftChangeId = $state('')
 	let artifactError = $state('')
-	let draftError = $state('')
 	let chatError = $state('')
 	let saveError = $state('')
 
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
+	const activeArtifactId = $derived($page.url.searchParams.get('artifact')?.trim() ?? '')
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
 	const startRequested = $derived($page.url.searchParams.get('start') === '1')
 	const selectedModel = $derived(
@@ -99,11 +100,22 @@
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
 	)
-	const threadDraftChanges = useQuery(listThreadDraftChangesQuery, () =>
-		auth.isAuthenticated && activeThreadId
-			? { threadId: activeThreadId as Id<'chatThreads'> }
-			: 'skip'
+	const groupedThreadArtifacts = $derived(
+		groupArtifacts(threadArtifacts.data ?? [], threadArtifactDoc)
 	)
+	const selectedThreadArtifact = $derived(
+		activeArtifactId
+			? (threadArtifacts.data?.find((item) => item.artifact._id === activeArtifactId) ?? null)
+			: null
+	)
+	const selectedContextArtifact = $derived(
+		activeArtifactId
+			? threadArtifacts.data === undefined
+				? undefined
+				: (selectedThreadArtifact?.artifact ?? null)
+			: null
+	)
+	const selectedContextLinkReason = $derived(selectedThreadArtifact?.link.reason)
 	const isChatBusy = $derived(chat?.status === 'submitted' || chat?.status === 'streaming')
 	const canSubmit = $derived(Boolean(composerText.trim()) && Boolean(chat) && !isChatBusy)
 	const canSaveIdea = $derived(Boolean(activeThreadId) && !isSavingIdea)
@@ -198,44 +210,40 @@
 		}
 	}
 
-	const applyDraftChange = async (draftChangeId: Id<'artifactDraftChanges'>) => {
-		if (busyDraftChangeId) return
-
-		draftError = ''
-		busyDraftChangeId = draftChangeId
-
-		try {
-			await getConvexClient().mutation(applyArtifactDraftChangeMutation, { draftChangeId })
-		} catch (error) {
-			console.error(error)
-			draftError = 'Could not apply this draft. Please try again.'
-		} finally {
-			busyDraftChangeId = ''
-		}
-	}
-
-	const discardDraftChange = async (draftChangeId: Id<'artifactDraftChanges'>) => {
-		if (busyDraftChangeId) return
-
-		draftError = ''
-		busyDraftChangeId = draftChangeId
-
-		try {
-			await getConvexClient().mutation(discardArtifactDraftChangeMutation, { draftChangeId })
-		} catch (error) {
-			console.error(error)
-			draftError = 'Could not discard this draft. Please try again.'
-		} finally {
-			busyDraftChangeId = ''
-		}
-	}
-
 	const closeContextPanel = async () => {
 		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
 
 		await goto(
 			resolve(
 				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
+			),
+			{
+				noScroll: true,
+				keepFocus: true
+			}
+		)
+	}
+
+	const openThreadArtifact = async (artifactId: string) => {
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+
+		await goto(
+			resolve(
+				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1&artifact=${encodeURIComponent(artifactId)}` as `/workspace?${string}`
+			),
+			{
+				noScroll: true,
+				keepFocus: true
+			}
+		)
+	}
+
+	const closeThreadArtifact = async () => {
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+
+		await goto(
+			resolve(
+				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
 			),
 			{
 				noScroll: true,
@@ -327,35 +335,6 @@
 		if (messageIndex !== messages.length - 1) return false
 		if (chat?.status !== 'submitted' && chat?.status !== 'streaming') return false
 		return !assistantSegmentsHaveContent(buildAssistantSegments(message))
-	}
-
-	const artifactTypeLabel = (type: string) => {
-		if (type === 'prd') return 'PRD'
-		if (type === 'idea') return 'Idea'
-		if (type === 'research') return 'Research'
-		if (type === 'markdown') return 'Markdown'
-		return type
-	}
-
-	const linkReasonLabel = (reason: 'created' | 'referenced' | 'imported') => {
-		if (reason === 'created') return 'Created in this thread'
-		if (reason === 'referenced') return 'Referenced here'
-		return 'Imported to this thread'
-	}
-
-	const artifactPreview = (contentMarkdown: string) => {
-		const firstLine = contentMarkdown
-			.split('\n')
-			.map((line) => line.trim())
-			.find(Boolean)
-
-		if (!firstLine) return 'No content yet.'
-		return firstLine.length > 140 ? `${firstLine.slice(0, 137)}...` : firstLine
-	}
-
-	const draftPreview = (contentMarkdown: string) => {
-		const preview = artifactPreview(contentMarkdown)
-		return preview.length > 120 ? `${preview.slice(0, 117)}...` : preview
 	}
 
 	const createArtifactTitle = (messages: UIMessage[]) => {
@@ -532,163 +511,110 @@
 				class="flex max-h-[min(44vh,25rem)] min-h-0 w-full shrink-0 flex-col border-t border-border/50 bg-background lg:max-h-none lg:w-[22rem] lg:border-t-0 lg:border-l"
 				aria-label="Thread context"
 			>
-				<div
-					class="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-4 py-3"
-				>
-					<div class="min-w-0">
-						<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							Thread context
-						</p>
-						<h2 class="mt-0.5 text-base font-semibold tracking-tight">Attached memory</h2>
-						<p class="mt-1 text-xs leading-5 text-muted-foreground">
-							Only artifacts created, referenced, or attached in this thread.
-						</p>
-					</div>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						class="size-8 shrink-0"
-						aria-label="Close thread context"
-						onclick={closeContextPanel}
+				{#if activeArtifactId}
+					<WorkspaceArtifactReader
+						artifact={selectedContextArtifact}
+						linkReason={selectedContextLinkReason}
+						compact
+						onBack={closeThreadArtifact}
+						onClose={closeContextPanel}
+					/>
+				{:else}
+					<div
+						class="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-4 py-3"
 					>
-						<XIcon class="size-3.5" />
-					</Button>
-				</div>
+						<div class="min-w-0">
+							<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+								Thread context
+							</p>
+							<h2 class="mt-0.5 text-base font-semibold tracking-tight">Attached memory</h2>
+							<p class="mt-1 text-xs leading-5 text-muted-foreground">
+								Only artifacts created, referenced, or attached in this thread.
+							</p>
+						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							class="size-8 shrink-0"
+							aria-label="Close thread context"
+							onclick={closeContextPanel}
+						>
+							<XIcon class="size-3.5" />
+						</Button>
+					</div>
 
-				<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-					<div class="space-y-4">
-						{#if threadDraftChanges.data === undefined}
-							<div class="space-y-1">
-								<p
-									class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-								>
-									Pending drafts
-								</p>
-								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading drafts...</p>
-							</div>
-						{:else if threadDraftChanges.data.length > 0}
-							<div class="space-y-1">
-								<p
-									class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-								>
-									Pending drafts
-								</p>
-								{#if draftError}
-									<p class="px-2 py-1 text-xs text-destructive">{draftError}</p>
-								{/if}
-								{#each threadDraftChanges.data as item (item.draftChange._id)}
-									<div class="rounded-md px-2 py-2.5">
-										<div class="flex items-start gap-3">
-											<div
-												class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent text-muted-foreground"
-											>
-												<FileTextIcon class="size-3.5" />
-											</div>
-											<div class="min-w-0 flex-1">
-												<div class="flex items-center justify-between gap-2">
-													<p class="truncate text-xs font-medium tracking-tight">
-														{item.draftChange.proposedTitle}
-													</p>
-													<span class="shrink-0 text-[10px] text-muted-foreground"> Draft </span>
-												</div>
-												<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
-													For {item.artifact.title}
-												</p>
-												{#if item.draftChange.summary}
-													<p class="mt-1 text-xs leading-5 text-foreground">
-														{item.draftChange.summary}
-													</p>
-												{/if}
-												<p class="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-													{draftPreview(item.draftChange.proposedContentMarkdown)}
-												</p>
-												<div class="mt-2 flex gap-2">
-													<Button
-														type="button"
-														size="sm"
-														class="h-7 px-2 text-xs"
-														disabled={Boolean(busyDraftChangeId)}
-														onclick={() => applyDraftChange(item.draftChange._id)}
+					<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+						{#if threadArtifacts.data === undefined}
+							<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
+						{:else if threadArtifacts.data.length === 0}
+							<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+								No artifacts attached to this thread yet.
+							</p>
+						{:else}
+							<div class="space-y-4">
+								{#each groupedThreadArtifacts as group (group.key)}
+									<div class="space-y-1">
+										<p
+											class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+										>
+											{group.label}
+										</p>
+										{#if group.artifacts.length === 0}
+											<p class="px-2 py-1.5 text-xs text-muted-foreground">No artifacts yet</p>
+										{:else}
+											{#each group.artifacts as item (item.link._id)}
+												<button
+													type="button"
+													class="group flex w-full gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													onclick={() => openThreadArtifact(item.artifact._id)}
+												>
+													<div
+														class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent text-muted-foreground group-hover:text-foreground"
 													>
-														{busyDraftChangeId === item.draftChange._id ? 'Applying...' : 'Apply'}
-													</Button>
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														class="h-7 px-2 text-xs text-muted-foreground"
-														disabled={Boolean(busyDraftChangeId)}
-														onclick={() => discardDraftChange(item.draftChange._id)}
-													>
-														{busyDraftChangeId === item.draftChange._id ? 'Working...' : 'Discard'}
-													</Button>
-												</div>
-											</div>
-										</div>
+														<FileTextIcon class="size-3.5" />
+													</div>
+													<span class="min-w-0 flex-1">
+														<span class="flex items-center justify-between gap-2">
+															<span class="truncate text-xs font-medium tracking-tight">
+																{item.artifact.title}
+															</span>
+															<span class="shrink-0 text-[10px] text-muted-foreground">
+																{artifactTypeLabel(item.artifact.type)}
+															</span>
+														</span>
+														<span class="mt-1 block text-[11px] leading-4 text-muted-foreground">
+															{linkReasonLabel(item.link.reason)}
+														</span>
+														<span class="mt-1 line-clamp-2 block text-xs leading-5 text-foreground">
+															{artifactPreview(item.artifact.contentMarkdown)}
+														</span>
+													</span>
+												</button>
+											{/each}
+										{/if}
 									</div>
 								{/each}
 							</div>
-						{:else if draftError}
-							<p class="px-2 py-1 text-xs text-destructive">{draftError}</p>
 						{/if}
-
-						<div class="space-y-1">
-							{#if threadArtifacts.data === undefined}
-								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
-							{:else if threadArtifacts.data.length === 0}
-								<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-									No artifacts attached to this thread yet.
-								</p>
-							{:else}
-								{#each threadArtifacts.data as item (item.link._id)}
-									<button
-										type="button"
-										class="group flex w-full gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-									>
-										<div
-											class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent text-muted-foreground group-hover:text-foreground"
-										>
-											<FileTextIcon class="size-3.5" />
-										</div>
-										<span class="min-w-0 flex-1">
-											<span class="flex items-center justify-between gap-2">
-												<span class="truncate text-xs font-medium tracking-tight">
-													{item.artifact.title}
-												</span>
-												<span class="shrink-0 text-[10px] text-muted-foreground">
-													{artifactTypeLabel(item.artifact.type)}
-												</span>
-											</span>
-											<span class="mt-1 block text-[11px] leading-4 text-muted-foreground">
-												{linkReasonLabel(item.link.reason)}
-											</span>
-											<span class="mt-1 line-clamp-2 block text-xs leading-5 text-foreground">
-												{artifactPreview(item.artifact.contentMarkdown)}
-											</span>
-										</span>
-									</button>
-								{/each}
-							{/if}
-						</div>
 					</div>
-				</div>
 
-				<div class="shrink-0 border-t border-border/50 px-4 py-3">
-					{#if artifactError}
-						<p class="mb-2 text-xs text-destructive">{artifactError}</p>
-					{/if}
-					<Button
-						type="button"
-						variant="secondary"
-						size="sm"
-						class="w-full justify-center text-xs"
-						disabled={!canSaveIdea}
-						onclick={saveThreadAsIdea}
-					>
-						{isSavingIdea ? 'Saving idea...' : 'Save as idea'}
-					</Button>
-				</div>
+					<div class="shrink-0 border-t border-border/50 px-4 py-3">
+						{#if artifactError}
+							<p class="mb-2 text-xs text-destructive">{artifactError}</p>
+						{/if}
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							class="w-full justify-center text-xs"
+							disabled={!canSaveIdea}
+							onclick={saveThreadAsIdea}
+						>
+							{isSavingIdea ? 'Saving idea...' : 'Save as idea'}
+						</Button>
+					</div>
+				{/if}
 			</aside>
 		{/if}
 	</div>

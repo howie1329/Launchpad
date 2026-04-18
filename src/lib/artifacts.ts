@@ -99,6 +99,12 @@ export const createArtifactMutation = makeFunctionReference<
 	CreateArtifactResult
 >('artifacts:createArtifact')
 
+export const listArtifactsQuery = makeFunctionReference<
+	'query',
+	Record<string, never>,
+	SavedArtifact[]
+>('artifacts:listArtifacts')
+
 export const listProjectArtifactsQuery = makeFunctionReference<
 	'query',
 	{ projectId: Id<'projects'> },
