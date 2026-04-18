@@ -1,8 +1,16 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params';
 	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte';
+	import WorkspaceThreadMock from '$lib/components/workspaces/WorkspaceThreadMock.svelte';
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
 	import TargetIcon from '@lucide/svelte/icons/target';
+	import { useSearchParams } from 'runed/kit';
+
+	const routeParams = useSearchParams(workspaceSearchParamsSchema);
+	const activeThreadId = $derived(routeParams.thread.trim());
 
 	const suggestions = [
 		{
@@ -46,6 +54,10 @@
 			icon: ClipboardListIcon
 		}
 	] as const;
+
+	const openMockThread = async () => {
+		await goto(resolve('/workspace?thread=demo'));
+	};
 </script>
 
 <svelte:head>
@@ -53,10 +65,15 @@
 	<meta name="description" content="Launchpad workspace." />
 </svelte:head>
 
-<WorkspaceChatLanding
-	title="What are we building?"
-	description="Start with a rough thought, customer quote, project idea, or problem."
-	placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
-	{suggestions}
-	{examples}
-/>
+{#if activeThreadId}
+	<WorkspaceThreadMock />
+{:else}
+	<WorkspaceChatLanding
+		title="What are we building?"
+		description="Start with a rough thought, customer quote, project idea, or problem."
+		placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
+		{suggestions}
+		{examples}
+		onSubmit={openMockThread}
+	/>
+{/if}

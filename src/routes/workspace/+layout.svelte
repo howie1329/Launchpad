@@ -4,12 +4,15 @@
 	import { page } from '$app/stores';
 	import { auth, signOut } from '$lib/auth.svelte';
 	import { LaunchpadMark } from '$lib/components/brand';
+	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
+	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
+	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 
 	let { children } = $props();
@@ -31,7 +34,36 @@
 	});
 
 	const pathname = $derived($page.url.pathname);
+	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
+	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
 	const isNewChatActive = $derived(pathname === '/workspace' && !$page.url.search);
+	const headerTitle = $derived(activeThreadId ? 'Customer notes into buildable scope' : 'New Chat');
+	const headerDescription = $derived(
+		activeThreadId ? 'Active thread with explicit context.' : 'Start from a rough thought.'
+	);
+
+	const toggleThreadContext = async () => {
+		if (contextPanelOpen) {
+			await goto(
+				resolve(`/workspace?thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`),
+				{
+					noScroll: true,
+					keepFocus: true
+				}
+			);
+			return;
+		}
+
+		await goto(
+			resolve(
+				`/workspace?thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
+			),
+			{
+				noScroll: true,
+				keepFocus: true
+			}
+		);
+	};
 
 	const handleSignOut = async () => {
 		if (isSigningOut) return;
@@ -157,9 +189,26 @@
 			>
 				<Sidebar.Trigger class="-ms-1" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-semibold tracking-tight">New Chat</p>
-					<p class="truncate text-[11px] text-muted-foreground">Start from a rough thought.</p>
+					<p class="truncate text-sm font-semibold tracking-tight">{headerTitle}</p>
+					<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
 				</div>
+				{#if activeThreadId}
+					<Button
+						type="button"
+						variant={contextPanelOpen ? 'secondary' : 'ghost'}
+						size="sm"
+						class="h-8 shrink-0 gap-1.5 text-xs"
+						onclick={toggleThreadContext}
+					>
+						{#if contextPanelOpen}
+							<PanelRightCloseIcon class="size-3.5" />
+							Hide context
+						{:else}
+							<PanelRightOpenIcon class="size-3.5" />
+							Thread context
+						{/if}
+					</Button>
+				{/if}
 			</header>
 
 			<main class="min-h-0 flex-1 overflow-hidden bg-background text-foreground">
