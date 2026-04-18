@@ -1,149 +1,160 @@
-import { makeFunctionReference } from 'convex/server';
-import type { Id } from '../convex/_generated/dataModel';
+import { makeFunctionReference } from 'convex/server'
+import type { Id } from '../convex/_generated/dataModel'
 
-export type ArtifactContentFormat = 'markdown';
-export type ArtifactLinkReason = 'created' | 'referenced' | 'imported';
-export type ArtifactDraftChangeStatus = 'pending' | 'applied' | 'discarded';
-export type ArtifactMetadata = Record<string, unknown>;
+export type ArtifactContentFormat = 'markdown'
+export type ArtifactLinkReason = 'created' | 'referenced' | 'imported'
+export type ArtifactDraftChangeStatus = 'pending' | 'applied' | 'discarded'
+export type ArtifactMetadata = Record<string, unknown>
 
 export type SavedArtifact = {
-	_id: Id<'artifacts'>;
-	_creationTime: number;
-	ownerId: Id<'users'>;
-	type: string;
-	title: string;
-	contentMarkdown: string;
-	contentFormat: ArtifactContentFormat;
-	metadata?: ArtifactMetadata;
-	projectId?: Id<'projects'>;
-	sourceThreadId?: Id<'chatThreads'>;
-	createdAt: number;
-	updatedAt: number;
-};
+	_id: Id<'artifacts'>
+	_creationTime: number
+	ownerId: Id<'users'>
+	type: string
+	title: string
+	contentMarkdown: string
+	contentFormat: ArtifactContentFormat
+	metadata?: ArtifactMetadata
+	projectId?: Id<'projects'>
+	sourceThreadId?: Id<'chatThreads'>
+	createdAt: number
+	updatedAt: number
+}
 
 export type ThreadArtifactLink = {
-	_id: Id<'threadArtifactLinks'>;
-	_creationTime: number;
-	ownerId: Id<'users'>;
-	threadId: Id<'chatThreads'>;
-	artifactId: Id<'artifacts'>;
-	reason: ArtifactLinkReason;
-	createdAt: number;
-	updatedAt: number;
-};
+	_id: Id<'threadArtifactLinks'>
+	_creationTime: number
+	ownerId: Id<'users'>
+	threadId: Id<'chatThreads'>
+	artifactId: Id<'artifacts'>
+	reason: ArtifactLinkReason
+	createdAt: number
+	updatedAt: number
+}
 
 export type ArtifactDraftChange = {
-	_id: Id<'artifactDraftChanges'>;
-	_creationTime: number;
-	ownerId: Id<'users'>;
-	artifactId: Id<'artifacts'>;
-	threadId?: Id<'chatThreads'>;
-	proposedTitle: string;
-	proposedContentMarkdown: string;
-	summary?: string;
-	status: ArtifactDraftChangeStatus;
-	createdAt: number;
-	updatedAt: number;
-	appliedAt?: number;
-	discardedAt?: number;
-};
+	_id: Id<'artifactDraftChanges'>
+	_creationTime: number
+	ownerId: Id<'users'>
+	artifactId: Id<'artifacts'>
+	threadId?: Id<'chatThreads'>
+	proposedTitle: string
+	proposedContentMarkdown: string
+	summary?: string
+	status: ArtifactDraftChangeStatus
+	createdAt: number
+	updatedAt: number
+	appliedAt?: number
+	discardedAt?: number
+}
 
 export type ThreadArtifact = {
-	link: ThreadArtifactLink;
-	artifact: SavedArtifact;
-};
+	link: ThreadArtifactLink
+	artifact: SavedArtifact
+}
+
+export type ThreadDraftChange = {
+	draftChange: ArtifactDraftChange
+	artifact: SavedArtifact
+}
 
 export type CreateArtifactArgs = {
-	type: string;
-	title: string;
-	contentMarkdown: string;
-	metadata?: ArtifactMetadata;
-	projectId?: Id<'projects'>;
-	sourceThreadId?: Id<'chatThreads'>;
-};
+	type: string
+	title: string
+	contentMarkdown: string
+	metadata?: ArtifactMetadata
+	projectId?: Id<'projects'>
+	sourceThreadId?: Id<'chatThreads'>
+}
 
 export type CreateArtifactResult = {
-	artifactId: Id<'artifacts'>;
-};
+	artifactId: Id<'artifacts'>
+}
 
 export type UpdateArtifactArgs = {
-	artifactId: Id<'artifacts'>;
-	title?: string;
-	contentMarkdown?: string;
-	metadata?: ArtifactMetadata | null;
-	projectId?: Id<'projects'> | null;
-};
+	artifactId: Id<'artifacts'>
+	title?: string
+	contentMarkdown?: string
+	metadata?: ArtifactMetadata | null
+	projectId?: Id<'projects'> | null
+}
 
 export type LinkArtifactToThreadArgs = {
-	threadId: Id<'chatThreads'>;
-	artifactId: Id<'artifacts'>;
-	reason: Exclude<ArtifactLinkReason, 'created'>;
-};
+	threadId: Id<'chatThreads'>
+	artifactId: Id<'artifacts'>
+	reason: Exclude<ArtifactLinkReason, 'created'>
+}
 
 export type CreateArtifactDraftChangeArgs = {
-	artifactId: Id<'artifacts'>;
-	threadId?: Id<'chatThreads'>;
-	proposedTitle: string;
-	proposedContentMarkdown: string;
-	summary?: string;
-};
+	artifactId: Id<'artifacts'>
+	threadId?: Id<'chatThreads'>
+	proposedTitle: string
+	proposedContentMarkdown: string
+	summary?: string
+}
 
 export const createArtifactMutation = makeFunctionReference<
 	'mutation',
 	CreateArtifactArgs,
 	CreateArtifactResult
->('artifacts:createArtifact');
+>('artifacts:createArtifact')
 
 export const listProjectArtifactsQuery = makeFunctionReference<
 	'query',
 	{ projectId: Id<'projects'> },
 	SavedArtifact[]
->('artifacts:listProjectArtifacts');
+>('artifacts:listProjectArtifacts')
 
 export const listThreadArtifactsQuery = makeFunctionReference<
 	'query',
 	{ threadId: Id<'chatThreads'> },
 	ThreadArtifact[]
->('artifacts:listThreadArtifacts');
+>('artifacts:listThreadArtifacts')
 
 export const getArtifactQuery = makeFunctionReference<
 	'query',
 	{ artifactId: Id<'artifacts'> },
 	SavedArtifact | null
->('artifacts:getArtifact');
+>('artifacts:getArtifact')
 
 export const updateArtifactMutation = makeFunctionReference<
 	'mutation',
 	UpdateArtifactArgs,
 	{ ok: true }
->('artifacts:updateArtifact');
+>('artifacts:updateArtifact')
 
 export const linkArtifactToThreadMutation = makeFunctionReference<
 	'mutation',
 	LinkArtifactToThreadArgs,
 	{ ok: true }
->('artifacts:linkArtifactToThread');
+>('artifacts:linkArtifactToThread')
 
 export const createArtifactDraftChangeMutation = makeFunctionReference<
 	'mutation',
 	CreateArtifactDraftChangeArgs,
 	{ draftChangeId: Id<'artifactDraftChanges'> }
->('artifacts:createArtifactDraftChange');
+>('artifacts:createArtifactDraftChange')
 
 export const listArtifactDraftChangesQuery = makeFunctionReference<
 	'query',
 	{ artifactId: Id<'artifacts'> },
 	ArtifactDraftChange[]
->('artifacts:listArtifactDraftChanges');
+>('artifacts:listArtifactDraftChanges')
+
+export const listThreadDraftChangesQuery = makeFunctionReference<
+	'query',
+	{ threadId: Id<'chatThreads'> },
+	ThreadDraftChange[]
+>('artifacts:listThreadDraftChanges')
 
 export const applyArtifactDraftChangeMutation = makeFunctionReference<
 	'mutation',
 	{ draftChangeId: Id<'artifactDraftChanges'> },
 	{ ok: true }
->('artifacts:applyArtifactDraftChange');
+>('artifacts:applyArtifactDraftChange')
 
 export const discardArtifactDraftChangeMutation = makeFunctionReference<
 	'mutation',
 	{ draftChangeId: Id<'artifactDraftChanges'> },
 	{ ok: true }
->('artifacts:discardArtifactDraftChange');
+>('artifacts:discardArtifactDraftChange')
