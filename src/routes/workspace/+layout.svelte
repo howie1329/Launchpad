@@ -18,6 +18,8 @@
 	import { Textarea } from '$lib/components/ui/textarea'
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte'
 	import { createProjectMutation, listProjectsQuery } from '$lib/projects'
+	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte'
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
 	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign'
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
 	import FileTextIcon from '@lucide/svelte/icons/file-text'
@@ -85,13 +87,11 @@
 	const headerDescription = $derived(
 		isSettingsActive
 			? 'Manage workspace preferences.'
-			: activeThreadId
+			: activeThreadId || activeArtifactId
 				? ''
-				: activeArtifactId
-					? 'Saved workspace artifact.'
-					: activeProjectId
-						? 'Start a new chat in this project.'
-						: 'Start from a rough thought.'
+				: activeProjectId
+					? 'Start a new chat in this project.'
+					: 'Start from a rough thought.'
 	)
 
 	const projectThreads = (projectId: string) =>
@@ -533,6 +533,54 @@
 						<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
 					{/if}
 				</div>
+				{#if workspaceArtifactChrome.value}
+					<div
+						class="flex max-w-[min(100%,20rem)] shrink-[2] flex-wrap items-center justify-end gap-1 sm:max-w-none"
+					>
+						{#if workspaceArtifactChrome.value.onBack}
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								class="size-8 shrink-0"
+								aria-label="Back to thread artifacts"
+								onclick={() => workspaceArtifactChrome.value?.onBack?.()}
+							>
+								<ChevronLeftIcon class="size-4" />
+							</Button>
+						{/if}
+						<div
+							class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5"
+						>
+							<Button
+								type="button"
+								size="sm"
+								variant={workspaceArtifactChrome.value.surfaceMode === 'read'
+									? 'secondary'
+									: 'ghost'}
+								class="h-7 rounded-sm px-2 text-xs font-medium"
+								onclick={() => workspaceArtifactChrome.value?.setRead()}
+							>
+								Read
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								variant={workspaceArtifactChrome.value.surfaceMode === 'compare'
+									? 'secondary'
+									: 'ghost'}
+								class="h-7 rounded-sm px-2 text-xs font-medium"
+								disabled={!workspaceArtifactChrome.value.canCompare}
+								title={!workspaceArtifactChrome.value.canCompare
+									? 'No pending AI drafts to compare'
+									: undefined}
+								onclick={() => workspaceArtifactChrome.value?.setCompare()}
+							>
+								Compare
+							</Button>
+						</div>
+					</div>
+				{/if}
 				{#if activeThreadId}
 					<Button
 						type="button"
