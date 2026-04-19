@@ -364,7 +364,7 @@
 				{#if chat}
 					<Conversation class="min-h-0 flex-1">
 						<ConversationContent
-							class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6"
+							class="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-5 sm:px-6"
 						>
 							{#each chat.messages as message, messageIndex (message.id)}
 								<Message from={message.role}>
@@ -372,7 +372,8 @@
 										{#if message.role === 'assistant'}
 											{@const segments = buildAssistantSegments(message)}
 											{#if assistantSegmentsHaveContent(segments)}
-												<div class="flex w-full min-w-0 flex-col gap-3">
+												<!-- gap-2: prose vs tools within one assistant turn; message gap-5 separates turns -->
+												<div class="flex w-full min-w-0 flex-col gap-2">
 													{#each segments as segment, segmentIndex (segmentIndex)}
 														{#if segment.kind === 'text'}
 															<MessageResponse
@@ -380,7 +381,9 @@
 																class="text-xs leading-relaxed"
 															/>
 														{:else}
-															<IdeaChatToolSteps tools={segment.tools} />
+															<div class="border-l border-border/40 pl-4 sm:pl-5">
+																<IdeaChatToolSteps tools={segment.tools} />
+															</div>
 														{/if}
 													{/each}
 												</div>
@@ -401,8 +404,10 @@
 
 							{#if chat.status === 'submitted'}
 								<Message from="assistant">
-									<MessageContent class="flex-row items-center gap-2 text-xs text-muted-foreground">
-										<LoaderCircleIcon class="size-3.5 animate-spin" />
+									<MessageContent
+										class="flex w-full min-w-0 flex-row items-center gap-2 text-muted-foreground"
+									>
+										<LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" />
 										Thinking...
 									</MessageContent>
 								</Message>
