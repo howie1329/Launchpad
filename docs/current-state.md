@@ -1,6 +1,6 @@
 # Launchpad — current state (maintainer snapshot)
 
-This document describes **what exists in the repository today**. For product intent and roadmap framing, see [chat-first-launchpad-prd.md](chat-first-launchpad-prd.md).
+This document describes **what exists in the repository today**. For a full **product-facing breakdown** (audience, features, routes, AI behavior), see [product-overview.md](product-overview.md). For product intent and roadmap framing, see [chat-first-launchpad-prd.md](chat-first-launchpad-prd.md).
 
 ## Product snapshot
 
@@ -16,7 +16,9 @@ The marketing page at **`/`** still frames a linear “idea → PRD → first we
 
 - `src/routes/+page.svelte` — `/`
 - `src/routes/auth/+page.svelte` — `/auth`
-- `src/routes/workspace/+layout.svelte`, `+page.svelte` — `/workspace` (query params: `project`, `thread`, `artifact`, `context`, etc.)
+- `src/routes/workspace/+layout.svelte`, `+page.svelte` — `/workspace` (query params: `project`, `thread`, `context`, `start`, etc.)
+- `src/routes/workspace/settings/+page.svelte` — `/workspace/settings` — timezone, daily AI cap, usage, activity
+- `src/routes/workspace/artifacts/[artifactId]/+page.svelte` — full-page artifact reader
 - `src/routes/api/workspace/chat/+server.ts` — `POST /api/workspace/chat` — streams AI output; uses Vercel AI SDK + AI Gateway; reads and writes Convex via HTTP for threads, artifacts, and draft changes
 
 ### Convex data model
