@@ -6,58 +6,48 @@
 		listArtifactDraftChangesQuery,
 		updateArtifactMutation,
 		type ArtifactDraftChange,
-		type ArtifactLinkReason,
 		type SavedArtifact
 	} from '$lib/artifacts'
-	import {
-		artifactTypeLabel,
-		draftPreview,
-		formatArtifactUpdatedAt,
-		linkReasonLabel
-	} from '$lib/artifact-display'
+	import { draftPreview } from '$lib/artifact-display'
 	import { Button } from '$lib/components/ui/button'
 	import ArtifactCodeEditor from '$lib/components/workspaces/ArtifactCodeEditor.svelte'
-	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
-	import PencilIcon from '@lucide/svelte/icons/pencil'
-	import SaveIcon from '@lucide/svelte/icons/save'
 	import FileTextIcon from '@lucide/svelte/icons/file-text'
-	import XIcon from '@lucide/svelte/icons/x'
+	import SaveIcon from '@lucide/svelte/icons/save'
 	import { useQuery } from 'convex-svelte'
 	import type { Id } from '../../../convex/_generated/dataModel'
 
 	let {
 		artifact,
-		linkReason,
 		compact = false,
-		showHeader = true,
-		fullWidthContent = false,
-		onBack,
-		onClose
+		fullWidthContent = false
 	}: {
 		artifact: SavedArtifact | null | undefined
-		linkReason?: ArtifactLinkReason
 		compact?: boolean
-		showHeader?: boolean
 		fullWidthContent?: boolean
-		onBack?: () => void
-		onClose?: () => void
 	} = $props()
+
+	type ArtifactViewMode = 'editor' | 'preview'
 
 	let busyDraftChangeId = $state('')
 	let draftError = $state('')
-	let isEditing = $state(false)
+	let isEditing = $state(true)
 	let editorValue = $state('')
 	let saveError = $state('')
 	let isSaving = $state(false)
+	let viewMode = $state<ArtifactViewMode>('editor')
 
 	const draftChanges = useQuery(listArtifactDraftChangesQuery, () =>
 		auth.isAuthenticated && artifact ? { artifactId: artifact._id as Id<'artifacts'> } : 'skip'
 	)
+
 	const pendingDraftChanges = $derived(
 		draftChanges.data?.filter((draftChange) => draftChange.status === 'pending') ?? []
 	)
+
 	const canSave = $derived(
 		Boolean(artifact) &&
+			isEditing &&
+			viewMode === 'editor' &&
 			editorValue.trim().length > 0 &&
 			editorValue !== (artifact?.contentMarkdown ?? '') &&
 			!isSaving
@@ -67,6 +57,17 @@
 		if (artifact === undefined || artifact === null || isEditing) return
 		editorValue = artifact.contentMarkdown
 		saveError = ''
+	})
+
+	$effect(() => {
+		if (!artifact) return
+		if (viewMode === 'editor' && !isEditing) {
+			saveError = ''
+			isEditing = true
+		}
+		if (viewMode === 'preview' && isEditing) {
+			isEditing = false
+		}
 	})
 
 	const applyDraftChange = async (draftChangeId: Id<'artifactDraftChanges'>) => {
@@ -101,16 +102,15 @@
 		}
 	}
 
-	const startEditing = () => {
+	const setEditorMode = () => {
 		if (!artifact) return
-		editorValue = artifact.contentMarkdown
+		viewMode = 'editor'
 		saveError = ''
 		isEditing = true
 	}
 
-	const cancelEditing = () => {
-		if (!artifact) return
-		editorValue = artifact.contentMarkdown
+	const setPreviewMode = () => {
+		viewMode = 'preview'
 		saveError = ''
 		isEditing = false
 	}
@@ -126,7 +126,6 @@
 				artifactId: artifact._id,
 				contentMarkdown: editorValue
 			})
-			isEditing = false
 		} catch (error) {
 			console.error(error)
 			saveError = 'Could not save this artifact. Please try again.'
@@ -157,7 +156,8 @@
 					<Button
 						type="button"
 						size="sm"
-						class="h-7 px-2 text-xs"
+						variant="ghost"
+						class="h-6 px-2 text-xs text-muted-foreground hover:bg-accent/70 hover:text-foreground"
 						disabled={Boolean(busyDraftChangeId)}
 						onclick={() => applyDraftChange(draftChange._id)}
 					>
@@ -167,7 +167,7 @@
 						type="button"
 						variant="ghost"
 						size="sm"
-						class="h-7 px-2 text-xs text-muted-foreground"
+						class="h-6 px-2 text-xs text-muted-foreground hover:bg-accent/70 hover:text-foreground"
 						disabled={Boolean(busyDraftChangeId)}
 						onclick={() => discardDraftChange(draftChange._id)}
 					>
@@ -199,128 +199,6 @@
 			</div>
 		</div>
 	{:else}
-		{#if showHeader}
-			<header class="shrink-0 border-b border-border/50 px-4 py-3">
-				<div class="flex items-start justify-between gap-3">
-					<div class="flex min-w-0 flex-1 items-start gap-2">
-						{#if onBack}
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								aria-label="Back to artifacts"
-								onclick={onBack}
-							>
-								<ArrowLeftIcon class="size-3.5" />
-							</Button>
-						{/if}
-						<div class="min-w-0">
-							<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-								{artifactTypeLabel(artifact.type)}
-							</p>
-							<h2 class="mt-0.5 text-base font-semibold tracking-tight">{artifact.title}</h2>
-							<p class="mt-1 text-xs leading-5 text-muted-foreground">
-								Updated {formatArtifactUpdatedAt(artifact.updatedAt)}
-								{#if linkReason}
-									<span> · {linkReasonLabel(linkReason)}</span>
-								{/if}
-							</p>
-						</div>
-					</div>
-					{#if onClose}
-						<div class="flex shrink-0 items-center gap-1">
-							{#if isEditing}
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									class="h-8 px-2 text-xs text-muted-foreground"
-									disabled={isSaving}
-									onclick={cancelEditing}
-								>
-									Cancel
-								</Button>
-								<Button
-									type="button"
-									size="sm"
-									class="h-8 gap-1.5 px-2 text-xs"
-									disabled={!canSave}
-									onclick={saveChanges}
-								>
-									<SaveIcon class="size-3.5" />
-									{isSaving ? 'Saving...' : 'Save'}
-								</Button>
-							{:else}
-								<Button
-									type="button"
-									variant="ghost"
-									size={compact ? 'icon' : 'sm'}
-									class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
-									aria-label="Edit artifact"
-									onclick={startEditing}
-								>
-									<PencilIcon class="size-3.5" />
-									{#if !compact}
-										Edit
-									{/if}
-								</Button>
-							{/if}
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								aria-label="Close artifact"
-								onclick={onClose}
-							>
-								<XIcon class="size-3.5" />
-							</Button>
-						</div>
-					{:else}
-						<div class="flex shrink-0 items-center gap-1">
-							{#if isEditing}
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									class="h-8 px-2 text-xs text-muted-foreground"
-									disabled={isSaving}
-									onclick={cancelEditing}
-								>
-									Cancel
-								</Button>
-								<Button
-									type="button"
-									size="sm"
-									class="h-8 gap-1.5 px-2 text-xs"
-									disabled={!canSave}
-									onclick={saveChanges}
-								>
-									<SaveIcon class="size-3.5" />
-									{isSaving ? 'Saving...' : 'Save'}
-								</Button>
-							{:else}
-								<Button
-									type="button"
-									variant="ghost"
-									size={compact ? 'icon' : 'sm'}
-									class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
-									aria-label="Edit artifact"
-									onclick={startEditing}
-								>
-									<PencilIcon class="size-3.5" />
-									{#if !compact}
-										Edit
-									{/if}
-								</Button>
-							{/if}
-						</div>
-					{/if}
-				</div>
-			</header>
-		{/if}
-
 		<div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
 			<div
 				class={
@@ -358,12 +236,24 @@
 							compact ? 'min-h-[12rem]' : 'min-h-[18rem]'
 						}`}
 					>
-						<ArtifactCodeEditor
-							value={editorValue}
-							readOnly={!isEditing}
-							{compact}
-							onChange={(nextValue) => (editorValue = nextValue)}
-						/>
+						{#if viewMode === 'editor'}
+							<ArtifactCodeEditor
+								value={editorValue}
+								readOnly={!isEditing}
+								{compact}
+								onChange={(nextValue) => (editorValue = nextValue)}
+							/>
+						{:else}
+							<div class="h-full min-h-[inherit] overflow-y-auto bg-background px-4 py-3">
+								{#if editorValue.trim().length === 0}
+									<p class="text-xs text-muted-foreground">Nothing to preview yet.</p>
+								{:else}
+									<pre
+										class="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-foreground"
+									>{editorValue}</pre>
+								{/if}
+							</div>
+						{/if}
 					</div>
 					{#if saveError}
 						<p class="mt-2 text-xs text-destructive">{saveError}</p>
@@ -371,5 +261,43 @@
 				</div>
 			</div>
 		</div>
+
+		<footer class="shrink-0 border-t border-border/50 px-0 py-1.5">
+			<div class="flex w-full items-center justify-between gap-2">
+				<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
+					<Button
+						type="button"
+						size="sm"
+						variant={viewMode === 'editor' ? 'default' : 'ghost'}
+						class="h-6 rounded-sm px-2 text-xs"
+						onclick={setEditorMode}
+					>
+						Editor
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						variant={viewMode === 'preview' ? 'default' : 'ghost'}
+						class="h-6 rounded-sm px-2 text-xs"
+						onclick={setPreviewMode}
+					>
+						Preview
+					</Button>
+				</div>
+
+				{#if viewMode === 'editor'}
+					<Button
+						type="button"
+						size="sm"
+						class="h-6 gap-1.5 px-2 text-xs"
+						disabled={!canSave}
+						onclick={saveChanges}
+					>
+						<SaveIcon class="size-3.5" />
+						{isSaving ? 'Saving...' : 'Save'}
+					</Button>
+				{/if}
+			</div>
+		</footer>
 	{/if}
 </section>
