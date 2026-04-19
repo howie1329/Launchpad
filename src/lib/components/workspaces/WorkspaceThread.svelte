@@ -81,10 +81,11 @@
 	let artifactError = $state('')
 	let chatError = $state('')
 	let saveError = $state('')
+	let contextArtifactId = $state('')
+	let lastThreadIdForContext = $state('')
 
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
-	const activeArtifactId = $derived($page.url.searchParams.get('artifact')?.trim() ?? '')
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
 	const startRequested = $derived($page.url.searchParams.get('start') === '1')
 	const selectedModel = $derived(
@@ -104,12 +105,12 @@
 		groupArtifacts(threadArtifacts.data ?? [], threadArtifactDoc)
 	)
 	const selectedThreadArtifact = $derived(
-		activeArtifactId
-			? (threadArtifacts.data?.find((item) => item.artifact._id === activeArtifactId) ?? null)
+		contextArtifactId
+			? (threadArtifacts.data?.find((item) => item.artifact._id === contextArtifactId) ?? null)
 			: null
 	)
 	const selectedContextArtifact = $derived(
-		activeArtifactId
+		contextArtifactId
 			? threadArtifacts.data === undefined
 				? undefined
 				: (selectedThreadArtifact?.artifact ?? null)
@@ -123,6 +124,13 @@
 		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}`
 	)
 	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4))
+
+	$effect(() => {
+		if (activeThreadId !== lastThreadIdForContext) {
+			lastThreadIdForContext = activeThreadId
+			contextArtifactId = ''
+		}
+	})
 
 	$effect(() => {
 		if (!activeThreadId || !threadMessages.data) {
@@ -262,20 +270,11 @@
 	}
 
 	const openThreadArtifact = async (artifactId: string) => {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+		if (contextPanelOpen) {
+			contextArtifactId = artifactId
+			return
+		}
 
-		await goto(
-			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1&artifact=${encodeURIComponent(artifactId)}` as `/workspace?${string}`
-			),
-			{
-				noScroll: true,
-				keepFocus: true
-			}
-		)
-	}
-
-	const closeThreadArtifact = async () => {
 		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
 
 		await goto(
@@ -287,6 +286,11 @@
 				keepFocus: true
 			}
 		)
+		contextArtifactId = artifactId
+	}
+
+	const closeThreadArtifact = () => {
+		contextArtifactId = ''
 	}
 
 	function createChat(threadId: string, messages: UIMessage[]) {
@@ -548,7 +552,7 @@
 				class="flex max-h-[min(44vh,25rem)] min-h-0 w-full shrink-0 flex-col border-t border-border/50 bg-background lg:max-h-none lg:w-[22rem] lg:border-t-0 lg:border-l"
 				aria-label="Thread context"
 			>
-				{#if activeArtifactId}
+				{#if contextArtifactId}
 					<WorkspaceArtifactReader
 						artifact={selectedContextArtifact}
 						linkReason={selectedContextLinkReason}

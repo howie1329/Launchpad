@@ -42,24 +42,20 @@
 	let projectError = $state('')
 	let openSections = $state({
 		Projects: true,
-		Chats: true
-	})
-	let artifactSectionsOpen = $state({
-		idea: true,
-		prd: true,
-		research: false,
-		markdown: false,
-		other: false
+		Chats: true,
+		Artifacts: true
 	})
 
 	const pathname = $derived($page.url.pathname)
 	const isSettingsActive = $derived(pathname === '/workspace/settings')
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
-	const activeArtifactId = $derived($page.url.searchParams.get('artifact')?.trim() ?? '')
+	const activeArtifactId = $derived(
+		/^\/workspace\/artifacts\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
+	)
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
 	const isNewChatActive = $derived(
-		pathname === '/workspace' && !activeProjectId && !activeThreadId && !activeArtifactId
+		pathname === '/workspace' && !activeProjectId && !activeThreadId
 	)
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
@@ -390,63 +386,75 @@
 					</Sidebar.Group>
 				</Collapsible.Root>
 
-				{#each artifactGroups as group (group.key)}
-					<Collapsible.Root bind:open={artifactSectionsOpen[group.key]}>
-						<Sidebar.Group>
-							<Collapsible.Trigger
-								class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-							>
-								<ChevronRightIcon
-									class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-								/>
-								<span class="min-w-0 truncate">{group.label}</span>
-							</Collapsible.Trigger>
-							<Collapsible.Content
-								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
-							>
-								<Sidebar.GroupContent>
-									<Sidebar.Menu>
-										{#if artifacts.data === undefined}
-											<Sidebar.MenuItem>
-												<Sidebar.MenuButton aria-disabled class="min-w-0">
-													<span class="min-w-0 truncate">Loading artifacts...</span>
-												</Sidebar.MenuButton>
-											</Sidebar.MenuItem>
-										{:else if group.artifacts.length === 0}
-											<Sidebar.MenuItem>
-												<Sidebar.MenuButton aria-disabled class="min-w-0">
-													<span class="min-w-0 truncate">No artifacts yet</span>
-												</Sidebar.MenuButton>
-											</Sidebar.MenuItem>
-										{:else}
-											{#each group.artifacts as artifact (artifact._id)}
-												<Sidebar.MenuItem>
-													<Sidebar.MenuButton
-														isActive={activeArtifactId === artifact._id && !activeThreadId}
-														class="min-w-0"
+				<Collapsible.Root bind:open={openSections.Artifacts}>
+					<Sidebar.Group>
+						<Collapsible.Trigger
+							class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+						>
+							<ChevronRightIcon
+								class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+							/>
+							<span class="min-w-0 truncate">Artifacts</span>
+						</Collapsible.Trigger>
+						<Collapsible.Content
+							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+						>
+							<Sidebar.GroupContent>
+								<Sidebar.Menu>
+									{#if artifacts.data === undefined}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">Loading artifacts...</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else if artifacts.data.length === 0}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">No artifacts yet</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else}
+										{#each artifactGroups as group (group.key)}
+											{#if group.artifacts.length > 0}
+												<li class="list-none px-2 pb-0.5 pt-2 first:pt-0" role="presentation">
+													<p
+														class="text-[11px] font-medium tracking-wide text-sidebar-foreground/50 uppercase"
 													>
-														{#snippet child({ props })}
-															<a
-																href={resolve(
-																	`/workspace?artifact=${encodeURIComponent(artifact._id)}` as `/workspace?${string}`
-																)}
-																{...props}
-															>
-																<FileTextIcon />
-																<span class="min-w-0 truncate">{artifact.title}</span>
-																<span class="sr-only">{artifactTypeLabel(artifact.type)}</span>
-															</a>
-														{/snippet}
-													</Sidebar.MenuButton>
-												</Sidebar.MenuItem>
-											{/each}
-										{/if}
-									</Sidebar.Menu>
-								</Sidebar.GroupContent>
-							</Collapsible.Content>
-						</Sidebar.Group>
-					</Collapsible.Root>
-				{/each}
+														{group.label}
+													</p>
+												</li>
+												{#each group.artifacts as artifact (artifact._id)}
+													<Sidebar.MenuItem>
+														<Sidebar.MenuButton
+															isActive={activeArtifactId === artifact._id && !activeThreadId}
+															class="min-w-0 gap-2"
+															tooltipContent={artifact.title}
+														>
+															{#snippet child({ props })}
+																<a
+																	href={resolve(
+																		`/workspace/artifacts/${encodeURIComponent(artifact._id)}`
+																	)}
+																	{...props}
+																>
+																	<FileTextIcon class="shrink-0" />
+																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
+																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
+																		{artifactTypeLabel(artifact.type)}
+																	</span>
+																</a>
+															{/snippet}
+														</Sidebar.MenuButton>
+													</Sidebar.MenuItem>
+												{/each}
+											{/if}
+										{/each}
+									{/if}
+								</Sidebar.Menu>
+							</Sidebar.GroupContent>
+						</Collapsible.Content>
+					</Sidebar.Group>
+				</Collapsible.Root>
 			</Sidebar.Content>
 
 			<Sidebar.Footer>
