@@ -2,28 +2,19 @@
 	import { goto } from '$app/navigation'
 	import { resolve } from '$app/paths'
 	import { auth, getConvexClient } from '$lib/auth.svelte'
-	import { getArtifactQuery } from '$lib/artifacts'
 	import { createThreadMutation } from '$lib/chat'
 	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params'
-	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte'
 	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte'
 	import WorkspaceThread from '$lib/components/workspaces/WorkspaceThread.svelte'
 	import type { Id } from '../../convex/_generated/dataModel'
 	import BoxIcon from '@lucide/svelte/icons/box'
 	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list'
 	import TargetIcon from '@lucide/svelte/icons/target'
-	import { useQuery } from 'convex-svelte'
 	import { useSearchParams } from 'runed/kit'
 
 	const routeParams = useSearchParams(workspaceSearchParamsSchema)
 	const activeProjectId = $derived(routeParams.project.trim())
 	const activeThreadId = $derived(routeParams.thread.trim())
-	const activeArtifactId = $derived(routeParams.artifact.trim())
-	const selectedArtifact = useQuery(getArtifactQuery, () =>
-		auth.isAuthenticated && activeArtifactId
-			? { artifactId: activeArtifactId as Id<'artifacts'> }
-			: 'skip'
-	)
 
 	const suggestions = [
 		{
@@ -96,8 +87,6 @@
 
 {#if activeThreadId}
 	<WorkspaceThread />
-{:else if activeArtifactId}
-	<WorkspaceArtifactReader artifact={selectedArtifact.data} />
 {:else}
 	<WorkspaceChatLanding
 		title="What are we building?"

@@ -9,10 +9,6 @@ export const workspaceSearchParamsSchema = createSearchParamsSchema({
 		type: 'string',
 		default: ''
 	},
-	artifact: {
-		type: 'string',
-		default: ''
-	},
 	context: {
 		type: 'string',
 		default: ''

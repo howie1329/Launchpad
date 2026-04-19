@@ -18,6 +18,8 @@
 	import { Textarea } from '$lib/components/ui/textarea'
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte'
 	import { createProjectMutation, listProjectsQuery } from '$lib/projects'
+	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte'
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
 	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign'
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
 	import FileTextIcon from '@lucide/svelte/icons/file-text'
@@ -42,24 +44,20 @@
 	let projectError = $state('')
 	let openSections = $state({
 		Projects: true,
-		Chats: true
-	})
-	let artifactSectionsOpen = $state({
-		idea: true,
-		prd: true,
-		research: false,
-		markdown: false,
-		other: false
+		Chats: true,
+		Artifacts: true
 	})
 
 	const pathname = $derived($page.url.pathname)
 	const isSettingsActive = $derived(pathname === '/workspace/settings')
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
-	const activeArtifactId = $derived($page.url.searchParams.get('artifact')?.trim() ?? '')
+	const activeArtifactId = $derived(
+		/^\/workspace\/artifacts\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
+	)
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
 	const isNewChatActive = $derived(
-		pathname === '/workspace' && !activeProjectId && !activeThreadId && !activeArtifactId
+		pathname === '/workspace' && !activeProjectId && !activeThreadId
 	)
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
@@ -89,13 +87,11 @@
 	const headerDescription = $derived(
 		isSettingsActive
 			? 'Manage workspace preferences.'
-			: activeThreadId
-				? 'Active thread with explicit context.'
-				: activeArtifactId
-					? 'Saved workspace artifact.'
-					: activeProjectId
-						? 'Start a new chat in this project.'
-						: 'Start from a rough thought.'
+			: activeThreadId || activeArtifactId
+				? ''
+				: activeProjectId
+					? 'Start a new chat in this project.'
+					: 'Start from a rough thought.'
 	)
 
 	const projectThreads = (projectId: string) =>
@@ -390,63 +386,75 @@
 					</Sidebar.Group>
 				</Collapsible.Root>
 
-				{#each artifactGroups as group (group.key)}
-					<Collapsible.Root bind:open={artifactSectionsOpen[group.key]}>
-						<Sidebar.Group>
-							<Collapsible.Trigger
-								class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-							>
-								<ChevronRightIcon
-									class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-								/>
-								<span class="min-w-0 truncate">{group.label}</span>
-							</Collapsible.Trigger>
-							<Collapsible.Content
-								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
-							>
-								<Sidebar.GroupContent>
-									<Sidebar.Menu>
-										{#if artifacts.data === undefined}
-											<Sidebar.MenuItem>
-												<Sidebar.MenuButton aria-disabled class="min-w-0">
-													<span class="min-w-0 truncate">Loading artifacts...</span>
-												</Sidebar.MenuButton>
-											</Sidebar.MenuItem>
-										{:else if group.artifacts.length === 0}
-											<Sidebar.MenuItem>
-												<Sidebar.MenuButton aria-disabled class="min-w-0">
-													<span class="min-w-0 truncate">No artifacts yet</span>
-												</Sidebar.MenuButton>
-											</Sidebar.MenuItem>
-										{:else}
-											{#each group.artifacts as artifact (artifact._id)}
-												<Sidebar.MenuItem>
-													<Sidebar.MenuButton
-														isActive={activeArtifactId === artifact._id && !activeThreadId}
-														class="min-w-0"
+				<Collapsible.Root bind:open={openSections.Artifacts}>
+					<Sidebar.Group>
+						<Collapsible.Trigger
+							class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+						>
+							<ChevronRightIcon
+								class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+							/>
+							<span class="min-w-0 truncate">Artifacts</span>
+						</Collapsible.Trigger>
+						<Collapsible.Content
+							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+						>
+							<Sidebar.GroupContent>
+								<Sidebar.Menu>
+									{#if artifacts.data === undefined}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">Loading artifacts...</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else if artifacts.data.length === 0}
+										<Sidebar.MenuItem>
+											<Sidebar.MenuButton aria-disabled class="min-w-0">
+												<span class="min-w-0 truncate">No artifacts yet</span>
+											</Sidebar.MenuButton>
+										</Sidebar.MenuItem>
+									{:else}
+										{#each artifactGroups as group (group.key)}
+											{#if group.artifacts.length > 0}
+												<li class="list-none px-2 pb-0.5 pt-2 first:pt-0" role="presentation">
+													<p
+														class="text-[11px] font-medium tracking-wide text-sidebar-foreground/50 uppercase"
 													>
-														{#snippet child({ props })}
-															<a
-																href={resolve(
-																	`/workspace?artifact=${encodeURIComponent(artifact._id)}` as `/workspace?${string}`
-																)}
-																{...props}
-															>
-																<FileTextIcon />
-																<span class="min-w-0 truncate">{artifact.title}</span>
-																<span class="sr-only">{artifactTypeLabel(artifact.type)}</span>
-															</a>
-														{/snippet}
-													</Sidebar.MenuButton>
-												</Sidebar.MenuItem>
-											{/each}
-										{/if}
-									</Sidebar.Menu>
-								</Sidebar.GroupContent>
-							</Collapsible.Content>
-						</Sidebar.Group>
-					</Collapsible.Root>
-				{/each}
+														{group.label}
+													</p>
+												</li>
+												{#each group.artifacts as artifact (artifact._id)}
+													<Sidebar.MenuItem>
+														<Sidebar.MenuButton
+															isActive={activeArtifactId === artifact._id && !activeThreadId}
+															class="min-w-0 gap-2"
+															tooltipContent={artifact.title}
+														>
+															{#snippet child({ props })}
+																<a
+																	href={resolve(
+																		`/workspace/artifacts/${encodeURIComponent(artifact._id)}`
+																	)}
+																	{...props}
+																>
+																	<FileTextIcon class="shrink-0" />
+																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
+																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
+																		{artifactTypeLabel(artifact.type)}
+																	</span>
+																</a>
+															{/snippet}
+														</Sidebar.MenuButton>
+													</Sidebar.MenuItem>
+												{/each}
+											{/if}
+										{/each}
+									{/if}
+								</Sidebar.Menu>
+							</Sidebar.GroupContent>
+						</Collapsible.Content>
+					</Sidebar.Group>
+				</Collapsible.Root>
 			</Sidebar.Content>
 
 			<Sidebar.Footer>
@@ -516,27 +524,76 @@
 
 		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
 			<header
-				class="flex h-12 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
+				class="flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
 			>
 				<Sidebar.Trigger class="-ms-1" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-semibold tracking-tight">{headerTitle}</p>
-					<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
+					<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+					{#if headerDescription}
+						<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
+					{/if}
 				</div>
+				{#if workspaceArtifactChrome.value}
+					<div
+						class="flex max-w-[min(100%,20rem)] shrink-[2] flex-wrap items-center justify-end gap-1 sm:max-w-none"
+					>
+						{#if workspaceArtifactChrome.value.onBack}
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								class="size-8 shrink-0"
+								aria-label="Back to thread artifacts"
+								onclick={() => workspaceArtifactChrome.value?.onBack?.()}
+							>
+								<ChevronLeftIcon class="size-4" />
+							</Button>
+						{/if}
+						<div
+							class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5"
+						>
+							<Button
+								type="button"
+								size="sm"
+								variant={workspaceArtifactChrome.value.surfaceMode === 'read'
+									? 'secondary'
+									: 'ghost'}
+								class="h-7 rounded-sm px-2 text-xs font-medium"
+								onclick={() => workspaceArtifactChrome.value?.setRead()}
+							>
+								Read
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								variant={workspaceArtifactChrome.value.surfaceMode === 'compare'
+									? 'secondary'
+									: 'ghost'}
+								class="h-7 rounded-sm px-2 text-xs font-medium"
+								disabled={!workspaceArtifactChrome.value.canCompare}
+								title={!workspaceArtifactChrome.value.canCompare
+									? 'No pending AI drafts to compare'
+									: undefined}
+								onclick={() => workspaceArtifactChrome.value?.setCompare()}
+							>
+								Compare
+							</Button>
+						</div>
+					</div>
+				{/if}
 				{#if activeThreadId}
 					<Button
 						type="button"
 						variant={contextPanelOpen ? 'secondary' : 'ghost'}
-						size="sm"
-						class="h-8 shrink-0 gap-1.5 text-xs"
+						size="icon"
+						class="size-8 shrink-0"
+						aria-label={contextPanelOpen ? 'Close thread context' : 'Open thread context'}
 						onclick={toggleThreadContext}
 					>
 						{#if contextPanelOpen}
 							<PanelRightCloseIcon class="size-3.5" />
-							Hide context
 						{:else}
 							<PanelRightOpenIcon class="size-3.5" />
-							Thread context
 						{/if}
 					</Button>
 				{/if}
