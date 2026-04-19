@@ -4,6 +4,7 @@
 		applyArtifactDraftChangeMutation,
 		discardArtifactDraftChangeMutation,
 		listArtifactDraftChangesQuery,
+		updateArtifactMutation,
 		type ArtifactDraftChange,
 		type ArtifactLinkReason,
 		type SavedArtifact
@@ -14,9 +15,11 @@
 		formatArtifactUpdatedAt,
 		linkReasonLabel
 	} from '$lib/artifact-display'
-	import { MessageResponse } from '$lib/components/ai-elements/new-message'
 	import { Button } from '$lib/components/ui/button'
+	import ArtifactCodeEditor from '$lib/components/workspaces/ArtifactCodeEditor.svelte'
 	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left'
+	import PencilIcon from '@lucide/svelte/icons/pencil'
+	import SaveIcon from '@lucide/svelte/icons/save'
 	import FileTextIcon from '@lucide/svelte/icons/file-text'
 	import XIcon from '@lucide/svelte/icons/x'
 	import { useQuery } from 'convex-svelte'
@@ -38,6 +41,10 @@
 
 	let busyDraftChangeId = $state('')
 	let draftError = $state('')
+	let isEditing = $state(false)
+	let editorValue = $state('')
+	let saveError = $state('')
+	let isSaving = $state(false)
 
 	const draftChanges = useQuery(listArtifactDraftChangesQuery, () =>
 		auth.isAuthenticated && artifact ? { artifactId: artifact._id as Id<'artifacts'> } : 'skip'
@@ -45,6 +52,18 @@
 	const pendingDraftChanges = $derived(
 		draftChanges.data?.filter((draftChange) => draftChange.status === 'pending') ?? []
 	)
+	const canSave = $derived(
+		Boolean(artifact) &&
+			editorValue.trim().length > 0 &&
+			editorValue !== (artifact?.contentMarkdown ?? '') &&
+			!isSaving
+	)
+
+	$effect(() => {
+		if (artifact === undefined || artifact === null || isEditing) return
+		editorValue = artifact.contentMarkdown
+		saveError = ''
+	})
 
 	const applyDraftChange = async (draftChangeId: Id<'artifactDraftChanges'>) => {
 		if (busyDraftChangeId) return
@@ -75,6 +94,40 @@
 			draftError = 'Could not discard this draft. Please try again.'
 		} finally {
 			busyDraftChangeId = ''
+		}
+	}
+
+	const startEditing = () => {
+		if (!artifact) return
+		editorValue = artifact.contentMarkdown
+		saveError = ''
+		isEditing = true
+	}
+
+	const cancelEditing = () => {
+		if (!artifact) return
+		editorValue = artifact.contentMarkdown
+		saveError = ''
+		isEditing = false
+	}
+
+	const saveChanges = async () => {
+		if (!artifact || !canSave) return
+
+		isSaving = true
+		saveError = ''
+
+		try {
+			await getConvexClient().mutation(updateArtifactMutation, {
+				artifactId: artifact._id,
+				contentMarkdown: editorValue
+			})
+			isEditing = false
+		} catch (error) {
+			console.error(error)
+			saveError = 'Could not save this artifact. Please try again.'
+		} finally {
+			isSaving = false
 		}
 	}
 </script>
@@ -171,16 +224,93 @@
 					</div>
 				</div>
 				{#if onClose}
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						class="size-8 shrink-0"
-						aria-label="Close artifact"
-						onclick={onClose}
-					>
-						<XIcon class="size-3.5" />
-					</Button>
+					<div class="flex shrink-0 items-center gap-1">
+						{#if isEditing}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="h-8 px-2 text-xs text-muted-foreground"
+								disabled={isSaving}
+								onclick={cancelEditing}
+							>
+								Cancel
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								class="h-8 gap-1.5 px-2 text-xs"
+								disabled={!canSave}
+								onclick={saveChanges}
+							>
+								<SaveIcon class="size-3.5" />
+								{isSaving ? 'Saving...' : 'Save'}
+							</Button>
+						{:else}
+							<Button
+								type="button"
+								variant="ghost"
+								size={compact ? 'icon' : 'sm'}
+								class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
+								aria-label="Edit artifact"
+								onclick={startEditing}
+							>
+								<PencilIcon class="size-3.5" />
+								{#if !compact}
+									Edit
+								{/if}
+							</Button>
+						{/if}
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							class="size-8 shrink-0"
+							aria-label="Close artifact"
+							onclick={onClose}
+						>
+							<XIcon class="size-3.5" />
+						</Button>
+					</div>
+				{:else}
+					<div class="flex shrink-0 items-center gap-1">
+						{#if isEditing}
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="h-8 px-2 text-xs text-muted-foreground"
+								disabled={isSaving}
+								onclick={cancelEditing}
+							>
+								Cancel
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								class="h-8 gap-1.5 px-2 text-xs"
+								disabled={!canSave}
+								onclick={saveChanges}
+							>
+								<SaveIcon class="size-3.5" />
+								{isSaving ? 'Saving...' : 'Save'}
+							</Button>
+						{:else}
+							<Button
+								type="button"
+								variant="ghost"
+								size={compact ? 'icon' : 'sm'}
+								class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
+								aria-label="Edit artifact"
+								onclick={startEditing}
+							>
+								<PencilIcon class="size-3.5" />
+								{#if !compact}
+									Edit
+								{/if}
+							</Button>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		</header>
@@ -212,10 +342,21 @@
 					<p class="mb-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 						Content
 					</p>
-					<MessageResponse
-						content={artifact.contentMarkdown}
-						class="text-xs leading-relaxed text-foreground"
-					/>
+					<div
+						class={`overflow-hidden rounded-md border border-border/70 ${
+							compact ? 'min-h-[12rem]' : 'min-h-[18rem]'
+						}`}
+					>
+						<ArtifactCodeEditor
+							value={editorValue}
+							readOnly={!isEditing}
+							{compact}
+							onChange={(nextValue) => (editorValue = nextValue)}
+						/>
+					</div>
+					{#if saveError}
+						<p class="mt-2 text-xs text-destructive">{saveError}</p>
+					{/if}
 				</div>
 			</div>
 		</div>
