@@ -4,7 +4,9 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { auth, getConvexClient } from '$lib/auth.svelte';
-	import { listThreadArtifactsQuery } from '$lib/artifacts';
+	import { listThreadArtifactsQuery, type ThreadArtifact } from '$lib/artifacts';
+	import { formatArtifactMentionToken } from '$lib/artifact-mention-tokens';
+	import { cn } from '$lib/utils';
 	import { formatArtifactCreatedAt } from '$lib/artifact-display';
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
@@ -64,6 +66,7 @@
 	import { Chat } from '@ai-sdk/svelte';
 	import { DefaultChatTransport, type UIMessage } from 'ai';
 	import { useQuery } from 'convex-svelte';
+	import { tick } from 'svelte';
 	import type { Id } from '../../../convex/_generated/dataModel';
 
 	let composerText = $state('');
@@ -79,6 +82,12 @@
 	let lastThreadIdForContext = $state('');
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
 	let mediaMinLg = $state(false);
+
+	/** @artifact mention picker (thread-linked artifacts only) */
+	let mentionOpen = $state(false);
+	let mentionStart = $state(0);
+	let mentionFilter = $state('');
+	let mentionHighlight = $state(0);
 
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
@@ -102,6 +111,19 @@
 			? [...threadArtifacts.data].sort((a, b) => b.artifact.createdAt - a.artifact.createdAt)
 			: []
 	);
+
+	const filteredMentionArtifacts = $derived.by(() => {
+		const rows = threadArtifacts.data ?? [];
+		const q = mentionFilter.trim().toLowerCase();
+		if (!q) return rows;
+		return rows.filter((item) => item.artifact.title.toLowerCase().includes(q));
+	});
+
+	$effect(() => {
+		if (!mentionOpen) return;
+		mentionFilter;
+		mentionHighlight = 0;
+	});
 	const selectedThreadArtifact = $derived(
 		contextArtifactId
 			? (threadArtifacts.data?.find((item) => item.artifact._id === contextArtifactId) ?? null)
@@ -176,6 +198,79 @@
 	const focusComposer = () => {
 		requestAnimationFrame(() => textareaRef?.focus());
 	};
+
+	function syncMentionFromComposer(el: HTMLTextAreaElement) {
+		const text = el.value;
+		const cursor = el.selectionStart ?? text.length;
+		const before = text.slice(0, cursor);
+		const lastAt = before.lastIndexOf('@');
+		if (lastAt === -1) {
+			mentionOpen = false;
+			return;
+		}
+		if (lastAt > 0) {
+			const ch = text[lastAt - 1];
+			if (ch && !/\s/.test(ch)) {
+				mentionOpen = false;
+				return;
+			}
+		}
+		const afterAt = before.slice(lastAt + 1);
+		if (afterAt.includes('\n')) {
+			mentionOpen = false;
+			return;
+		}
+		mentionStart = lastAt;
+		mentionFilter = afterAt;
+		mentionOpen = true;
+	}
+
+	function handleComposerInputPost(event: Event & { currentTarget: HTMLTextAreaElement }) {
+		syncMentionFromComposer(event.currentTarget);
+	}
+
+	function handleComposerKeyDown(e: KeyboardEvent): boolean {
+		if (!mentionOpen) return false;
+		const list = filteredMentionArtifacts;
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			mentionOpen = false;
+			return true;
+		}
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			mentionHighlight = Math.min(mentionHighlight + 1, Math.max(0, list.length - 1));
+			return true;
+		}
+		if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			mentionHighlight = Math.max(mentionHighlight - 1, 0);
+			return true;
+		}
+		if (e.key === 'Enter' && !e.shiftKey && list.length > 0) {
+			e.preventDefault();
+			const item = list[mentionHighlight];
+			if (item) void pickArtifactMention(item);
+			return true;
+		}
+		return false;
+	}
+
+	async function pickArtifactMention(item: ThreadArtifact) {
+		const el = textareaRef;
+		if (!el) return;
+		const text = composerText;
+		const cursor = el.selectionStart ?? text.length;
+		const start = mentionStart;
+		const token = `${formatArtifactMentionToken(item.artifact._id)} `;
+		const next = text.slice(0, start) + token + text.slice(cursor);
+		composerText = next;
+		mentionOpen = false;
+		await tick();
+		const pos = start + token.length;
+		el.setSelectionRange(pos, pos);
+		el.focus();
+	}
 
 	const selectModel = (modelId: IdeaAiModelId) => {
 		selectedModelId = modelId;
@@ -492,7 +587,41 @@
 				{/if}
 			</div>
 
-			<div class="shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
+			<div class="relative shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
+				{#if mentionOpen}
+					<div
+						class="absolute right-0 bottom-full left-0 z-20 mb-1 max-h-40 overflow-y-auto rounded-md border border-border/60 bg-popover text-popover-foreground shadow-md"
+						role="listbox"
+						aria-label="Thread artifacts"
+					>
+						{#if threadArtifacts.data === undefined}
+							<p class="px-3 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
+						{:else if filteredMentionArtifacts.length === 0}
+							<p class="px-3 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
+						{:else}
+							{#each filteredMentionArtifacts as item, i (item.artifact._id)}
+								<button
+									type="button"
+									role="option"
+									aria-selected={i === mentionHighlight}
+									class={cn(
+										'flex w-full flex-col gap-0.5 px-3 py-2 text-left text-xs transition-colors',
+										i === mentionHighlight ? 'bg-accent/60' : 'hover:bg-accent/50'
+									)}
+									onmouseenter={() => {
+										mentionHighlight = i;
+									}}
+									onclick={() => void pickArtifactMention(item)}
+								>
+									<span class="truncate font-medium">{item.artifact.title}</span>
+									<span class="text-[10px] text-muted-foreground">
+										{formatArtifactCreatedAt(item.artifact.createdAt)}
+									</span>
+								</button>
+							{/each}
+						{/if}
+					</div>
+				{/if}
 				<div class="w-full space-y-2">
 					{#if chatError || saveError}
 						<p class="text-xs text-destructive">{chatError || saveError}</p>
@@ -507,7 +636,9 @@
 							bind:ref={textareaRef}
 							bind:value={composerText}
 							class="min-h-20 px-4 py-4 text-sm"
-							placeholder="Continue shaping this thread..."
+							placeholder="Continue shaping this thread… (@ to cite a thread artifact)"
+							onInputPost={handleComposerInputPost}
+							onKeyDownIntercept={handleComposerKeyDown}
 						/>
 						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 							<PromptInputTools>

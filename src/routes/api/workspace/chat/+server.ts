@@ -9,6 +9,7 @@ import {
 	listThreadArtifactsQuery,
 	type SavedArtifact
 } from '$lib/artifacts';
+import { parseArtifactMentionIds } from '$lib/artifact-mention-tokens';
 import { artifactPreview } from '$lib/artifact-display';
 import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects';
@@ -22,7 +23,8 @@ import {
 	safeValidateUIMessages,
 	stepCountIs,
 	tool,
-	ToolLoopAgent
+	ToolLoopAgent,
+	type UIMessage
 } from 'ai';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { z } from 'zod';
@@ -30,6 +32,9 @@ import { z } from 'zod';
 const gateway = createGateway({
 	apiKey: AI_GATEWAY_API_KEY
 });
+
+/** Max markdown chars per artifact when expanding @artifact: mentions (per request). */
+const MAX_REFERENCED_ARTIFACT_CHARS = 14_000;
 
 type WorkspaceProject = {
 	_id: Id<'projects'>;
@@ -111,9 +116,20 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: 'Invalid chat messages' }, { status: 400 });
 		}
 
+		const lastUserText = lastUserMessageText(validatedMessages.data);
+		const referenced = await buildReferencedArtifactInstructions(convex, thread._id, lastUserText);
+		if (referenced.error) {
+			return json({ error: referenced.error }, { status: 400 });
+		}
+
+		const instructions =
+			referenced.block.length > 0
+				? `${workspaceInstructions(project)}\n\n${referenced.block}`
+				: workspaceInstructions(project);
+
 		const agent = new ToolLoopAgent({
 			model: gateway(body.modelId),
-			instructions: workspaceInstructions(project),
+			instructions,
 			tools,
 			stopWhen: stepCountIs(8)
 		});
@@ -405,6 +421,68 @@ async function getThreadArtifact(
 		artifact: row.artifact,
 		reason: row.link.reason
 	};
+}
+
+function extractTextFromUIMessage(message: UIMessage): string {
+	return message.parts
+		.filter(
+			(p): p is { type: 'text'; text: string } =>
+				p.type === 'text' && typeof (p as { text?: string }).text === 'string'
+		)
+		.map((p) => p.text)
+		.join('');
+}
+
+function lastUserMessageText(messages: UIMessage[]): string {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		if (messages[i].role === 'user') {
+			return extractTextFromUIMessage(messages[i]);
+		}
+	}
+	return '';
+}
+
+async function buildReferencedArtifactInstructions(
+	convex: ConvexHttpClient,
+	threadId: Id<'chatThreads'>,
+	lastUserText: string
+): Promise<{ block: string; error: string | null }> {
+	const ids = parseArtifactMentionIds(lastUserText);
+	if (ids.length === 0) {
+		return { block: '', error: null };
+	}
+
+	const sections: string[] = [];
+	for (const id of ids) {
+		try {
+			const { artifact } = await getThreadArtifact(convex, threadId, id);
+			let md = artifact.contentMarkdown;
+			let truncated = false;
+			if (md.length > MAX_REFERENCED_ARTIFACT_CHARS) {
+				md = md.slice(0, MAX_REFERENCED_ARTIFACT_CHARS);
+				truncated = true;
+			}
+			let block = `#### ${artifact.title}\nArtifact id: \`${artifact._id}\`\n\n${md}`;
+			if (truncated) {
+				block += `\n\n_[Content truncated for length. Use the readThreadArtifact tool with this artifact id for the full markdown.]_`;
+			}
+			sections.push(block);
+		} catch {
+			return {
+				block: '',
+				error: `Referenced artifact is not linked to this thread: ${id}`
+			};
+		}
+	}
+
+	const block = [
+		'### Explicitly referenced thread artifacts',
+		'The user included @artifact: tokens in their latest message. Treat the following markdown as primary context for this turn (in addition to any tools you call).',
+		'',
+		sections.join('\n\n---\n\n')
+	].join('\n');
+
+	return { block, error: null };
 }
 
 async function getProjectArtifact(
