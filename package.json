@@ -61,6 +61,7 @@
 	"dependencies": {
 		"@auth/core": "^0.37.0",
 		"@codemirror/lang-markdown": "^6.3.5",
+		"@codemirror/merge": "^6.12.1",
 		"@codemirror/state": "^6.5.2",
 		"@codemirror/view": "^6.38.6",
 		"@convex-dev/auth": "^0.0.91",
