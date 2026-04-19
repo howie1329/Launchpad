@@ -14,6 +14,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { cn } from '$lib/utils';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
@@ -28,6 +29,7 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
+	import MoreVerticalIcon from '@lucide/svelte/icons/more-vertical';
 	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -239,31 +241,34 @@
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
-					<Sidebar.MenuItem class="shrink-0">
-						<Sidebar.MenuButton
-							size="sm"
-							isActive={isNewChatActive}
-							class={cn(navPill, navPillPrimary)}
-						>
-							{#snippet child({ props })}
-								<a href={resolve('/workspace')} aria-label="New chat" {...props}>
-									<MessageSquarePlusIcon />
-									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
-										>New chat</span
-									>
-								</a>
-							{/snippet}
-							{#snippet tooltipContent()}
-								<span>New chat</span>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 			</Sidebar.Header>
 
 			<Sidebar.Content>
-				<Collapsible.Root bind:open={openSections.Projects}>
-					<Sidebar.Group>
+				<Sidebar.Group class="border-0 shadow-none ring-0">
+					<Sidebar.Menu>
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton
+								size="sm"
+								isActive={isNewChatActive}
+								class={cn(navPill, navPillPrimary)}
+								tooltipContent="New chat"
+							>
+								{#snippet child({ props })}
+									<a href={resolve('/workspace')} aria-label="New chat" {...props}>
+										<MessageSquarePlusIcon />
+										<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
+											>New chat</span
+										>
+									</a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					</Sidebar.Menu>
+				</Sidebar.Group>
+
+				<Collapsible.Root bind:open={openSections.Projects} class="border-0 shadow-none ring-0">
+					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
 							<ChevronRightIcon
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
@@ -271,6 +276,7 @@
 							<span class="min-w-0 truncate">Projects</span>
 						</Collapsible.Trigger>
 						<Sidebar.GroupAction
+							class="top-1 right-2"
 							aria-label="New project"
 							aria-disabled={isCreatingProject}
 							onclick={() => {
@@ -334,11 +340,11 @@
 														</Sidebar.MenuSubItem>
 													{:else}
 														{#each threadsForProject as thread (thread._id)}
-															<Sidebar.MenuSubItem>
+															<Sidebar.MenuSubItem class="flex min-w-0 items-center gap-0.5">
 																<Sidebar.MenuSubButton
 																	size="sm"
 																	isActive={activeThreadId === thread._id}
-																	class={subNavPill}
+																	class={cn(subNavPill, 'min-w-0 flex-1')}
 																>
 																	{#snippet child({ props })}
 																		<a
@@ -352,6 +358,26 @@
 																		</a>
 																	{/snippet}
 																</Sidebar.MenuSubButton>
+																<DropdownMenu.Root>
+																	<DropdownMenu.Trigger>
+																		{#snippet child({ props })}
+																			<button
+																				type="button"
+																				class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-offset-0 md:opacity-0 md:group-focus-within/menu-sub-item:opacity-100 md:group-hover/menu-sub-item:opacity-100"
+																				aria-label="Chat options"
+																				{...props}
+																			>
+																				<MoreVerticalIcon class="size-3.5" />
+																			</button>
+																		{/snippet}
+																	</DropdownMenu.Trigger>
+																	<DropdownMenu.Content align="end" class="min-w-[8rem]">
+																		<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
+																		<DropdownMenu.Item disabled variant="destructive"
+																			>Delete</DropdownMenu.Item
+																		>
+																	</DropdownMenu.Content>
+																</DropdownMenu.Root>
 															</Sidebar.MenuSubItem>
 														{/each}
 													{/if}
@@ -365,8 +391,8 @@
 					</Sidebar.Group>
 				</Collapsible.Root>
 
-				<Collapsible.Root bind:open={openSections.Chats}>
-					<Sidebar.Group>
+				<Collapsible.Root bind:open={openSections.Chats} class="border-0 shadow-none ring-0">
+					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
 							<ChevronRightIcon
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
@@ -409,6 +435,21 @@
 														</a>
 													{/snippet}
 												</Sidebar.MenuButton>
+												<DropdownMenu.Root>
+													<DropdownMenu.Trigger>
+														{#snippet child({ props })}
+															<Sidebar.MenuAction {...props} showOnHover>
+																<MoreVerticalIcon class="size-3.5" />
+															</Sidebar.MenuAction>
+														{/snippet}
+													</DropdownMenu.Trigger>
+													<DropdownMenu.Content align="end" class="min-w-[8rem]">
+														<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
+														<DropdownMenu.Item disabled variant="destructive"
+															>Delete</DropdownMenu.Item
+														>
+													</DropdownMenu.Content>
+												</DropdownMenu.Root>
 											</Sidebar.MenuItem>
 										{/each}
 									{/if}
@@ -418,8 +459,8 @@
 					</Sidebar.Group>
 				</Collapsible.Root>
 
-				<Collapsible.Root bind:open={openSections.Artifacts}>
-					<Sidebar.Group>
+				<Collapsible.Root bind:open={openSections.Artifacts} class="border-0 shadow-none ring-0">
+					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
 							<ChevronRightIcon
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
@@ -478,6 +519,21 @@
 																</a>
 															{/snippet}
 														</Sidebar.MenuButton>
+														<DropdownMenu.Root>
+															<DropdownMenu.Trigger>
+																{#snippet child({ props })}
+																	<Sidebar.MenuAction {...props} showOnHover>
+																		<MoreVerticalIcon class="size-3.5" />
+																	</Sidebar.MenuAction>
+																{/snippet}
+															</DropdownMenu.Trigger>
+															<DropdownMenu.Content align="end" class="min-w-[8rem]">
+																<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
+																<DropdownMenu.Item disabled variant="destructive"
+																	>Delete</DropdownMenu.Item
+																>
+															</DropdownMenu.Content>
+														</DropdownMenu.Root>
 													</Sidebar.MenuItem>
 												{/each}
 											{/if}
