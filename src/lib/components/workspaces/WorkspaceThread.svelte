@@ -4,14 +4,8 @@
 	import { resolve } from '$app/paths'
 	import { page } from '$app/stores'
 	import { auth, getConvexClient } from '$lib/auth.svelte'
-	import { createArtifactMutation, listThreadArtifactsQuery } from '$lib/artifacts'
-	import {
-		artifactPreview,
-		artifactTypeLabel,
-		groupArtifacts,
-		linkReasonLabel,
-		threadArtifactDoc
-	} from '$lib/artifact-display'
+	import { listThreadArtifactsQuery } from '$lib/artifacts'
+	import { formatArtifactCreatedAt } from '$lib/artifact-display'
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat'
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte'
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte'
@@ -63,10 +57,8 @@
 	} from '$lib/idea-chat-assistant-parts'
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up'
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
-	import FileTextIcon from '@lucide/svelte/icons/file-text'
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle'
 	import SearchIcon from '@lucide/svelte/icons/search'
-	import XIcon from '@lucide/svelte/icons/x'
 	import { Chat } from '@ai-sdk/svelte'
 	import { DefaultChatTransport, type UIMessage } from 'ai'
 	import { useQuery } from 'convex-svelte'
@@ -79,8 +71,6 @@
 	let startedThreadId = $state('')
 	let modelSelectorOpen = $state(false)
 	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId)
-	let isSavingIdea = $state(false)
-	let artifactError = $state('')
 	let chatError = $state('')
 	let saveError = $state('')
 	let contextArtifactId = $state('')
@@ -105,8 +95,12 @@
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
 	)
-	const groupedThreadArtifacts = $derived(
-		groupArtifacts(threadArtifacts.data ?? [], threadArtifactDoc)
+	const sortedThreadArtifacts = $derived(
+		threadArtifacts.data
+			? [...threadArtifacts.data].sort(
+					(a, b) => b.artifact.createdAt - a.artifact.createdAt
+				)
+			: []
 	)
 	const selectedThreadArtifact = $derived(
 		contextArtifactId
@@ -120,10 +114,8 @@
 				: (selectedThreadArtifact?.artifact ?? null)
 			: null
 	)
-	const selectedContextLinkReason = $derived(selectedThreadArtifact?.link.reason)
 	const isChatBusy = $derived(chat?.status === 'submitted' || chat?.status === 'streaming')
 	const canSubmit = $derived(Boolean(composerText.trim()) && Boolean(chat) && !isChatBusy)
-	const canSaveIdea = $derived(Boolean(activeThreadId) && !isSavingIdea)
 	const contextText = $derived(
 		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}`
 	)
@@ -246,44 +238,6 @@
 		return 'Could not send this message. Please try again.'
 	}
 
-	const saveThreadAsIdea = async () => {
-		if (!canSaveIdea || !chat) return
-
-		artifactError = ''
-		isSavingIdea = true
-
-		try {
-			await getConvexClient().mutation(createArtifactMutation, {
-				type: 'idea',
-				title: createArtifactTitle(chat.messages),
-				contentMarkdown: createArtifactMarkdown(chat.messages),
-				sourceThreadId: activeThreadId as Id<'chatThreads'>,
-				metadata: {
-					source: 'workspace-thread'
-				}
-			})
-		} catch (error) {
-			console.error(error)
-			artifactError = 'Could not save this idea. Please try again.'
-		} finally {
-			isSavingIdea = false
-		}
-	}
-
-	const closeContextPanel = async () => {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
-
-		await goto(
-			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
-			),
-			{
-				noScroll: true,
-				keepFocus: true
-			}
-		)
-	}
-
 	const openThreadArtifact = async (artifactId: string) => {
 		if (contextPanelOpen) {
 			contextArtifactId = artifactId
@@ -393,24 +347,6 @@
 		return !assistantSegmentsHaveContent(buildAssistantSegments(message))
 	}
 
-	const createArtifactTitle = (messages: UIMessage[]) => {
-		const firstUserMessage = messages.find((message) => message.role === 'user')
-		const firstLine =
-			messageText(firstUserMessage ?? messages[0])
-				.split('\n')[0]
-				?.trim() ?? ''
-
-		if (!firstLine) return 'Untitled idea'
-		return firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine
-	}
-
-	const createArtifactMarkdown = (messages: UIMessage[]) =>
-		messages
-			.map((message) => {
-				const speaker = message.role === 'user' ? 'User' : 'Assistant'
-				return `## ${speaker}\n\n${messageText(message)}`
-			})
-			.join('\n\n')
 </script>
 
 <section class="flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -483,36 +419,10 @@
 					{#if contextArtifactId}
 						<WorkspaceArtifactReader
 							artifact={selectedContextArtifact}
-							linkReason={selectedContextLinkReason}
 							compact
 							onBack={closeThreadArtifact}
-							onClose={closeContextPanel}
 						/>
 					{:else}
-						<div
-							class="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-4 py-3"
-						>
-							<div class="min-w-0">
-								<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-									Thread context
-								</p>
-								<h2 class="mt-0.5 text-base font-semibold tracking-tight">Attached memory</h2>
-								<p class="mt-1 text-xs leading-5 text-muted-foreground">
-									Only artifacts created, referenced, or attached in this thread.
-								</p>
-							</div>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								class="size-8 shrink-0"
-								aria-label="Close thread context"
-								onclick={closeContextPanel}
-							>
-								<XIcon class="size-3.5" />
-							</Button>
-						</div>
-
 						<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 							{#if threadArtifacts.data === undefined}
 								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
@@ -521,67 +431,23 @@
 									No artifacts attached to this thread yet.
 								</p>
 							{:else}
-								<div class="space-y-4">
-									{#each groupedThreadArtifacts as group (group.key)}
-										<div class="space-y-1">
-											<p
-												class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-											>
-												{group.label}
-											</p>
-											{#if group.artifacts.length === 0}
-												<p class="px-2 py-1.5 text-xs text-muted-foreground">No artifacts yet</p>
-											{:else}
-												{#each group.artifacts as item (item.link._id)}
-													<button
-														type="button"
-														class="group flex w-full gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-														onclick={() => openThreadArtifact(item.artifact._id)}
-													>
-														<div
-															class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-accent text-muted-foreground group-hover:text-foreground"
-														>
-															<FileTextIcon class="size-3.5" />
-														</div>
-														<span class="min-w-0 flex-1">
-															<span class="flex items-center justify-between gap-2">
-																<span class="truncate text-xs font-medium tracking-tight">
-																	{item.artifact.title}
-																</span>
-																<span class="shrink-0 text-[10px] text-muted-foreground">
-																	{artifactTypeLabel(item.artifact.type)}
-																</span>
-															</span>
-															<span class="mt-1 block text-[11px] leading-4 text-muted-foreground">
-																{linkReasonLabel(item.link.reason)}
-															</span>
-															<span class="mt-1 line-clamp-2 block text-xs leading-5 text-foreground">
-																{artifactPreview(item.artifact.contentMarkdown)}
-															</span>
-														</span>
-													</button>
-												{/each}
-											{/if}
-										</div>
+								<div class="space-y-1">
+									{#each sortedThreadArtifacts as item (item.link._id)}
+										<button
+											type="button"
+											class="flex w-full flex-col gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+											onclick={() => openThreadArtifact(item.artifact._id)}
+										>
+											<span class="truncate text-xs font-medium tracking-tight">
+												{item.artifact.title}
+											</span>
+											<span class="text-[11px] text-muted-foreground">
+												{formatArtifactCreatedAt(item.artifact.createdAt)}
+											</span>
+										</button>
 									{/each}
 								</div>
 							{/if}
-						</div>
-
-						<div class="shrink-0 border-t border-border/50 px-4 py-3">
-							{#if artifactError}
-								<p class="mb-2 text-xs text-destructive">{artifactError}</p>
-							{/if}
-							<Button
-								type="button"
-								variant="secondary"
-								size="sm"
-								class="w-full justify-center text-xs"
-								disabled={!canSaveIdea}
-								onclick={saveThreadAsIdea}
-							>
-								{isSavingIdea ? 'Saving idea...' : 'Save as idea'}
-							</Button>
 						</div>
 					{/if}
 				</aside>

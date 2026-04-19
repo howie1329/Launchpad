@@ -86,7 +86,7 @@
 		isSettingsActive
 			? 'Manage workspace preferences.'
 			: activeThreadId
-				? 'Active thread with explicit context.'
+				? ''
 				: activeArtifactId
 					? 'Saved workspace artifact.'
 					: activeProjectId
@@ -524,27 +524,28 @@
 
 		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
 			<header
-				class="flex h-12 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
+				class="flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
 			>
 				<Sidebar.Trigger class="-ms-1" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-xl font-semibold tracking-tight">{headerTitle}</p>
-					<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
+					<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+					{#if headerDescription}
+						<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
+					{/if}
 				</div>
 				{#if activeThreadId}
 					<Button
 						type="button"
 						variant={contextPanelOpen ? 'secondary' : 'ghost'}
-						size="sm"
-						class="h-8 shrink-0 gap-1.5 text-xs"
+						size="icon"
+						class="size-8 shrink-0"
+						aria-label={contextPanelOpen ? 'Close thread context' : 'Open thread context'}
 						onclick={toggleThreadContext}
 					>
 						{#if contextPanelOpen}
 							<PanelRightCloseIcon class="size-3.5" />
-							Hide context
 						{:else}
 							<PanelRightOpenIcon class="size-3.5" />
-							Thread context
 						{/if}
 					</Button>
 				{/if}

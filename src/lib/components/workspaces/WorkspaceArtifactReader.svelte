@@ -13,13 +13,15 @@
 	import ArtifactCodeEditor from '$lib/components/workspaces/ArtifactCodeEditor.svelte'
 	import ArtifactDiffEditor from '$lib/components/workspaces/ArtifactDiffEditor.svelte'
 	import { Button } from '$lib/components/ui/button'
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
 	import { cn } from '$lib/utils'
 	import githubDarkDefault from '@shikijs/themes/github-dark-default'
 	import githubLightDefault from '@shikijs/themes/github-light-default'
+	import CheckIcon from '@lucide/svelte/icons/check'
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
 	import FileTextIcon from '@lucide/svelte/icons/file-text'
+	import MoreHorizontalIcon from '@lucide/svelte/icons/more-horizontal'
 	import SaveIcon from '@lucide/svelte/icons/save'
-	import XIcon from '@lucide/svelte/icons/x'
 	import { mode } from 'mode-watcher'
 	import { useQuery } from 'convex-svelte'
 	import Code from 'svelte-streamdown/code'
@@ -34,8 +36,7 @@
 		fullWidthContent = false,
 		showHeader,
 		linkReason,
-		onBack,
-		onClose
+		onBack
 	}: {
 		artifact: SavedArtifact | null | undefined
 		compact?: boolean
@@ -44,11 +45,10 @@
 		showHeader?: boolean
 		linkReason?: ArtifactLinkReason
 		onBack?: () => void
-		onClose?: () => void
 	} = $props()
 
 	const showContextToolbar = $derived(
-		showHeader !== false && (Boolean(onBack) || Boolean(onClose) || linkReason != null)
+		showHeader !== false && (Boolean(onBack) || (linkReason != null && !compact))
 	)
 
 	type SurfaceMode = 'read' | 'compare'
@@ -302,16 +302,16 @@
 	{:else}
 		{#if showContextToolbar}
 			<div
-				class="flex shrink-0 items-center gap-2 border-b border-border/50 py-2 {compact
-					? 'px-3'
-					: 'px-4'}"
+				class="flex shrink-0 items-center gap-2 border-b border-border/50 {compact
+					? 'py-1.5 px-3'
+					: 'py-2 px-4'}"
 			>
 				{#if onBack}
 					<Button
 						type="button"
 						variant="ghost"
 						size="icon"
-						class="size-8 shrink-0"
+						class="{compact ? 'size-7' : 'size-8'} shrink-0"
 						aria-label="Back to thread artifacts"
 						onclick={onBack}
 					>
@@ -324,94 +324,146 @@
 					>
 						{artifact.title}
 					</p>
-					{#if linkReason != null}
+					{#if linkReason != null && !compact}
 						<p class="mt-0.5 text-[11px] leading-4 text-muted-foreground">
 							{linkReasonLabel(linkReason)}
 						</p>
 					{/if}
 				</div>
-				{#if onClose}
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						class="size-8 shrink-0"
-						aria-label="Close thread context"
-						onclick={onClose}
-					>
-						<XIcon class="size-3.5" />
-					</Button>
+				{#if compact}
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								class="size-7 shrink-0"
+								aria-label="Artifact view options"
+							>
+								<MoreHorizontalIcon class="size-4" />
+							</Button>
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content class="w-52" align="end">
+							<DropdownMenu.Label class="text-[11px] font-normal text-muted-foreground"
+								>Surface</DropdownMenu.Label
+							>
+							<DropdownMenu.Item class="gap-2 text-xs" onclick={() => setReadSurface()}>
+								<span class="flex-1">Read</span>
+								{#if surfaceMode === 'read'}
+									<CheckIcon class="size-3.5" />
+								{/if}
+							</DropdownMenu.Item>
+							<DropdownMenu.Item
+								class="gap-2 text-xs"
+								disabled={!canCompare}
+								title={!canCompare ? 'No pending AI drafts to compare' : undefined}
+								onclick={() => setCompareSurface()}
+							>
+								<span class="flex-1">Compare</span>
+								{#if surfaceMode === 'compare'}
+									<CheckIcon class="size-3.5" />
+								{/if}
+							</DropdownMenu.Item>
+							{#if surfaceMode === 'read'}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Label class="text-[11px] font-normal text-muted-foreground"
+									>View</DropdownMenu.Label
+								>
+								<DropdownMenu.Item class="gap-2 text-xs" onclick={() => setEditorMode()}>
+									<span class="flex-1">Editor</span>
+									{#if readMode === 'editor'}
+										<CheckIcon class="size-3.5" />
+									{/if}
+								</DropdownMenu.Item>
+								<DropdownMenu.Item class="gap-2 text-xs" onclick={() => setPreviewMode()}>
+									<span class="flex-1">Preview</span>
+									{#if readMode === 'preview'}
+										<CheckIcon class="size-3.5" />
+									{/if}
+								</DropdownMenu.Item>
+							{/if}
+							<DropdownMenu.Separator />
+							<DropdownMenu.Item
+								class="gap-2 text-xs"
+								disabled={!canSave}
+								onclick={() => saveChanges()}
+							>
+								<SaveIcon class="size-3.5" />
+								<span class="flex-1">{isSaving ? 'Saving...' : 'Save'}</span>
+							</DropdownMenu.Item>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 				{/if}
 			</div>
 		{/if}
 
-		<div
-			class="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/50 py-1.5 {compact
-				? 'px-3'
-				: 'px-4'}"
-		>
-			<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
-				<Button
-					type="button"
-					size="sm"
-					variant={surfaceMode === 'read' ? 'secondary' : 'ghost'}
-					class="h-7 rounded-sm px-2.5 text-xs font-medium"
-					onclick={setReadSurface}
-				>
-					Read
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					variant={surfaceMode === 'compare' ? 'secondary' : 'ghost'}
-					class="h-7 rounded-sm px-2.5 text-xs font-medium"
-					disabled={!canCompare}
-					title={!canCompare ? 'No pending AI drafts to compare' : undefined}
-					onclick={setCompareSurface}
-				>
-					Compare
-				</Button>
-			</div>
-
-			{#if surfaceMode === 'read'}
+		{#if !compact}
+			<div
+				class="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/50 py-1.5 px-4"
+			>
 				<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
 					<Button
 						type="button"
 						size="sm"
-						variant={readMode === 'editor' ? 'secondary' : 'ghost'}
+						variant={surfaceMode === 'read' ? 'secondary' : 'ghost'}
 						class="h-7 rounded-sm px-2.5 text-xs font-medium"
-						onclick={setEditorMode}
+						onclick={setReadSurface}
 					>
-						Editor
+						Read
 					</Button>
 					<Button
 						type="button"
 						size="sm"
-						variant={readMode === 'preview' ? 'secondary' : 'ghost'}
+						variant={surfaceMode === 'compare' ? 'secondary' : 'ghost'}
 						class="h-7 rounded-sm px-2.5 text-xs font-medium"
-						onclick={setPreviewMode}
+						disabled={!canCompare}
+						title={!canCompare ? 'No pending AI drafts to compare' : undefined}
+						onclick={setCompareSurface}
 					>
-						Preview
+						Compare
 					</Button>
 				</div>
-			{/if}
 
-			<span class="min-w-[1rem] flex-1"></span>
+				{#if surfaceMode === 'read'}
+					<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
+						<Button
+							type="button"
+							size="sm"
+							variant={readMode === 'editor' ? 'secondary' : 'ghost'}
+							class="h-7 rounded-sm px-2.5 text-xs font-medium"
+							onclick={setEditorMode}
+						>
+							Editor
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							variant={readMode === 'preview' ? 'secondary' : 'ghost'}
+							class="h-7 rounded-sm px-2.5 text-xs font-medium"
+							onclick={setPreviewMode}
+						>
+							Preview
+						</Button>
+					</div>
+				{/if}
 
-			{#if surfaceMode === 'read' && readMode === 'editor'}
-				<Button
-					type="button"
-					variant="default"
-					size="sm"
-					class="h-8 gap-1.5 px-2.5 text-xs"
-					disabled={!canSave}
-					onclick={saveChanges}
-				>
-					<SaveIcon class="size-3.5" />
-					{isSaving ? 'Saving...' : 'Save'}
-				</Button>
-			{/if}
-		</div>
+				<span class="min-w-[1rem] flex-1"></span>
+
+				{#if surfaceMode === 'read' && readMode === 'editor'}
+					<Button
+						type="button"
+						variant="default"
+						size="sm"
+						class="h-8 gap-1.5 px-2.5 text-xs"
+						disabled={!canSave}
+						onclick={saveChanges}
+					>
+						<SaveIcon class="size-3.5" />
+						{isSaving ? 'Saving...' : 'Save'}
+					</Button>
+				{/if}
+			</div>
+		{/if}
 
 		<div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
 			<div

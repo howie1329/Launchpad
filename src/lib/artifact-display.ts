@@ -81,6 +81,10 @@ export function formatArtifactUpdatedAt(updatedAt: number) {
 	}).format(new Date(updatedAt))
 }
 
+export function formatArtifactCreatedAt(createdAt: number) {
+	return formatArtifactUpdatedAt(createdAt)
+}
+
 export function threadArtifactDoc(item: ThreadArtifact) {
 	return item.artifact
 }
