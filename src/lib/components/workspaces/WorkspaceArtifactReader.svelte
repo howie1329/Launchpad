@@ -29,12 +29,16 @@
 		artifact,
 		linkReason,
 		compact = false,
+		showHeader = true,
+		fullWidthContent = false,
 		onBack,
 		onClose
 	}: {
 		artifact: SavedArtifact | null | undefined
 		linkReason?: ArtifactLinkReason
 		compact?: boolean
+		showHeader?: boolean
+		fullWidthContent?: boolean
 		onBack?: () => void
 		onClose?: () => void
 	} = $props()
@@ -195,128 +199,138 @@
 			</div>
 		</div>
 	{:else}
-		<header class="shrink-0 border-b border-border/50 px-4 py-3">
-			<div class="flex items-start justify-between gap-3">
-				<div class="flex min-w-0 flex-1 items-start gap-2">
-					{#if onBack}
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							class="size-8 shrink-0"
-							aria-label="Back to artifacts"
-							onclick={onBack}
-						>
-							<ArrowLeftIcon class="size-3.5" />
-						</Button>
-					{/if}
-					<div class="min-w-0">
-						<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							{artifactTypeLabel(artifact.type)}
-						</p>
-						<h2 class="mt-0.5 text-base font-semibold tracking-tight">{artifact.title}</h2>
-						<p class="mt-1 text-xs leading-5 text-muted-foreground">
-							Updated {formatArtifactUpdatedAt(artifact.updatedAt)}
-							{#if linkReason}
-								<span> · {linkReasonLabel(linkReason)}</span>
+		{#if showHeader}
+			<header class="shrink-0 border-b border-border/50 px-4 py-3">
+				<div class="flex items-start justify-between gap-3">
+					<div class="flex min-w-0 flex-1 items-start gap-2">
+						{#if onBack}
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								class="size-8 shrink-0"
+								aria-label="Back to artifacts"
+								onclick={onBack}
+							>
+								<ArrowLeftIcon class="size-3.5" />
+							</Button>
+						{/if}
+						<div class="min-w-0">
+							<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+								{artifactTypeLabel(artifact.type)}
+							</p>
+							<h2 class="mt-0.5 text-base font-semibold tracking-tight">{artifact.title}</h2>
+							<p class="mt-1 text-xs leading-5 text-muted-foreground">
+								Updated {formatArtifactUpdatedAt(artifact.updatedAt)}
+								{#if linkReason}
+									<span> · {linkReasonLabel(linkReason)}</span>
+								{/if}
+							</p>
+						</div>
+					</div>
+					{#if onClose}
+						<div class="flex shrink-0 items-center gap-1">
+							{#if isEditing}
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-8 px-2 text-xs text-muted-foreground"
+									disabled={isSaving}
+									onclick={cancelEditing}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									class="h-8 gap-1.5 px-2 text-xs"
+									disabled={!canSave}
+									onclick={saveChanges}
+								>
+									<SaveIcon class="size-3.5" />
+									{isSaving ? 'Saving...' : 'Save'}
+								</Button>
+							{:else}
+								<Button
+									type="button"
+									variant="ghost"
+									size={compact ? 'icon' : 'sm'}
+									class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
+									aria-label="Edit artifact"
+									onclick={startEditing}
+								>
+									<PencilIcon class="size-3.5" />
+									{#if !compact}
+										Edit
+									{/if}
+								</Button>
 							{/if}
-						</p>
-					</div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon"
+								class="size-8 shrink-0"
+								aria-label="Close artifact"
+								onclick={onClose}
+							>
+								<XIcon class="size-3.5" />
+							</Button>
+						</div>
+					{:else}
+						<div class="flex shrink-0 items-center gap-1">
+							{#if isEditing}
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-8 px-2 text-xs text-muted-foreground"
+									disabled={isSaving}
+									onclick={cancelEditing}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									class="h-8 gap-1.5 px-2 text-xs"
+									disabled={!canSave}
+									onclick={saveChanges}
+								>
+									<SaveIcon class="size-3.5" />
+									{isSaving ? 'Saving...' : 'Save'}
+								</Button>
+							{:else}
+								<Button
+									type="button"
+									variant="ghost"
+									size={compact ? 'icon' : 'sm'}
+									class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
+									aria-label="Edit artifact"
+									onclick={startEditing}
+								>
+									<PencilIcon class="size-3.5" />
+									{#if !compact}
+										Edit
+									{/if}
+								</Button>
+							{/if}
+						</div>
+					{/if}
 				</div>
-				{#if onClose}
-					<div class="flex shrink-0 items-center gap-1">
-						{#if isEditing}
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								class="h-8 px-2 text-xs text-muted-foreground"
-								disabled={isSaving}
-								onclick={cancelEditing}
-							>
-								Cancel
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								class="h-8 gap-1.5 px-2 text-xs"
-								disabled={!canSave}
-								onclick={saveChanges}
-							>
-								<SaveIcon class="size-3.5" />
-								{isSaving ? 'Saving...' : 'Save'}
-							</Button>
-						{:else}
-							<Button
-								type="button"
-								variant="ghost"
-								size={compact ? 'icon' : 'sm'}
-								class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
-								aria-label="Edit artifact"
-								onclick={startEditing}
-							>
-								<PencilIcon class="size-3.5" />
-								{#if !compact}
-									Edit
-								{/if}
-							</Button>
-						{/if}
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							class="size-8 shrink-0"
-							aria-label="Close artifact"
-							onclick={onClose}
-						>
-							<XIcon class="size-3.5" />
-						</Button>
-					</div>
-				{:else}
-					<div class="flex shrink-0 items-center gap-1">
-						{#if isEditing}
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								class="h-8 px-2 text-xs text-muted-foreground"
-								disabled={isSaving}
-								onclick={cancelEditing}
-							>
-								Cancel
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								class="h-8 gap-1.5 px-2 text-xs"
-								disabled={!canSave}
-								onclick={saveChanges}
-							>
-								<SaveIcon class="size-3.5" />
-								{isSaving ? 'Saving...' : 'Save'}
-							</Button>
-						{:else}
-							<Button
-								type="button"
-								variant="ghost"
-								size={compact ? 'icon' : 'sm'}
-								class={compact ? 'size-8' : 'h-8 gap-1.5 px-2 text-xs'}
-								aria-label="Edit artifact"
-								onclick={startEditing}
-							>
-								<PencilIcon class="size-3.5" />
-								{#if !compact}
-									Edit
-								{/if}
-							</Button>
-						{/if}
-					</div>
-				{/if}
-			</div>
-		</header>
+			</header>
+		{/if}
 
 		<div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-			<div class={compact ? 'space-y-5' : 'mx-auto max-w-3xl space-y-6'}>
+			<div
+				class={
+					fullWidthContent
+						? 'space-y-6'
+						: compact
+							? 'space-y-5'
+							: 'mx-auto max-w-3xl space-y-6'
+				}
+			>
 				{#if draftChanges.data === undefined}
 					<div>
 						<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
@@ -339,9 +353,6 @@
 				{/if}
 
 				<div>
-					<p class="mb-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-						Content
-					</p>
 					<div
 						class={`overflow-hidden rounded-md border border-border/70 ${
 							compact ? 'min-h-[12rem]' : 'min-h-[18rem]'

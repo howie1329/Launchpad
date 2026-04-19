@@ -19,4 +19,4 @@
 	<meta name="description" content="Saved workspace artifact." />
 </svelte:head>
 
-<WorkspaceArtifactReader artifact={selectedArtifact.data} />
+<WorkspaceArtifactReader artifact={selectedArtifact.data} showHeader={false} fullWidthContent />
