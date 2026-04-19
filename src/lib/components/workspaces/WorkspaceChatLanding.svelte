@@ -28,11 +28,9 @@
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Suggestion, Suggestions } from '$lib/components/ai-elements/suggestion';
-	import { Button } from '$lib/components/ui/button';
 	import { defaultIdeaAiModelId, ideaAiModels, type IdeaAiModelId } from '$lib/idea-ai-models';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import SearchIcon from '@lucide/svelte/icons/search';
 	import type { Component } from 'svelte';
 
 	type ChatLandingSuggestion = {
@@ -143,11 +141,6 @@
 			/>
 			<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 				<PromptInputTools>
-					<Button type="button" variant="ghost" size="sm" class="gap-1.5 text-muted-foreground">
-						<SearchIcon data-icon="inline-start" />
-						Tools
-						<ChevronDownIcon data-icon="inline-end" />
-					</Button>
 					<ModelSelector bind:open={modelSelectorOpen}>
 						<ModelSelectorTrigger
 							class="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
