@@ -5,7 +5,11 @@
 	import { page } from '$app/stores';
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import { listThreadArtifactsQuery, type ThreadArtifact } from '$lib/artifacts';
-	import { formatArtifactMentionToken } from '$lib/artifact-mention-tokens';
+	import {
+		buildOutgoingUserMessageWithTokens,
+		formatArtifactMentionToken,
+		parseComposedUserMessage
+	} from '$lib/artifact-mention-tokens';
 	import { cn } from '$lib/utils';
 	import { formatArtifactCreatedAt } from '$lib/artifact-display';
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
@@ -63,6 +67,7 @@
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { Chat } from '@ai-sdk/svelte';
 	import { DefaultChatTransport, type UIMessage } from 'ai';
 	import { useQuery } from 'convex-svelte';
@@ -88,6 +93,8 @@
 	let mentionStart = $state(0);
 	let mentionFilter = $state('');
 	let mentionHighlight = $state(0);
+	/** Composer chips (persisted as trailing @artifact: lines on send) */
+	let mentionChips = $state<Array<{ id: string; title: string }>>([]);
 
 	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
 	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
@@ -137,9 +144,11 @@
 			: null
 	);
 	const isChatBusy = $derived(chat?.status === 'submitted' || chat?.status === 'streaming');
-	const canSubmit = $derived(Boolean(composerText.trim()) && Boolean(chat) && !isChatBusy);
+	const canSubmit = $derived(
+		Boolean((composerText.trim() || mentionChips.length > 0) && chat && !isChatBusy)
+	);
 	const contextText = $derived(
-		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}`
+		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
 	);
 	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4));
 
@@ -184,6 +193,11 @@
 		chatKey = nextKey;
 		chatError = '';
 		saveError = '';
+	});
+
+	$effect(() => {
+		activeThreadId;
+		mentionChips = [];
 	});
 
 	$effect(() => {
@@ -256,19 +270,24 @@
 		return false;
 	}
 
+	function removeMentionChip(artifactId: string) {
+		mentionChips = mentionChips.filter((c) => c.id !== artifactId);
+	}
+
 	async function pickArtifactMention(item: ThreadArtifact) {
 		const el = textareaRef;
 		if (!el) return;
 		const text = composerText;
 		const cursor = el.selectionStart ?? text.length;
 		const start = mentionStart;
-		const token = `${formatArtifactMentionToken(item.artifact._id)} `;
-		const next = text.slice(0, start) + token + text.slice(cursor);
+		const next = text.slice(0, start) + text.slice(cursor);
 		composerText = next;
+		if (!mentionChips.some((c) => c.id === item.artifact._id)) {
+			mentionChips = [...mentionChips, { id: item.artifact._id, title: item.artifact.title }];
+		}
 		mentionOpen = false;
 		await tick();
-		const pos = start + token.length;
-		el.setSelectionRange(pos, pos);
+		el.setSelectionRange(start, start);
 		el.focus();
 	}
 
@@ -279,22 +298,37 @@
 	};
 
 	const submitMessage = async (message: PromptInputMessage) => {
-		const text = message.text.trim();
-		if (!chat || !text || isChatBusy) return;
+		const prose = message.text.trim();
+		const outgoing = buildOutgoingUserMessageWithTokens(
+			prose,
+			mentionChips.map((c) => c.id)
+		);
+		if (!chat || !outgoing || isChatBusy) return;
 
 		chatError = '';
 		saveError = '';
 
+		const prevProse = prose;
+		const prevChips = mentionChips.slice();
+
 		try {
 			composerText = '';
-			await chat.sendMessage({ text });
+			mentionChips = [];
+			await chat.sendMessage({ text: outgoing });
 		} catch (error) {
 			console.error(error);
-			composerText = text;
+			composerText = prevProse;
+			mentionChips = prevChips;
 			chatError = buildChatErrorMessage(error);
 			throw error;
 		}
 	};
+
+	function artifactTitleForId(artifactId: string): string {
+		return (
+			threadArtifacts.data?.find((x) => x.artifact._id === artifactId)?.artifact.title ?? 'Artifact'
+		);
+	}
 
 	function buildChatErrorMessage(error: unknown) {
 		if (error instanceof Error) {
@@ -491,7 +525,23 @@
 												<p class="text-xs text-muted-foreground">No response yet.</p>
 											{/if}
 										{:else}
-											<p class="text-xs leading-5 whitespace-pre-wrap">{messageText(message)}</p>
+											{@const composed = parseComposedUserMessage(messageText(message))}
+											<div class="flex w-full min-w-0 flex-col gap-2">
+												{#if composed.artifactIds.length > 0}
+													<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
+														{#each composed.artifactIds as aid (aid)}
+															<span
+																class="inline-flex max-w-full items-center rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground"
+															>
+																<span class="truncate">{artifactTitleForId(aid)}</span>
+															</span>
+														{/each}
+													</div>
+												{/if}
+												{#if composed.body}
+													<p class="text-xs leading-5 whitespace-pre-wrap">{composed.body}</p>
+												{/if}
+											</div>
 										{/if}
 									</MessageContent>
 								</Message>
@@ -625,6 +675,26 @@
 				<div class="w-full space-y-2">
 					{#if chatError || saveError}
 						<p class="text-xs text-destructive">{chatError || saveError}</p>
+					{/if}
+
+					{#if mentionChips.length > 0}
+						<div class="flex flex-wrap gap-1.5" aria-label="Artifacts to include in this message">
+							{#each mentionChips as chip (chip.id)}
+								<span
+									class="inline-flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-muted/40 py-0.5 pr-0.5 pl-2 text-[11px] font-medium text-foreground"
+								>
+									<span class="max-w-[min(100%,14rem)] truncate">{chip.title}</span>
+									<button
+										type="button"
+										class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										aria-label="Remove artifact reference"
+										onclick={() => removeMentionChip(chip.id)}
+									>
+										<XIcon class="size-3" />
+									</button>
+								</span>
+							{/each}
+						</div>
 					{/if}
 
 					<PromptInput
