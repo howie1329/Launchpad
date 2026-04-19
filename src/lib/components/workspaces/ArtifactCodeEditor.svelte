@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Compartment, EditorState } from '@codemirror/state'
+	import { Compartment, EditorState, Transaction } from '@codemirror/state'
 	import { EditorView, type ViewUpdate } from '@codemirror/view'
 	import { markdown } from '@codemirror/lang-markdown'
 	import { basicSetup } from 'codemirror'
@@ -27,12 +27,21 @@
 	const editorTheme = EditorView.theme({
 		'&': {
 			height: '100%',
-			backgroundColor: 'hsl(var(--background))',
-			color: 'hsl(var(--foreground))'
+			backgroundColor: 'var(--background)',
+			color: 'var(--foreground)'
 		},
 		'.cm-scroller': {
 			overflow: 'auto',
-			fontFamily: 'var(--font-mono, var(--font-sans))'
+			fontFamily: 'var(--font-mono), ui-monospace, monospace'
+		},
+		'.cm-gutters': {
+			backgroundColor: 'var(--muted)',
+			borderRight: '1px solid var(--border)',
+			color: 'var(--muted-foreground)'
+		},
+		'.cm-lineNumbers .cm-gutterElement': {
+			padding: '0 0.375rem 0 0.5rem',
+			minWidth: '2.25rem'
 		},
 		'.cm-content': {
 			padding: '0.75rem 0.875rem'
@@ -40,17 +49,11 @@
 		'.cm-line': {
 			padding: '0'
 		},
-		'.cm-focused': {
-			outline: 'none'
-		},
-		'.cm-editor.cm-focused': {
-			outline: 'none'
-		},
 		'.cm-cursor, .cm-dropCursor': {
-			borderLeftColor: 'hsl(var(--foreground))'
+			borderLeftColor: 'var(--foreground)'
 		},
 		'.cm-selectionBackground, ::selection': {
-			backgroundColor: 'hsl(var(--accent))'
+			backgroundColor: 'var(--accent)'
 		}
 	})
 
@@ -79,6 +82,10 @@
 					readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
 					EditorView.updateListener.of((update: ViewUpdate) => {
 						if (!update.docChanged) return
+						const fromRemote = update.transactions.some((tr) =>
+							tr.annotation(Transaction.userEvent)?.startsWith('remote')
+						)
+						if (fromRemote) return
 						onChange?.(update.state.doc.toString())
 					})
 				]
@@ -101,7 +108,8 @@
 				from: 0,
 				to: currentValue.length,
 				insert: value
-			}
+			},
+			annotations: Transaction.userEvent.of('remote.sync')
 		})
 	})
 
@@ -118,4 +126,14 @@
 	})
 </script>
 
-<div class="artifact-code-editor" bind:this={editorElement}></div>
+<div
+	class="artifact-code-editor rounded-md outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+	bind:this={editorElement}
+></div>
+
+<style>
+	.artifact-code-editor {
+		height: 100%;
+		min-height: 0;
+	}
+</style>

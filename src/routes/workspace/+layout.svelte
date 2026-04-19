@@ -528,7 +528,7 @@
 			>
 				<Sidebar.Trigger class="-ms-1" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-sm font-semibold tracking-tight">{headerTitle}</p>
+					<p class="truncate text-xl font-semibold tracking-tight">{headerTitle}</p>
 					<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
 				</div>
 				{#if activeThreadId}
