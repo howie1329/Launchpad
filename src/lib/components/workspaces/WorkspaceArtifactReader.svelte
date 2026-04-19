@@ -231,30 +231,26 @@
 				{/if}
 
 				<div>
-					<div
-						class={`overflow-hidden rounded-md border border-border/70 ${
-							compact ? 'min-h-[12rem]' : 'min-h-[18rem]'
-						}`}
-					>
-						{#if viewMode === 'editor'}
+					{#if viewMode === 'editor'}
+						<div class={compact ? 'min-h-[12rem]' : 'min-h-[18rem]'}>
 							<ArtifactCodeEditor
 								value={editorValue}
 								readOnly={!isEditing}
 								{compact}
 								onChange={(nextValue) => (editorValue = nextValue)}
 							/>
-						{:else}
-							<div class="h-full min-h-[inherit] overflow-y-auto bg-background px-4 py-3">
-								{#if editorValue.trim().length === 0}
-									<p class="text-xs text-muted-foreground">Nothing to preview yet.</p>
-								{:else}
-									<pre
-										class="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-foreground"
-									>{editorValue}</pre>
-								{/if}
-							</div>
-						{/if}
-					</div>
+						</div>
+					{:else}
+						<div class={`overflow-y-auto px-4 py-3 ${compact ? 'min-h-[12rem]' : 'min-h-[18rem]'}`}>
+							{#if editorValue.trim().length === 0}
+								<p class="text-xs text-muted-foreground">Nothing to preview yet.</p>
+							{:else}
+								<pre class="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-foreground"
+									>{editorValue}</pre
+								>
+							{/if}
+						</div>
+					{/if}
 					{#if saveError}
 						<p class="mt-2 text-xs text-destructive">{saveError}</p>
 					{/if}
