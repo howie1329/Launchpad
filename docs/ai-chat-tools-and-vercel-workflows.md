@@ -1,355 +1,137 @@
-# Launchpad AI Chat Tools + Vercel Workflow Opportunities
+# Launchpad AI Chat Toolset Review + Recommended Target Set
 
 _Last updated: April 19, 2026_
 
-This doc maps AI tool and workflow ideas to Launchpad’s current product shape:
-
-- Chat-first builder workflow
-- Thread-scoped artifact memory
-- Draft-then-apply edits
-- Convex-backed ownership and project/thread scoping
-
-It is intentionally practical: small, high-leverage additions first.
+This revision focuses on one question: **what should the AI chat toolset be, given what already exists today**.
 
 ---
 
-## 1) What Launchpad already does well
+## 1) Current toolset in the chat API (implemented)
 
-Current chat agent capabilities already match the product’s core loop:
+From `src/routes/api/workspace/chat/+server.ts`, the current ToolLoopAgent exposes:
 
-- Thread artifact discovery/read (`listThreadArtifacts`, `readThreadArtifact`)
-- Project artifact discovery/import in project chats (`listProjectArtifacts`, `importProjectArtifactToThread`)
-- Create artifacts (`createIdeaArtifact`, `createPrdArtifact`)
-- Promote work (`createProjectFromThread`)
-- Safe edits via draft changes (`proposeArtifactEdit`)
+1. `listThreadArtifacts`
+2. `readThreadArtifact`
+3. `listProjectArtifacts`
+4. `importProjectArtifactToThread`
+5. `createIdeaArtifact`
+6. `createPrdArtifact`
+7. `createProjectFromThread`
+8. `proposeArtifactEdit`
 
-This is a strong baseline. The next tools should primarily improve:
-
-1. Context quality (better retrieval and less noise)
-2. Conversion speed (chat -> usable artifacts faster)
-3. Workflow continuity (keep momentum across sessions)
-4. Safety and trust (clear write controls and explicit diffs)
+These are already aligned with Launchpad’s core product rules (thread-scoped context, explicit imports, draft-then-apply edits).
 
 ---
 
-## 2) Recommended new AI chat tools (product-fit)
+## 2) Proposed tools vs current tools (overlap analysis)
 
-## A. Context + retrieval tools
+## Legend
+- **Overlap: Direct** = essentially already covered
+- **Overlap: Partial** = same job area, but more precise/new behavior
+- **Overlap: None** = net-new capability
 
-### 1. `searchArtifacts`
-**What it does:** semantic + keyword search across user-owned artifacts with filters (`type`, `projectId`, recency).
-
-**Why it fits Launchpad:** users accumulate many artifacts; list-only retrieval will degrade as memory grows.
-
-**Minimal output shape:**
-- `artifactId`
-- `title`
-- `type`
-- `projectId`
-- `preview`
-- `matchReason` (keyword/semantic)
-
-**Guardrails:**
-- Never auto-import to thread context
-- Return candidates; user confirms import
-
----
-
-### 2. `readArtifactSections`
-**What it does:** fetches only requested headings/sections from markdown artifacts.
-
-**Why it fits:** keeps context token-efficient and avoids dropping full docs into every turn.
-
-**Good inputs:**
-- `artifactId`
-- `sectionTitles[]` (e.g. `MVP scope`, `Test scenarios`)
+| Proposed tool | Overlap with current tools | Overlap level | Keep? | Notes |
+| --- | --- | --- | --- | --- |
+| `searchArtifacts` | `listThreadArtifacts`, `listProjectArtifacts` | Partial | **Yes** | Existing tools list; this adds retrieval quality (search/filter/ranking). |
+| `readArtifactSections` | `readThreadArtifact` | Partial | **Yes** | Existing read returns full markdown; this adds token-efficient partial read. |
+| `summarizeArtifactForThread` | none | None | Optional | Useful, but can be done by model without a dedicated persistence tool. |
+| `createArtifactFromTemplate` | `createIdeaArtifact`, `createPrdArtifact` | Partial | **No (for now)** | Existing creation tools already handle MVP types; template system can wait. |
+| `proposeArtifactSectionEdit` | `proposeArtifactEdit` | Partial | **Yes** | Keeps diffs smaller and safer; strong extension of current edit flow. |
+| `compareArtifacts` | none | None | Optional | Good for later planning/iteration, not core MVP loop. |
+| `readinessCheckForPromotion` | `createProjectFromThread` | Partial | **Yes** | Existing tool executes promotion; this adds pre-flight decision support. |
+| `generateExecutionBacklog` | none | None | **Yes** | Natural next step after PRD; high user value. |
+| `extractOpenQuestions` | none | None | **Yes** | Helps de-risk scope before build. |
+| `logDecision` | none | None | Optional | Valuable, but can initially be handled as normal artifact edits. |
+| `threadMilestoneSnapshot` | none | None | Optional | Useful continuity feature; not critical for first expansion. |
+| `budgetAwareMode` | usage/budget checks in server path | Partial | No | Budget control already exists at request gate; no urgent need for dedicated tool. |
 
 ---
 
-### 3. `summarizeArtifactForThread`
-**What it does:** creates a compact, thread-specific summary snapshot of an artifact for current chat goals.
+## 3) Final recommended AI chat toolset
 
-**Why it fits:** project memory can be large; thread needs focused context.
+This is the **target toolset** I recommend, including both existing and new tools.
 
-**Guardrails:**
-- Summaries are ephemeral by default
-- Persist as artifact only on explicit user request
+## A) Keep current tools (core, already correct)
 
----
-
-## B. Artifact refinement tools
-
-### 4. `createArtifactFromTemplate`
-**What it does:** creates markdown artifacts from controlled templates (`idea`, `prd`, later `brief`, `experiment-plan`).
-
-**Why it fits:** consistency across artifacts without adding heavy schema complexity.
-
-**Guardrails:**
-- Template choice explicit in tool input
-- Uses same draft-safe editing model for updates
+1. `listThreadArtifacts`
+2. `readThreadArtifact`
+3. `listProjectArtifacts`
+4. `importProjectArtifactToThread`
+5. `createIdeaArtifact`
+6. `createPrdArtifact`
+7. `createProjectFromThread`
+8. `proposeArtifactEdit`
 
 ---
 
-### 5. `proposeArtifactSectionEdit`
-**What it does:** propose targeted edits to specific sections instead of rewriting whole artifact draft content.
+## B) Add now (highest ROI, low complexity)
 
-**Why it fits:** smaller diffs are easier to review and trust.
+9. `searchArtifacts` *(new)*
+10. `readArtifactSections` *(new)*
+11. `proposeArtifactSectionEdit` *(new)*
+12. `readinessCheckForPromotion` *(new)*
 
-**Good inputs:**
-- `artifactId`
-- `sectionTitle`
-- `proposedReplacementMarkdown`
-- optional `summary`
-
----
-
-### 6. `compareArtifacts`
-**What it does:** compares two artifacts (or two PRDs) and returns deltas in goals/scope/test scenarios.
-
-**Why it fits:** builders often iterate direction and need quick “what changed?” clarity.
+Why these four first:
+- Improve retrieval precision and token efficiency
+- Improve edit trust via smaller diffs
+- Improve promotion quality without auto-writing
 
 ---
 
-## C. Project progression tools
+## C) Add next (strong product leverage)
 
-### 7. `readinessCheckForPromotion`
-**What it does:** scores whether a thread is ready for “Create Project from this” based on explicit checklist signals.
+13. `generateExecutionBacklog` *(new)*
+14. `extractOpenQuestions` *(new)*
 
-**Suggested checks:**
-- Problem clarity
-- Target user clarity
-- MVP scope bounded
-- Known risks captured
-- Next 1–2 build steps defined
-
-**Why it fits:** aligns with Launchpad’s chat -> project promotion loop.
+Why next:
+- They convert planning artifacts into immediate execution momentum
+- They reduce hidden ambiguity before coding
 
 ---
 
-### 8. `generateExecutionBacklog`
-**What it does:** derives first implementation backlog from PRD into small tasks (MVP-only).
+## D) Defer (nice-to-have, not core for current scope)
 
-**Output:** markdown checklist artifact or draft proposal.
-
-**Why it fits:** gives immediate post-PRD momentum.
-
-**Guardrails:**
-- Keep scope intentionally narrow
-- No autonomous execution in MVP
+- `compareArtifacts`
+- `logDecision`
+- `threadMilestoneSnapshot`
+- `summarizeArtifactForThread`
+- `createArtifactFromTemplate`
+- `budgetAwareMode`
 
 ---
 
-### 9. `extractOpenQuestions`
-**What it does:** pulls unresolved decisions from thread + linked artifacts and groups by severity.
+## 4) Recommended “set tool set” (single canonical list)
 
-**Why it fits:** reduces hidden ambiguity before coding starts.
+If we freeze one canonical list for roadmap alignment, it should be:
 
----
+1. `listThreadArtifacts` (existing)
+2. `readThreadArtifact` (existing)
+3. `listProjectArtifacts` (existing)
+4. `importProjectArtifactToThread` (existing)
+5. `createIdeaArtifact` (existing)
+6. `createPrdArtifact` (existing)
+7. `createProjectFromThread` (existing)
+8. `proposeArtifactEdit` (existing)
+9. `searchArtifacts` (new)
+10. `readArtifactSections` (new)
+11. `proposeArtifactSectionEdit` (new)
+12. `readinessCheckForPromotion` (new)
+13. `generateExecutionBacklog` (new)
+14. `extractOpenQuestions` (new)
 
-## D. Decision + traceability tools
-
-### 10. `logDecision`
-**What it does:** appends a structured decision block to a selected artifact (or creates a dedicated decisions artifact).
-
-**Fields:**
-- Decision
-- Alternatives considered
-- Rationale
-- Risks
-- Revisit trigger/date
-
-**Why it fits:** preserves “why” behind scope decisions and prevents repeated debates.
-
----
-
-### 11. `threadMilestoneSnapshot`
-**What it does:** snapshots current thread state (summary + linked artifact ids + next actions).
-
-**Why it fits:** better continuity after long gaps between sessions.
+This set keeps the current product principles intact (chat-first, explicit context, user-controlled writes), while adding the highest-leverage missing capabilities.
 
 ---
 
-## E. Usage + budget-aware tools
+## 5) Vercel AI workflow fit (kept concise)
 
-### 12. `budgetAwareMode`
-**What it does:** recommends response mode by daily cap state (`deep`, `balanced`, `lean`).
+For this toolset, the most useful workflow patterns are:
 
-**Why it fits:** product already enforces daily spend cap; this gives proactive UX before hard stop.
+1. **Routing**: classify user intent, then expose only relevant tools per turn.
+2. **Sequential chain**: convert chat -> structured output -> quality pass.
+3. **Evaluator-optimizer (bounded)**: 1–2 refinement passes for PRD quality checks.
 
----
+For durable background execution (Vercel Workflows), start with one workflow only:
+- **Artifact quality pipeline** that generates draft proposals asynchronously and logs progress.
 
-## 3) Prioritized rollout (smallest path first)
-
-### Phase 1 (highest ROI, low complexity)
-1. `searchArtifacts`
-2. `readArtifactSections`
-3. `proposeArtifactSectionEdit`
-4. `readinessCheckForPromotion`
-
-### Phase 2 (quality + continuity)
-5. `extractOpenQuestions`
-6. `generateExecutionBacklog`
-7. `threadMilestoneSnapshot`
-
-### Phase 3 (nice-to-have)
-8. `compareArtifacts`
-9. `logDecision`
-10. `budgetAwareMode`
-
----
-
-## 4) Vercel AI workflow patterns that make sense for Launchpad
-
-AI SDK’s workflow patterns are directly relevant for in-request orchestration inside your current chat endpoint.
-
-## A. Sequential processing (chain)
-Use for deterministic multi-step transforms.
-
-**Launchpad fit:**
-- user request -> clarify intent -> produce structured artifact draft -> quality pass -> final response
-
-**Best for:** PRD generation, backlog generation.
-
----
-
-## B. Routing
-Use a classifier step to decide path/toolset.
-
-**Launchpad fit:**
-- classify user turn as: brainstorm / artifact-create / artifact-edit / project-promotion / memory-retrieval
-- enable only relevant tools per route
-
-**Benefit:** lower tool misuse and cleaner responses.
-
----
-
-## C. Parallel processing
-Run independent analyses concurrently.
-
-**Launchpad fit:**
-- parallel PRD audits: scope risk, test completeness, clarity score
-- merge outputs into one concise recommendation
-
-**Benefit:** richer feedback with predictable latency.
-
----
-
-## D. Evaluator-optimizer loop
-Generate -> evaluate against rubric -> revise (bounded iterations).
-
-**Launchpad fit:**
-- PRD quality loop with max 2–3 passes and explicit stop condition
-
-**Benefit:** higher artifact quality without manual back-and-forth.
-
----
-
-## E. Orchestrator-worker
-One coordinator delegates to specialized workers.
-
-**Launchpad fit:**
-- orchestrator handles plan
-- workers for: problem framing, user/persona clarity, MVP slicing, test scenario generation
-
-**Benefit:** good for complex project planning turns.
-
----
-
-## 5) Vercel Workflow (durable workflows) opportunities
-
-Use Vercel Workflow when work must continue beyond a single request/response, wait for events, or survive retries/deploys.
-
-## Durable candidate workflows for Launchpad
-
-### 1. Artifact quality pipeline (async)
-- Trigger: user requests “improve this PRD”
-- Steps:
-  1. run quality checks
-  2. generate section-level proposals
-  3. persist draft change candidates
-  4. notify user in activity feed
-
-**Why durable:** multiple steps, retry-safe, user can return later.
-
----
-
-### 2. Human-in-the-loop approval workflow
-- Trigger: high-impact edit proposal
-- Flow:
-  - workflow pauses waiting for explicit user approval event
-  - resumes to apply/discard and log activity
-
-**Why durable:** explicit pause/resume maps to approval UX.
-
----
-
-### 3. Scheduled project heartbeat
-- Trigger: daily/weekly schedule
-- Flow:
-  - summarize project status
-  - detect stale artifacts/open questions
-  - create “next actions” summary artifact draft
-
-**Why durable:** scheduled long-running background coordination.
-
----
-
-### 4. Research queue (post-MVP)
-- Trigger: user asks for research plan execution
-- Flow:
-  - fan out sources
-  - collect notes
-  - evaluate confidence
-  - draft research memo
-
-**Why durable:** naturally parallel + retry-heavy + could span minutes/hours.
-
-**Note:** this conflicts with current MVP “no automation”; keep behind future flag.
-
----
-
-### 5. Project setup assistant
-- Trigger: “Create project from this thread”
-- Flow:
-  - create project
-  - relink artifacts
-  - create initial backlog draft
-  - create kickoff checklist
-
-**Why durable:** chained writes where idempotency and retries matter.
-
----
-
-## 6) Suggested workflow architecture (simple and safe)
-
-1. **Keep synchronous chat path as default** for immediate responses.
-2. **Escalate to durable workflow only** when task is long-running, retriable, or approval-gated.
-3. **Use thread + project ids as workflow correlation keys** for traceability.
-4. **Persist intermediate results as draft artifacts** (never silent canonical writes).
-5. **Emit activity events on each major step** for transparent progress.
-
----
-
-## 7) Concrete recommendations for next 30 days
-
-1. Add `searchArtifacts` + `readArtifactSections` to improve retrieval precision.
-2. Add `proposeArtifactSectionEdit` to reduce oversized diff proposals.
-3. Introduce a lightweight routing step in chat to limit active tools by intent.
-4. Pilot one durable Vercel Workflow: **Artifact quality pipeline** (async draft proposals only).
-5. Add simple metrics for tool success:
-   - tool invocation frequency
-   - apply/discard rate for draft changes
-   - time from chat request to accepted artifact update
-
----
-
-## 8) Scope boundaries to keep
-
-To stay aligned with Launchpad’s current product strategy:
-
-- Keep chat primary; workflows should support chat, not replace it.
-- Keep thread context explicit (no hidden global memory injection).
-- Keep user in control of writes (draft-then-apply remains default).
-- Avoid autonomous “agent runs wild” behavior in MVP.
-
-If we keep those constraints, these tool/workflow additions should increase quality and speed without increasing product complexity.
+Keep all durable outputs as drafts unless user explicitly applies changes.
