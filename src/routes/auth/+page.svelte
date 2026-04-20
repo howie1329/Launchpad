@@ -9,21 +9,19 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { auth, signIn } from '$lib/auth.svelte';
+	import { getSafePostAuthRedirect } from '$lib/safeRedirect';
 
 	type Flow = 'signIn' | 'signUp';
 	type Status = 'idle' | 'loading' | 'error';
-	type PostAuthDestination = '/' | '/workspace';
 
 	let flow = $state<Flow>('signIn');
 	let status = $state<Status>('idle');
 	let errorMessage = $state('');
 
 	const isSignUp = $derived(flow === 'signUp');
-	const redirectTo = $derived.by<PostAuthDestination>(() => {
-		const raw = page.url.searchParams.get('redirectTo');
-		if (raw === '/' || raw === null || raw === '') return '/';
-		return '/workspace';
-	});
+	const redirectTo = $derived.by(() =>
+		getSafePostAuthRedirect(page.url.searchParams.get('redirectTo'))
+	);
 
 	const toggleFlow = () => {
 		flow = isSignUp ? 'signIn' : 'signUp';
@@ -42,7 +40,14 @@
 			const result = await signIn('password', formData);
 
 			if (result.signingIn || auth.isAuthenticated) {
-				await goto(resolve(redirectTo));
+				const dest = redirectTo;
+				if (dest === '/') {
+					await goto(resolve('/'));
+				} else {
+					// getSafePostAuthRedirect restricts dest to /workspace**; query/hash preserved
+					// eslint-disable-next-line svelte/no-navigation-without-resolve
+					await goto(dest);
+				}
 				return;
 			}
 
@@ -92,7 +97,11 @@
 			</div>
 
 			<div class="w-full border-y border-border/70 py-6">
-				<form class="mx-auto flex max-w-sm flex-col gap-4" onsubmit={handleSubmit}>
+				<form
+					class="mx-auto flex max-w-sm flex-col gap-4"
+					onsubmit={handleSubmit}
+					aria-busy={status === 'loading'}
+				>
 					<div>
 						<h2 class="text-xl font-semibold tracking-tight">
 							{isSignUp ? 'Create account' : 'Sign in'}
@@ -126,7 +135,14 @@
 					</div>
 
 					{#if status === 'error'}
-						<p class="text-xs leading-5 text-destructive">{errorMessage}</p>
+						<p class="text-xs leading-5 text-destructive" role="status" aria-live="polite">
+							{errorMessage}
+						</p>
+					{/if}
+					{#if status === 'loading'}
+						<p class="sr-only" role="status" aria-live="polite">
+							{isSignUp ? 'Creating account…' : 'Signing in…'}
+						</p>
 					{/if}
 
 					<div class="flex items-center justify-between gap-3 pt-1">

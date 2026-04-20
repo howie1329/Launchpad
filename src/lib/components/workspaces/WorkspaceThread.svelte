@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { auth, getConvexClient } from '$lib/auth.svelte';
@@ -53,6 +53,7 @@
 		PromptInputTools,
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
+	import { Button } from '$lib/components/ui/button';
 	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
 	import {
 		defaultIdeaAiModelId,
@@ -119,6 +120,12 @@
 			: []
 	);
 
+	const mentionListboxId = $derived(
+		activeThreadId
+			? `workspace-thread-mention-listbox-${activeThreadId}`
+			: 'workspace-thread-mention-listbox'
+	);
+
 	const filteredMentionArtifacts = $derived.by(() => {
 		const rows = threadArtifacts.data ?? [];
 		const q = mentionFilter.trim().toLowerCase();
@@ -126,9 +133,16 @@
 		return rows.filter((item) => item.artifact.title.toLowerCase().includes(q));
 	});
 
+	const mentionActiveOptionId = $derived.by(() => {
+		if (!mentionOpen) return undefined;
+		const item = filteredMentionArtifacts[mentionHighlight];
+		if (!item) return undefined;
+		return `workspace-mention-opt-${item.artifact._id}`;
+	});
+
 	$effect(() => {
 		if (!mentionOpen) return;
-		mentionFilter;
+		void mentionFilter;
 		mentionHighlight = 0;
 	});
 	const selectedThreadArtifact = $derived(
@@ -196,7 +210,7 @@
 	});
 
 	$effect(() => {
-		activeThreadId;
+		void activeThreadId;
 		mentionChips = [];
 	});
 
@@ -448,8 +462,14 @@
 			saveError = '';
 		} catch (error) {
 			console.error(error);
-			saveError = 'Chat saved locally for now. Send another message to retry syncing.';
+			saveError =
+				'Could not save messages to the server. Your latest replies may not persist after refresh—try again or send another message to retry sync.';
 		}
+	}
+
+	async function retrySaveMessages() {
+		if (!chat || !activeThreadId) return;
+		await persistMessages(activeThreadId, chat.messages);
 	}
 
 	function authHeaders(): Record<string, string> {
@@ -479,7 +499,36 @@
 
 <section class="flex h-full min-h-0 flex-col bg-background text-foreground">
 	<div class="flex min-h-0 flex-1 flex-col">
-		{#if threadMessages.data === undefined || !chat}
+		{#if threadMessages.error}
+			<div class="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-8">
+				<div class="max-w-sm text-center">
+					<p class="text-sm font-semibold tracking-tight">Could not load this thread</p>
+					<p class="mt-2 text-xs leading-5 text-muted-foreground">
+						{threadMessages.error.message}
+					</p>
+				</div>
+				<div class="flex flex-wrap items-center justify-center gap-2">
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						onclick={() => {
+							void invalidateAll();
+						}}
+					>
+						Try again
+					</Button>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onclick={() => goto(resolve('/workspace'))}
+					>
+						Back to workspace
+					</Button>
+				</div>
+			</div>
+		{:else if threadMessages.isLoading || threadMessages.data === undefined || !chat}
 			<div class="flex flex-1 items-center justify-center px-4">
 				<div class="text-center">
 					<p class="text-sm font-semibold tracking-tight">Loading thread.</p>
@@ -573,7 +622,22 @@
 						/>
 					{:else}
 						<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-							{#if threadArtifacts.data === undefined}
+							{#if threadArtifacts.error}
+								<div class="space-y-2 px-2 py-2">
+									<p class="text-xs text-destructive">{threadArtifacts.error.message}</p>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										class="h-7 text-xs"
+										onclick={() => {
+											void invalidateAll();
+										}}
+									>
+										Retry
+									</Button>
+								</div>
+							{:else if threadArtifacts.data === undefined}
 								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
 							{:else if threadArtifacts.data.length === 0}
 								<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
@@ -640,11 +704,14 @@
 			<div class="relative shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
 				{#if mentionOpen}
 					<div
+						id={mentionListboxId}
 						class="absolute right-0 bottom-full left-0 z-20 mb-1 max-h-40 overflow-y-auto rounded-md border border-border/60 bg-popover text-popover-foreground shadow-md"
 						role="listbox"
 						aria-label="Thread artifacts"
 					>
-						{#if threadArtifacts.data === undefined}
+						{#if threadArtifacts.error}
+							<p class="px-3 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
+						{:else if threadArtifacts.data === undefined}
 							<p class="px-3 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
 						{:else if filteredMentionArtifacts.length === 0}
 							<p class="px-3 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
@@ -652,6 +719,7 @@
 							{#each filteredMentionArtifacts as item, i (item.artifact._id)}
 								<button
 									type="button"
+									id={`workspace-mention-opt-${item.artifact._id}`}
 									role="option"
 									aria-selected={i === mentionHighlight}
 									class={cn(
@@ -674,7 +742,22 @@
 				{/if}
 				<div class="w-full space-y-2">
 					{#if chatError || saveError}
-						<p class="text-xs text-destructive">{chatError || saveError}</p>
+						<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+							<p class="text-xs text-destructive">{chatError || saveError}</p>
+							{#if saveError && !chatError}
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									class="h-7 shrink-0 self-start text-xs"
+									onclick={() => {
+										void retrySaveMessages();
+									}}
+								>
+									Retry sync
+								</Button>
+							{/if}
+						</div>
 					{/if}
 
 					{#if mentionChips.length > 0}
@@ -709,6 +792,11 @@
 							placeholder="Continue shaping this thread… (@ to cite a thread artifact)"
 							onInputPost={handleComposerInputPost}
 							onKeyDownIntercept={handleComposerKeyDown}
+							role="combobox"
+							aria-expanded={mentionOpen}
+							aria-controls={mentionOpen ? mentionListboxId : undefined}
+							aria-autocomplete="list"
+							aria-activedescendant={mentionActiveOptionId}
 						/>
 						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 							<PromptInputTools>

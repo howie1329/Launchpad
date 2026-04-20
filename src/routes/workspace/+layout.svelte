@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
@@ -14,11 +14,14 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { cn } from '$lib/utils';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
-	import { createProjectMutation, listProjectsQuery } from '$lib/projects';
+	import {
+		createProjectFromThreadMutation,
+		createProjectMutation,
+		listProjectsQuery
+	} from '$lib/projects';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign';
@@ -29,11 +32,12 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
-	import MoreVerticalIcon from '@lucide/svelte/icons/more-vertical';
 	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
 	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
+	import RocketIcon from '@lucide/svelte/icons/rocket';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { useQuery } from 'convex-svelte';
+	import type { Id } from '../../convex/_generated/dataModel';
 
 	let { children } = $props();
 
@@ -44,6 +48,11 @@
 	let projectName = $state('');
 	let projectSummary = $state('');
 	let projectError = $state('');
+	let promoteDialogOpen = $state(false);
+	let promoteName = $state('');
+	let promoteSummary = $state('');
+	let promoteError = $state('');
+	let isPromoting = $state(false);
 	let openSections = $state({
 		Projects: true,
 		Chats: true,
@@ -65,11 +74,23 @@
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const budget = useQuery(getAiBudgetStatusQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const workspaceListError = $derived(
+		projects.error ?? threads.error ?? artifacts.error ?? budget.error
+	);
 	const selectedProject = $derived(
 		projects.data?.find((project) => project._id === activeProjectId) ?? null
 	);
 	const selectedThread = $derived(
 		threads.data?.find((thread) => thread._id === activeThreadId) ?? null
+	);
+	const canPromoteThreadToProject = $derived(
+		Boolean(
+			activeThreadId &&
+			selectedThread &&
+			!selectedThread.projectId &&
+			!isSettingsActive &&
+			!activeArtifactId
+		)
 	);
 	const selectedArtifact = $derived(
 		artifacts.data?.find((artifact) => artifact._id === activeArtifactId) ?? null
@@ -163,6 +184,60 @@
 		projectError = '';
 	};
 
+	const openPromoteDialog = () => {
+		if (!selectedThread || selectedThread.projectId) return;
+		promoteName = selectedThread.title?.trim() || 'New project';
+		promoteSummary = '';
+		promoteError = '';
+		promoteDialogOpen = true;
+	};
+
+	const closePromoteDialog = () => {
+		if (isPromoting) return;
+		promoteDialogOpen = false;
+		promoteName = '';
+		promoteSummary = '';
+		promoteError = '';
+	};
+
+	const promoteThreadToProject = async () => {
+		if (isPromoting || !activeThreadId) return;
+
+		const name = promoteName.trim();
+		if (!name) {
+			promoteError = 'Project name is required.';
+			return;
+		}
+
+		isPromoting = true;
+		promoteError = '';
+
+		try {
+			const summary = promoteSummary.trim();
+			const result = await getConvexClient().mutation(createProjectFromThreadMutation, {
+				threadId: activeThreadId as Id<'chatThreads'>,
+				name,
+				...(summary ? { summary } : {})
+			});
+			promoteDialogOpen = false;
+			promoteName = '';
+			promoteSummary = '';
+			await goto(
+				resolve(
+					`/workspace?project=${encodeURIComponent(result.projectId)}&thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
+				)
+			);
+		} catch (error) {
+			console.error(error);
+			promoteError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not create a project from this chat. Please try again.';
+		} finally {
+			isPromoting = false;
+		}
+	};
+
 	const toggleThreadContext = async () => {
 		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
 
@@ -205,7 +280,10 @@
 
 	$effect(() => {
 		if (!auth.isLoading && !auth.isAuthenticated) {
-			const nextPath = pathname.startsWith('/workspace') ? pathname : '/workspace';
+			const u = $page.url;
+			const nextPath = u.pathname.startsWith('/workspace')
+				? `${u.pathname}${u.search}${u.hash}`
+				: '/workspace';
 			void goto(resolve(`/auth?redirectTo=${encodeURIComponent(nextPath)}`));
 		}
 	});
@@ -245,6 +323,26 @@
 			</Sidebar.Header>
 
 			<Sidebar.Content>
+				{#if workspaceListError}
+					<div
+						class="border-b border-destructive/25 bg-destructive/10 px-3 py-2.5 text-[11px] text-destructive"
+						role="status"
+					>
+						<p class="font-medium">Could not load part of the workspace</p>
+						<p class="mt-1 leading-snug opacity-90">{workspaceListError.message}</p>
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							class="mt-2 h-7 text-xs"
+							onclick={() => {
+								void invalidateAll();
+							}}
+						>
+							Try again
+						</Button>
+					</div>
+				{/if}
 				<Sidebar.Group class="border-0 shadow-none ring-0">
 					<Sidebar.Menu>
 						<Sidebar.MenuItem>
@@ -340,11 +438,11 @@
 														</Sidebar.MenuSubItem>
 													{:else}
 														{#each threadsForProject as thread (thread._id)}
-															<Sidebar.MenuSubItem class="flex min-w-0 items-center gap-0.5">
+															<Sidebar.MenuSubItem>
 																<Sidebar.MenuSubButton
 																	size="sm"
 																	isActive={activeThreadId === thread._id}
-																	class={cn(subNavPill, 'min-w-0 flex-1')}
+																	class={cn(subNavPill, 'min-w-0')}
 																>
 																	{#snippet child({ props })}
 																		<a
@@ -358,26 +456,6 @@
 																		</a>
 																	{/snippet}
 																</Sidebar.MenuSubButton>
-																<DropdownMenu.Root>
-																	<DropdownMenu.Trigger>
-																		{#snippet child({ props })}
-																			<button
-																				type="button"
-																				class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-offset-0 md:opacity-0 md:group-focus-within/menu-sub-item:opacity-100 md:group-hover/menu-sub-item:opacity-100"
-																				aria-label="Chat options"
-																				{...props}
-																			>
-																				<MoreVerticalIcon class="size-3.5" />
-																			</button>
-																		{/snippet}
-																	</DropdownMenu.Trigger>
-																	<DropdownMenu.Content align="end" class="min-w-[8rem]">
-																		<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
-																		<DropdownMenu.Item disabled variant="destructive"
-																			>Delete</DropdownMenu.Item
-																		>
-																	</DropdownMenu.Content>
-																</DropdownMenu.Root>
 															</Sidebar.MenuSubItem>
 														{/each}
 													{/if}
@@ -435,21 +513,6 @@
 														</a>
 													{/snippet}
 												</Sidebar.MenuButton>
-												<DropdownMenu.Root>
-													<DropdownMenu.Trigger>
-														{#snippet child({ props })}
-															<Sidebar.MenuAction {...props} showOnHover>
-																<MoreVerticalIcon class="size-3.5" />
-															</Sidebar.MenuAction>
-														{/snippet}
-													</DropdownMenu.Trigger>
-													<DropdownMenu.Content align="end" class="min-w-[8rem]">
-														<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
-														<DropdownMenu.Item disabled variant="destructive"
-															>Delete</DropdownMenu.Item
-														>
-													</DropdownMenu.Content>
-												</DropdownMenu.Root>
 											</Sidebar.MenuItem>
 										{/each}
 									{/if}
@@ -519,21 +582,6 @@
 																</a>
 															{/snippet}
 														</Sidebar.MenuButton>
-														<DropdownMenu.Root>
-															<DropdownMenu.Trigger>
-																{#snippet child({ props })}
-																	<Sidebar.MenuAction {...props} showOnHover>
-																		<MoreVerticalIcon class="size-3.5" />
-																	</Sidebar.MenuAction>
-																{/snippet}
-															</DropdownMenu.Trigger>
-															<DropdownMenu.Content align="end" class="min-w-[8rem]">
-																<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
-																<DropdownMenu.Item disabled variant="destructive"
-																	>Delete</DropdownMenu.Item
-																>
-															</DropdownMenu.Content>
-														</DropdownMenu.Root>
 													</Sidebar.MenuItem>
 												{/each}
 											{/if}
@@ -569,6 +617,21 @@
 								></div>
 							</div>
 						</a>
+					{:else if budget.error}
+						<div class="mb-2 space-y-1.5 px-1.5">
+							<p class="text-[10px] leading-snug text-destructive">Could not load usage.</p>
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								class="h-7 w-full text-[10px]"
+								onclick={() => {
+									void invalidateAll();
+								}}
+							>
+								Retry
+							</Button>
+						</div>
 					{:else}
 						<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/50">Loading usage…</p>
 					{/if}
@@ -682,6 +745,19 @@
 						</div>
 					</div>
 				{/if}
+				{#if canPromoteThreadToProject}
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						class="h-8 shrink-0 gap-1.5 px-2 text-xs font-medium"
+						onclick={openPromoteDialog}
+					>
+						<RocketIcon class="size-3.5 shrink-0" />
+						<span class="hidden min-[420px]:inline">Create project from chat</span>
+						<span class="min-[420px]:hidden">Project</span>
+					</Button>
+				{/if}
 				{#if activeThreadId}
 					<Button
 						type="button"
@@ -704,6 +780,67 @@
 				{@render children()}
 			</main>
 		</Sidebar.Inset>
+
+		<Dialog.Root bind:open={promoteDialogOpen}>
+			<Dialog.Content class="sm:max-w-md">
+				<form
+					class="space-y-4"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void promoteThreadToProject();
+					}}
+				>
+					<Dialog.Header>
+						<Dialog.Title>Create project from this chat</Dialog.Title>
+						<Dialog.Description>
+							Starts a named project and attaches this thread and its linked artifacts. You can keep
+							chatting in the same thread afterward.
+						</Dialog.Description>
+					</Dialog.Header>
+
+					<div class="space-y-3">
+						<div class="space-y-1.5">
+							<Label for="promote-project-name">Project name</Label>
+							<Input
+								id="promote-project-name"
+								bind:value={promoteName}
+								placeholder="Project name"
+								aria-invalid={promoteError ? 'true' : undefined}
+								disabled={isPromoting}
+							/>
+						</div>
+						<div class="space-y-1.5">
+							<Label for="promote-project-summary">Summary</Label>
+							<Textarea
+								id="promote-project-summary"
+								bind:value={promoteSummary}
+								placeholder="Optional context for future chats in this project"
+								class="min-h-20"
+								disabled={isPromoting}
+							/>
+						</div>
+					</div>
+
+					{#if promoteError}
+						<p class="text-xs text-destructive">{promoteError}</p>
+					{/if}
+
+					<Dialog.Footer>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={isPromoting}
+							onclick={closePromoteDialog}
+						>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={isPromoting || !promoteName.trim()}>
+							{isPromoting ? 'Creating…' : 'Create project'}
+						</Button>
+					</Dialog.Footer>
+				</form>
+			</Dialog.Content>
+		</Dialog.Root>
 
 		<Dialog.Root bind:open={projectDialogOpen}>
 			<Dialog.Content class="sm:max-w-md">

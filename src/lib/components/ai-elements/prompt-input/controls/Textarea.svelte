@@ -4,8 +4,14 @@
 	import { getAttachmentsContext } from '../context/attachments.svelte.js';
 	import { getPromptInputProvider } from '../context/provider.svelte.js';
 	import { getPromptInputTextRegistration } from '../context/text-registration.svelte.js';
+	import type { HTMLTextareaAttributes } from 'svelte/elements';
 
-	interface Props {
+	type MentionAria = Pick<
+		HTMLTextareaAttributes,
+		'role' | 'aria-expanded' | 'aria-controls' | 'aria-autocomplete' | 'aria-activedescendant'
+	>;
+
+	interface Props extends MentionAria {
 		ref?: HTMLTextAreaElement | null;
 		class?: string;
 		placeholder?: string;
@@ -136,10 +142,10 @@
 	<Textarea
 		bind:ref
 		class={cn(
-			'w-full resize-none rounded-none border-none p-3 shadow-none ring-0 outline-none',
+			'w-full resize-none rounded-none border-none p-3 shadow-none outline-none',
 			'field-sizing-content bg-transparent dark:bg-transparent',
 			'max-h-48 min-h-10',
-			'focus-visible:ring-0',
+			'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
 			className
 		)}
 		oninput={handleInput}
@@ -155,10 +161,10 @@
 	<Textarea
 		bind:ref
 		class={cn(
-			'w-full resize-none rounded-none border-none p-3 shadow-none ring-0 outline-none',
+			'w-full resize-none rounded-none border-none p-3 shadow-none outline-none',
 			'field-sizing-content bg-transparent dark:bg-transparent',
 			'max-h-48 min-h-10',
-			'focus-visible:ring-0',
+			'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0',
 			className
 		)}
 		oninput={handleInput}
