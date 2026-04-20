@@ -218,8 +218,9 @@
 		<div class="space-y-1">
 			<h2 class="text-sm font-semibold tracking-tight">AI assistant preferences</h2>
 			<p class="text-xs leading-5 text-muted-foreground">
-				Optional text included with workspace chat instructions. Do not paste passwords, API keys,
-				or regulated personal data.
+				Optional text included with workspace chat instructions. Artifacts remain your editable
+				workspace memory; Launchpad may use secure memory recall to find relevant artifact context
+				across chats. Do not paste passwords, API keys, or regulated personal data.
 			</p>
 		</div>
 

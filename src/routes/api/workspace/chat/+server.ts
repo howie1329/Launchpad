@@ -15,6 +15,11 @@ import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
+import { syncArtifactMemory } from '$lib/server/launchpad-memory';
+import {
+	composeRetrievedMemoryInstructions,
+	retrieveRelevantMemories
+} from '$lib/server/supermemory';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { ConvexHttpClient } from 'convex/browser';
@@ -136,10 +141,15 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: referenced.error }, { status: 400 });
 		}
 
-		const coreInstructions =
-			referenced.block.length > 0
-				? `${workspaceInstructions(project)}\n\n${referenced.block}`
-				: workspaceInstructions(project);
+		const memories = await retrieveRelevantMemories({
+			ownerId: thread.ownerId,
+			...(project?._id ? { projectId: project._id } : {}),
+			query: lastUserText
+		});
+		const memoryBlock = composeRetrievedMemoryInstructions(memories);
+		const coreInstructions = [workspaceInstructions(project), referenced.block, memoryBlock]
+			.filter((part) => part.length > 0)
+			.join('\n\n');
 
 		const userSettingsRow = await convex.query(getMyUserSettingsQuery, {});
 		const instructions = appendUserAiPreferenceInstructions(coreInstructions, userSettingsRow);
@@ -338,6 +348,7 @@ function workspaceTools({
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' }
 				});
+				queueArtifactMemorySync(convex, result.artifactId);
 
 				return {
 					artifactId: result.artifactId,
@@ -369,6 +380,7 @@ function workspaceTools({
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' }
 				});
+				queueArtifactMemorySync(convex, result.artifactId);
 
 				return {
 					artifactId: result.artifactId,
@@ -436,6 +448,12 @@ function workspaceTools({
 			}
 		})
 	};
+}
+
+function queueArtifactMemorySync(convex: ConvexHttpClient, artifactId: Id<'artifacts'>) {
+	void syncArtifactMemory(convex, artifactId).catch((error) => {
+		console.info('Artifact memory sync skipped', error);
+	});
 }
 
 function artifactSummary(artifact: SavedArtifact, reason?: string) {

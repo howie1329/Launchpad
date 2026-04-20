@@ -16,6 +16,7 @@ const artifactDraftChangeStatus = v.union(
 	v.literal('applied'),
 	v.literal('discarded')
 );
+const memorySyncStatus = v.union(v.literal('synced'), v.literal('blocked'), v.literal('failed'));
 
 export default defineSchema({
 	...authTables,
@@ -135,5 +136,23 @@ export default defineSchema({
 	})
 		.index('by_artifactId_and_updatedAt', ['artifactId', 'updatedAt'])
 		.index('by_artifactId_and_status_and_updatedAt', ['artifactId', 'status', 'updatedAt'])
+		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt']),
+	memorySyncs: defineTable({
+		ownerId: v.string(),
+		sourceType: v.literal('artifact'),
+		sourceId: v.string(),
+		artifactId: v.id('artifacts'),
+		projectId: v.optional(v.id('projects')),
+		threadId: v.optional(v.id('chatThreads')),
+		customId: v.string(),
+		containerTag: v.string(),
+		supermemoryDocumentId: v.optional(v.string()),
+		status: memorySyncStatus,
+		lastError: v.optional(v.string()),
+		lastSyncedAt: v.optional(v.number()),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	})
+		.index('by_sourceType_and_sourceId', ['sourceType', 'sourceId'])
 		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt'])
 });

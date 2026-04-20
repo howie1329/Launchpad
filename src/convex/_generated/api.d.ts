@@ -16,6 +16,7 @@ import type * as authHelpers from "../authHelpers.js";
 import type * as chat from "../chat.js";
 import type * as dateKey from "../dateKey.js";
 import type * as http from "../http.js";
+import type * as memory from "../memory.js";
 import type * as projects from "../projects.js";
 import type * as usage from "../usage.js";
 import type * as userSettings from "../userSettings.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   chat: typeof chat;
   dateKey: typeof dateKey;
   http: typeof http;
+  memory: typeof memory;
   projects: typeof projects;
   usage: typeof usage;
   userSettings: typeof userSettings;

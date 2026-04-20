@@ -32,7 +32,6 @@
 		compact = false,
 		fullWidthContent = false,
 		showHeader,
-		linkReason: _linkReason,
 		onBack
 	}: {
 		artifact: SavedArtifact | null | undefined
@@ -140,9 +139,11 @@
 
 		draftError = ''
 		busyDraftChangeId = draftChangeId
+		const draft = pendingDraftChanges.find((item) => item._id === draftChangeId)
 
 		try {
 			await getConvexClient().mutation(applyArtifactDraftChangeMutation, { draftChangeId })
+			if (draft) queueArtifactMemorySync(draft.artifactId)
 		} catch (error) {
 			console.error(error)
 			draftError = 'Could not apply this draft. Please try again.'
@@ -202,6 +203,7 @@
 				contentMarkdown: editorValue
 			})
 			contentDirty = false
+			queueArtifactMemorySync(artifact._id)
 		} catch (error) {
 			console.error(error)
 			saveError = 'Could not save this artifact. Please try again.'
@@ -212,6 +214,21 @@
 
 	const selectDraftForCompare = (draftChangeId: Id<'artifactDraftChanges'>) => {
 		selectedDraftChangeId = draftChangeId
+	}
+
+	function queueArtifactMemorySync(artifactId: Id<'artifacts'>) {
+		if (!auth.token) return
+
+		void fetch('/api/workspace/memory/artifact', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${auth.token}`
+			},
+			body: JSON.stringify({ artifactId })
+		}).catch((error) => {
+			console.info('Artifact memory sync skipped', error)
+		})
 	}
 
 	$effect(() => {
