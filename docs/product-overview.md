@@ -71,6 +71,7 @@ Workspace chat calls a **SvelteKit API route** that streams responses using the 
 - Create **idea** and **PRD** artifacts (markdown) after user-aligned actions.
 - **Propose edits** to existing thread-linked artifacts (draft changes).
 - **Create a project from the current thread** when the user wants to promote work.
+- Search the web and read source pages when Tavily is configured and current external context matters.
 
 The chat UI shows tool activity in expandable steps with human-readable summaries and optional technical JSON for debugging.
 
@@ -93,13 +94,13 @@ The chat UI shows tool activity in expandable steps with human-readable summarie
 
 ## Routes (product map)
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Marketing home; sign-in entry points |
-| `/auth` | Sign in and sign up (Convex Auth) |
-| `/workspace` | Main shell: sidebar, chat landing or active thread (query: `project`, `thread`, `context`, `start`) |
-| `/workspace/settings` | Timezone, daily AI cap, usage, activity |
-| `/workspace/artifacts/[artifactId]` | Full-page artifact reader/editor |
+| Route                               | Purpose                                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `/`                                 | Marketing home; sign-in entry points                                                                |
+| `/auth`                             | Sign in and sign up (Convex Auth)                                                                   |
+| `/workspace`                        | Main shell: sidebar, chat landing or active thread (query: `project`, `thread`, `context`, `start`) |
+| `/workspace/settings`               | Timezone, daily AI cap, usage, activity                                                             |
+| `/workspace/artifacts/[artifactId]` | Full-page artifact reader/editor                                                                    |
 
 **API (not a page):** `POST /api/workspace/chat` — authenticated streaming chat for workspace threads.
 
@@ -107,14 +108,14 @@ The chat UI shows tool activity in expandable steps with human-readable summarie
 
 ## Technical stack (summary)
 
-| Layer | Choice |
-| --- | --- |
-| Frontend | SvelteKit, Svelte 5 (runes), TypeScript |
-| UI | Tailwind CSS v4, shadcn-svelte (Bits UI) |
-| Backend / data | Convex — queries, mutations, realtime subscriptions |
-| Auth | Convex Auth (`@convex-dev/auth`) |
-| Client data | `convex-svelte` |
-| AI | `ai`, `@ai-sdk/svelte`; models via Vercel AI Gateway |
+| Layer            | Choice                                                |
+| ---------------- | ----------------------------------------------------- |
+| Frontend         | SvelteKit, Svelte 5 (runes), TypeScript               |
+| UI               | Tailwind CSS v4, shadcn-svelte (Bits UI)              |
+| Backend / data   | Convex — queries, mutations, realtime subscriptions   |
+| Auth             | Convex Auth (`@convex-dev/auth`)                      |
+| Client data      | `convex-svelte`                                       |
+| AI               | `ai`, `@ai-sdk/svelte`; models via Vercel AI Gateway  |
 | Artifact editing | CodeMirror (markdown + merge), Streamdown for preview |
 
 ---
@@ -123,14 +124,14 @@ The chat UI shows tool activity in expandable steps with human-readable summarie
 
 High-level tables (see `src/convex/schema.ts` for the source of truth):
 
-| Area | Tables |
-| --- | --- |
-| Auth | Convex Auth tables |
-| User prefs | `userSettings` — timezone, daily AI cap |
-| Usage | `aiUsageEvents`, `aiDailyUsage` — token and cost rollups |
-| Workspace | `projects`, `chatThreads`, `chatMessages` |
-| Content | `artifacts`, `threadArtifactLinks`, `artifactDraftChanges` |
-| Observability | `activityEvents` — user-visible history |
+| Area          | Tables                                                     |
+| ------------- | ---------------------------------------------------------- |
+| Auth          | Convex Auth tables                                         |
+| User prefs    | `userSettings` — timezone, daily AI cap                    |
+| Usage         | `aiUsageEvents`, `aiDailyUsage` — token and cost rollups   |
+| Workspace     | `projects`, `chatThreads`, `chatMessages`                  |
+| Content       | `artifacts`, `threadArtifactLinks`, `artifactDraftChanges` |
+| Observability | `activityEvents` — user-visible history                    |
 
 Ownership is consistently **`ownerId`** (Convex Auth user id); server code uses helpers in `src/convex/authHelpers.ts`.
 
@@ -138,10 +139,11 @@ Ownership is consistently **`ownerId`** (Convex Auth user id); server code uses 
 
 ## Environment variables
 
-| Variable | Role |
-| --- | --- |
-| `PUBLIC_CONVEX_URL` | Convex deployment URL (browser client and server HTTP client) |
-| `AI_GATEWAY_API_KEY` | Private key for Vercel AI Gateway (workspace chat streaming) |
+| Variable             | Role                                                                   |
+| -------------------- | ---------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`  | Convex deployment URL (browser client and server HTTP client)          |
+| `AI_GATEWAY_API_KEY` | Private key for Vercel AI Gateway (workspace chat streaming)           |
+| `TAVILY_API_KEY`     | Private key for optional workspace chat web search and page extraction |
 
 Convex deployment configuration follows [Convex environment variables](https://docs.convex.dev/production/environment-variables).
 
@@ -168,15 +170,15 @@ Quality checks: `npm run check`, `npm run lint`, `npm run format`.
 
 ## Related documentation
 
-| Document | Contents |
-| --- | --- |
-| [README.md](../README.md) | Quick start, stack, env, tooling |
-| [current-state.md](current-state.md) | Maintainer snapshot vs PRD, architecture notes |
-| [chat-first-launchpad-prd.md](chat-first-launchpad-prd.md) | Original product vision and MVP scope |
-| [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md) | Workspace AI tools: implemented set, planned tools, UI notes |
-| [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md) | Background workflows, runtime comparison, product catalog |
-| [design-system.md](design-system.md) | Visual and interaction principles |
-| [artifact-schema-plan.md](artifact-schema-plan.md) | Markdown-first artifact rationale |
+| Document                                                                         | Contents                                                     |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| [README.md](../README.md)                                                        | Quick start, stack, env, tooling                             |
+| [current-state.md](current-state.md)                                             | Maintainer snapshot vs PRD, architecture notes               |
+| [chat-first-launchpad-prd.md](chat-first-launchpad-prd.md)                       | Original product vision and MVP scope                        |
+| [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md)   | Workspace AI tools: implemented set, planned tools, UI notes |
+| [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md) | Background workflows, runtime comparison, product catalog    |
+| [design-system.md](design-system.md)                                             | Visual and interaction principles                            |
+| [artifact-schema-plan.md](artifact-schema-plan.md)                               | Markdown-first artifact rationale                            |
 
 ---
 

@@ -39,8 +39,8 @@ Ownership uses `ownerId` string from Convex Auth (`getAuthUserId` in app code—
 
 - Browser chat UI calls `POST /api/workspace/chat` with `threadId` and model id.
 - Server builds context from Convex (thread, messages, linked artifacts, optional project artifacts), runs a `ToolLoopAgent`, and streams the response.
-- Tools create/link artifacts and create draft changes for edits; mutations go through Convex.
-- **Durable / background workflows** (multi-step polish, promotion pipelines, scheduled jobs) are **not implemented** in the repo yet; see [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md). Planned chat tools (search, section reads, backlog helpers) live in [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md).
+- Tools create/link artifacts, create draft changes for edits, and optionally search/read web sources through Tavily when `TAVILY_API_KEY` is configured; mutations go through Convex.
+- **Durable / background workflows** (multi-step polish, promotion pipelines, scheduled jobs) are **not implemented** in the repo yet; see [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md). Planned chat tools (artifact search, section reads, backlog helpers) live in [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md).
 
 ## Auth
 
@@ -74,9 +74,10 @@ Treat the chat-first PRD as **direction**; this file is the **inventory**.
 
 ## Environment (quick reference)
 
-| Variable | Role |
-| --- | --- |
-| `PUBLIC_CONVEX_URL` | Public Convex URL (client + server HTTP client) |
-| `AI_GATEWAY_API_KEY` | Private; Vercel AI Gateway for workspace chat |
+| Variable             | Role                                                                       |
+| -------------------- | -------------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`  | Public Convex URL (client + server HTTP client)                            |
+| `AI_GATEWAY_API_KEY` | Private; Vercel AI Gateway for workspace chat                              |
+| `TAVILY_API_KEY`     | Private; optional Tavily web search and page extraction for workspace chat |
 
 See root [README.md](../README.md) for how to run the app and where to set variables.

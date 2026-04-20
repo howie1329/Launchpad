@@ -24,7 +24,9 @@ const WORKSPACE_TOOL_TITLES: Record<string, string> = {
 	createIdeaArtifact: 'Save idea artifact',
 	createPrdArtifact: 'Save PRD artifact',
 	createProjectFromThread: 'Promote chat to project',
-	proposeArtifactEdit: 'Draft artifact changes'
+	proposeArtifactEdit: 'Draft artifact changes',
+	tavilySearch: 'Search web',
+	tavilyExtract: 'Read web pages'
 };
 
 const WORKSPACE_RUNNING_SUMMARIES: Record<string, string> = {
@@ -35,7 +37,9 @@ const WORKSPACE_RUNNING_SUMMARIES: Record<string, string> = {
 	createIdeaArtifact: 'Saving idea artifact…',
 	createPrdArtifact: 'Saving PRD artifact…',
 	createProjectFromThread: 'Promoting chat to project…',
-	proposeArtifactEdit: 'Drafting artifact changes…'
+	proposeArtifactEdit: 'Drafting artifact changes…',
+	tavilySearch: 'Searching the web…',
+	tavilyExtract: 'Reading source pages…'
 };
 
 function toolTitleForName(toolName: string): string {
@@ -124,8 +128,19 @@ function summarizeWorkspaceTool(
 	const name = typeof out.name === 'string' ? out.name : '';
 	const artifactTitle = typeof out.artifactTitle === 'string' ? out.artifactTitle : '';
 	const artifacts = Array.isArray(out.artifacts) ? out.artifacts : null;
+	const results = Array.isArray(out.results) ? out.results : null;
 
 	switch (toolName) {
+		case 'tavilySearch':
+			return {
+				summary: `Found ${results?.length ?? 0} source${results?.length === 1 ? '' : 's'}.`,
+				detailJson
+			};
+		case 'tavilyExtract':
+			return {
+				summary: `Read ${results?.length ?? 0} page${results?.length === 1 ? '' : 's'}.`,
+				detailJson
+			};
 		case 'listThreadArtifacts':
 		case 'listProjectArtifacts':
 			return {

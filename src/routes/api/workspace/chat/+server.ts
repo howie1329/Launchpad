@@ -1,4 +1,5 @@
 import { AI_GATEWAY_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { getThreadQuery } from '$lib/chat';
 import {
@@ -28,6 +29,7 @@ import {
 } from '$lib/server/memory';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
+import { tavilyExtract, tavilySearch } from '@tavily/ai-sdk';
 import { ConvexHttpClient } from 'convex/browser';
 import {
 	createAgentUIStreamResponse,
@@ -158,7 +160,16 @@ export const POST: RequestHandler = async ({ request }) => {
 			query: lastUserText
 		});
 		const memoryBlock = composeRetrievedMemoryInstructions(memories);
-		const coreInstructions = [workspaceInstructions(project), referenced.block, profileBlock, memoryBlock]
+		const webSearchRequested = body.webSearchRequested === true;
+		const webSearchApiKey = env.TAVILY_API_KEY?.trim() ?? '';
+		const webSearchAvailable = Boolean(webSearchApiKey);
+		const coreInstructions = [
+			workspaceInstructions(project),
+			webSearchInstructions(webSearchRequested, webSearchAvailable),
+			referenced.block,
+			profileBlock,
+			memoryBlock
+		]
 			.filter((part) => part.length > 0)
 			.join('\n\n');
 
@@ -171,7 +182,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			project: project as WorkspaceProject | null,
 			ownerId: thread.ownerId,
 			projectId: project?._id,
-			lastUserText
+			lastUserText,
+			webSearchAvailable,
+			webSearchApiKey
 		});
 
 		const agent = new ToolLoopAgent({
@@ -253,6 +266,35 @@ function workspaceInstructions(project: WorkspaceProject | null) {
 ${projectContext}`;
 }
 
+function webSearchInstructions(webSearchRequested: boolean, webSearchAvailable: boolean) {
+	const availability = webSearchAvailable
+		? [
+				'Web search tools:',
+				'- tavilySearch: search the web for current or source-backed context.',
+				'- tavilyExtract: read specific source URLs after search or when the user provides URLs.',
+				'- Use tavilySearch for current events, prices, laws, product docs/specs, competitor facts, or claims likely to have changed.',
+				'- Use tavilySearch when the user asks to search, browse, look up, verify, or check the latest information.',
+				'- Use tavilyExtract only for explicit URLs or when search results need deeper reading.',
+				'- Cite source links in your final answer whenever you use web search or extraction.',
+				'- Do not save web results as artifacts unless the user explicitly asks.'
+			]
+		: [
+				'Web search tools are not configured for this workspace.',
+				'- If the user asks for current or external information, say web search is unavailable and answer only if you can do so safely from existing context.',
+				'- Do not imply that you searched the web.'
+			];
+
+	if (webSearchRequested) {
+		availability.push(
+			webSearchAvailable
+				? 'The user enabled Search web for this message. Use tavilySearch before answering unless the request does not need external information.'
+				: 'The user enabled Search web for this message, but web search is unavailable because Tavily is not configured.'
+		);
+	}
+
+	return availability.join('\n');
+}
+
 function appendUserAiPreferenceInstructions(
 	base: string,
 	userSettings: { aiContextMarkdown?: string; aiBehaviorMarkdown?: string } | null
@@ -286,7 +328,9 @@ function workspaceTools({
 	project,
 	ownerId,
 	projectId,
-	lastUserText
+	lastUserText,
+	webSearchAvailable,
+	webSearchApiKey
 }: {
 	convex: ConvexHttpClient;
 	threadId: Id<'chatThreads'>;
@@ -294,12 +338,34 @@ function workspaceTools({
 	ownerId: Id<'users'>;
 	projectId?: Id<'projects'>;
 	lastUserText: string;
+	webSearchAvailable: boolean;
+	webSearchApiKey: string;
 }) {
 	const artifactIdSchema = z.object({
 		artifactId: z.string().describe('The artifact id.')
 	});
 
 	return {
+		...(webSearchAvailable
+			? {
+					tavilySearch: tavilySearch({
+						apiKey: webSearchApiKey,
+						searchDepth: 'basic',
+						maxResults: 5,
+						includeAnswer: false,
+						includeImages: false,
+						includeFavicon: true
+					}),
+					tavilyExtract: tavilyExtract({
+						apiKey: webSearchApiKey,
+						extractDepth: 'basic',
+						format: 'markdown',
+						includeImages: false,
+						chunksPerSource: 3,
+						timeout: 10
+					})
+				}
+			: {}),
 		listThreadArtifacts: tool({
 			description: 'List artifacts already linked to the active thread.',
 			inputSchema: z.object({}),
@@ -481,8 +547,11 @@ function workspaceTools({
 			}),
 			execute: async ({ text }) => {
 				if (!userMemoryTextAllowedForMessage(lastUserText, text)) {
-					memoryLog('supermemory.add_memory_denied', { reason: 'not_in_user_message' })
-					return { ok: false as const, reason: 'Text must appear verbatim in the user latest message.' };
+					memoryLog('supermemory.add_memory_denied', { reason: 'not_in_user_message' });
+					return {
+						ok: false as const,
+						reason: 'Text must appear verbatim in the user latest message.'
+					};
 				}
 				const result = await addUserMemoryDocument({
 					ownerId,
@@ -491,14 +560,14 @@ function workspaceTools({
 					text
 				});
 				if (result.status === 'blocked') {
-					memoryLog('supermemory.add_memory_denied', { reason: result.reason })
+					memoryLog('supermemory.add_memory_denied', { reason: result.reason });
 					return { ok: false as const, reason: result.reason };
 				}
 				if (result.status === 'disabled') {
 					return { ok: false as const, reason: 'Memory service is not configured.' };
 				}
 				if (result.status === 'failed') {
-					memoryLog('supermemory.add_memory_failed', { error: result.error })
+					memoryLog('supermemory.add_memory_failed', { error: result.error });
 					return { ok: false as const, reason: result.error };
 				}
 				return { ok: true as const, documentId: result.documentId };
@@ -517,7 +586,7 @@ function workspaceTools({
 					...(projectId ? { projectId } : {})
 				});
 				if (!gate.ok) {
-					memoryLog('supermemory.forget_denied', { reason: gate.reason })
+					memoryLog('supermemory.forget_denied', { reason: gate.reason });
 					return { ok: false as const, reason: gate.reason };
 				}
 				const del = await deleteSupermemoryDocument(documentId);
