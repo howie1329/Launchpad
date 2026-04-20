@@ -343,16 +343,18 @@
 		<Sidebar.Root collapsible="icon" class="overflow-hidden">
 			<Sidebar.Header class="border-b border-sidebar-border/60 px-2 pb-2">
 				<Sidebar.Menu class="flex flex-row items-center gap-1">
-					<Sidebar.MenuItem class="min-w-0 flex-1">
+					<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 							{#snippet child({ props })}
 								<a href={resolve('/workspace')} aria-label="Workspace home" {...props}>
 									<div
-										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
+										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
 									>
 										<LaunchpadMark class="size-3.5" />
 									</div>
-									<span class="min-w-0 truncate font-semibold">Workspace</span>
+									<span class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
+										>Workspace</span
+									>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
