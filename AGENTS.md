@@ -20,6 +20,10 @@ Write code that another strong engineer can quickly understand, safely extend, a
 4. Build just enough to accomplish the goal or plan.
 5. Write code as if there is no user base yet.
 
+## Maintainability
+
+Long term maintainability is a core priority. If you add new functionality, first check if there is shared logic that can be extracted to a separate module. Duplicate logic across multiple files is a code smell and should be avoided. Don't be afraid to change existing code. Don't take shortcuts by just adding local logic to solve a problem.
+
 ## Do Not
 
 - Add edge-case logic for scenarios that aren't in the current requirements
@@ -28,6 +32,7 @@ Write code that another strong engineer can quickly understand, safely extend, a
 - Add semicolons (codebase omits them)
 
 <!-- convex-ai-start -->
+
 This project uses [Convex](https://convex.dev) as its backend.
 
 When working on Convex code, **always read `src/convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
@@ -35,4 +40,5 @@ When working on Convex code, **always read `src/convex/_generated/ai/guidelines.
 Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
 
 **Ownership:** For app data keyed by user (`ownerId` on projects, threads, messages, artifacts, etc.), use `getAuthUserId` from `@convex-dev/auth/server` via [`src/convex/authHelpers.ts`](src/convex/authHelpers.ts). Do not use `getUserIdentity().tokenIdentifier` for ownership — it includes the session id and changes on new sessions.
+
 <!-- convex-ai-end -->
