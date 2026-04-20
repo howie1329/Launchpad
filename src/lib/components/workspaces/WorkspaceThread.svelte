@@ -771,16 +771,16 @@
 				{#if mentionOpen}
 					<div
 						id={mentionListboxId}
-						class="absolute right-0 bottom-full left-0 z-20 mb-1 max-h-40 overflow-y-auto rounded-md border border-border/60 bg-popover text-popover-foreground shadow-md"
+						class="absolute bottom-full left-4 z-20 mb-2 max-h-48 w-[min(28rem,calc(100%-2rem))] overflow-y-auto rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-none sm:left-6 sm:w-96"
 						role="listbox"
 						aria-label="Thread artifacts"
 					>
 						{#if threadArtifacts.error}
-							<p class="px-3 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
+							<p class="px-2 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
 						{:else if threadArtifacts.data === undefined}
-							<p class="px-3 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
+							<p class="px-2 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
 						{:else if filteredMentionArtifacts.length === 0}
-							<p class="px-3 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
+							<p class="px-2 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
 						{:else}
 							{#each filteredMentionArtifacts as item, i (item.artifact._id)}
 								<button
@@ -789,16 +789,25 @@
 									role="option"
 									aria-selected={i === mentionHighlight}
 									class={cn(
-										'flex w-full flex-col gap-0.5 px-3 py-2 text-left text-xs transition-colors',
-										i === mentionHighlight ? 'bg-accent/60' : 'hover:bg-accent/50'
+										'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left text-xs transition-colors',
+										i === mentionHighlight
+											? 'bg-accent/50 text-accent-foreground'
+											: 'hover:bg-accent/40'
 									)}
 									onmouseenter={() => {
 										mentionHighlight = i;
 									}}
 									onclick={() => void pickArtifactMention(item)}
 								>
-									<span class="truncate font-medium">{item.artifact.title}</span>
-									<span class="text-[10px] text-muted-foreground">
+									<span
+										class={cn(
+											'size-1.5 shrink-0 rounded-full',
+											i === mentionHighlight ? 'bg-primary' : 'bg-muted-foreground/50'
+										)}
+										aria-hidden="true"
+									></span>
+									<span class="min-w-0 flex-1 truncate font-medium">{item.artifact.title}</span>
+									<span class="shrink-0 text-[10px] text-muted-foreground">
 										{formatArtifactCreatedAt(item.artifact.createdAt)}
 									</span>
 								</button>
