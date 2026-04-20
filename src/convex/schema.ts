@@ -23,6 +23,8 @@ export default defineSchema({
 		ownerId: v.string(),
 		timeZone: v.string(),
 		dailyAiCapUsd: v.number(),
+		aiContextMarkdown: v.optional(v.string()),
+		aiBehaviorMarkdown: v.optional(v.string()),
 		createdAt: v.number(),
 		updatedAt: v.number()
 	}).index('by_ownerId', ['ownerId']),
