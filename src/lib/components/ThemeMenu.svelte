@@ -18,11 +18,7 @@
 	const preference = $derived(userPrefersMode.current);
 
 	const TriggerIcon = $derived(
-		preference === 'system'
-			? MonitorIcon
-			: preference === 'dark'
-				? MoonIcon
-				: SunIcon
+		preference === 'system' ? MonitorIcon : preference === 'dark' ? MoonIcon : SunIcon
 	);
 
 	function select(next: 'light' | 'dark' | 'system') {
@@ -64,14 +60,21 @@
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
 					<Sidebar.MenuButton
+						size="sm"
 						{...props}
 						tooltipContent="Color theme"
 						class={variant === 'sidebar'
 							? 'justify-center px-0 md:size-8 md:p-0'
-							: 'min-w-0'}
+							: 'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3'}
 					>
-						<TriggerIcon class="size-4" />
-						<span class={variant === 'sidebar' ? 'sr-only' : 'min-w-0 truncate'}>Theme</span>
+						<TriggerIcon class={variant === 'sidebar' ? 'size-4' : 'size-3'} />
+						<span
+							class={variant === 'sidebar'
+								? 'sr-only'
+								: 'min-w-0 truncate group-data-[collapsible=icon]:sr-only'}
+						>
+							Theme
+						</span>
 					</Sidebar.MenuButton>
 				{/snippet}
 			</DropdownMenu.Trigger>

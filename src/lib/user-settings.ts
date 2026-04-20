@@ -7,6 +7,8 @@ export type UserSettings = {
 	ownerId: Id<'users'>
 	timeZone: string
 	dailyAiCapUsd: number
+	aiContextMarkdown?: string
+	aiBehaviorMarkdown?: string
 	createdAt: number
 	updatedAt: number
 }
@@ -17,7 +19,12 @@ export const getMyUserSettingsQuery = makeFunctionReference<'query', Record<stri
 
 export const upsertMyUserSettingsMutation = makeFunctionReference<
 	'mutation',
-	{ timeZone: string; dailyAiCapUsd?: number },
+	{
+		timeZone: string
+		dailyAiCapUsd?: number
+		aiContextMarkdown?: string
+		aiBehaviorMarkdown?: string
+	},
 	{ ok: true }
 >('userSettings:upsertMine')
 

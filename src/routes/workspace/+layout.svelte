@@ -1,89 +1,91 @@
 <script lang="ts">
-	import { goto } from '$app/navigation'
-	import { resolve } from '$app/paths'
-	import { page } from '$app/stores'
-	import { auth, getConvexClient, signOut } from '$lib/auth.svelte'
-	import { listArtifactsQuery } from '$lib/artifacts'
-	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display'
-	import { listThreadsQuery } from '$lib/chat'
-	import { getAiBudgetStatusQuery } from '$lib/usage'
-	import { LaunchpadMark } from '$lib/components/brand'
-	import { Button } from '$lib/components/ui/button'
-	import * as Collapsible from '$lib/components/ui/collapsible'
-	import * as Dialog from '$lib/components/ui/dialog'
-	import * as HoverCard from '$lib/components/ui/hover-card/index.js'
-	import { Input } from '$lib/components/ui/input'
-	import { Label } from '$lib/components/ui/label'
-	import * as Sidebar from '$lib/components/ui/sidebar'
-	import { Textarea } from '$lib/components/ui/textarea'
-	import ThemeMenu from '$lib/components/ThemeMenu.svelte'
-	import { createProjectMutation, listProjectsQuery } from '$lib/projects'
-	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte'
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left'
-	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign'
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right'
-	import FileTextIcon from '@lucide/svelte/icons/file-text'
-	import FolderIcon from '@lucide/svelte/icons/folder'
-	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus'
-	import LogOutIcon from '@lucide/svelte/icons/log-out'
-	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus'
-	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text'
-	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close'
-	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open'
-	import SettingsIcon from '@lucide/svelte/icons/settings'
-	import { useQuery } from 'convex-svelte'
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
+	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
+	import { listArtifactsQuery } from '$lib/artifacts';
+	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display';
+	import { listThreadsQuery } from '$lib/chat';
+	import { getAiBudgetStatusQuery } from '$lib/usage';
+	import { LaunchpadMark } from '$lib/components/brand';
+	import { Button } from '$lib/components/ui/button';
+	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import * as Sidebar from '$lib/components/ui/sidebar';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { cn } from '$lib/utils';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
+	import { createProjectMutation, listProjectsQuery } from '$lib/projects';
+	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import FolderIcon from '@lucide/svelte/icons/folder';
+	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
+	import LogOutIcon from '@lucide/svelte/icons/log-out';
+	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
+	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
+	import MoreVerticalIcon from '@lucide/svelte/icons/more-vertical';
+	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
+	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import { useQuery } from 'convex-svelte';
 
-	let { children } = $props()
+	let { children } = $props();
 
-	let sidebarOpen = $state(true)
-	let isSigningOut = $state(false)
-	let isCreatingProject = $state(false)
-	let projectDialogOpen = $state(false)
-	let projectName = $state('')
-	let projectSummary = $state('')
-	let projectError = $state('')
+	let sidebarOpen = $state(true);
+	let isSigningOut = $state(false);
+	let isCreatingProject = $state(false);
+	let projectDialogOpen = $state(false);
+	let projectName = $state('');
+	let projectSummary = $state('');
+	let projectError = $state('');
 	let openSections = $state({
 		Projects: true,
 		Chats: true,
 		Artifacts: true
-	})
+	});
 
-	const pathname = $derived($page.url.pathname)
-	const isSettingsActive = $derived(pathname === '/workspace/settings')
-	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
-	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
+	const pathname = $derived($page.url.pathname);
+	const isSettingsActive = $derived(pathname === '/workspace/settings');
+	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
+	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
 	const activeArtifactId = $derived(
 		/^\/workspace\/artifacts\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
-	)
-	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
+	);
+	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
 	const isNewChatActive = $derived(
 		pathname === '/workspace' && !activeProjectId && !activeThreadId
-	)
-	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
-	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
-	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
-	const budget = useQuery(getAiBudgetStatusQuery, () => (auth.isAuthenticated ? {} : 'skip'))
+	);
+	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const budget = useQuery(getAiBudgetStatusQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const selectedProject = $derived(
 		projects.data?.find((project) => project._id === activeProjectId) ?? null
-	)
+	);
 	const selectedThread = $derived(
 		threads.data?.find((thread) => thread._id === activeThreadId) ?? null
-	)
+	);
 	const selectedArtifact = $derived(
 		artifacts.data?.find((artifact) => artifact._id === activeArtifactId) ?? null
-	)
+	);
 	const generalThreads = $derived(
 		threads.data?.filter((thread) => thread.scopeType === 'general') ?? []
-	)
-	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact))
+	);
+	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact));
 	const headerTitle = $derived(
 		isSettingsActive
 			? 'Settings'
-			: selectedThread?.title ??
+			: (selectedThread?.title ??
 					selectedArtifact?.title ??
 					selectedProject?.name ??
-					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat')
-	)
+					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat'))
+	);
 	const headerDescription = $derived(
 		isSettingsActive
 			? 'Manage workspace preferences.'
@@ -92,56 +94,77 @@
 				: activeProjectId
 					? 'Start a new chat in this project.'
 					: 'Start from a rough thought.'
-	)
+	);
 
 	const projectThreads = (projectId: string) =>
-		threads.data?.filter((thread) => thread.projectId === projectId) ?? []
-	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject)
+		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
+	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject);
 
-	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+	/** Design-system-aligned nav rows: pill, dense, 12px icons */
+	const navPill =
+		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+	const navPillPrimary =
+		'bg-primary text-primary-foreground shadow-none hover:bg-primary/90 hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground';
+	const sectionTrigger =
+		'group/section flex h-7 w-full items-center gap-1 rounded-md px-2 text-left text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
+	const subNavPill =
+		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+
+	const usageBarPct = $derived(
+		budget.data && budget.data.capUsd > 0
+			? Math.min(100, (budget.data.spentUsd / budget.data.capUsd) * 100)
+			: 0
+	);
+	const usageTooltip = $derived(
+		budget.data
+			? `AI usage today: ${money.format(budget.data.spentUsd)} / ${money.format(budget.data.capUsd)} · ${budget.data.dateKey}`
+			: 'Usage'
+	);
 
 	const createProject = async () => {
-		if (isCreatingProject) return
+		if (isCreatingProject) return;
 
-		const name = projectName.trim()
-		const summary = projectSummary.trim()
+		const name = projectName.trim();
+		const summary = projectSummary.trim();
 
 		if (!name) {
-			projectError = 'Project name is required.'
-			return
+			projectError = 'Project name is required.';
+			return;
 		}
 
-		isCreatingProject = true
-		projectError = ''
+		isCreatingProject = true;
+		projectError = '';
 
 		try {
 			const result = await getConvexClient().mutation(createProjectMutation, {
 				name,
 				...(summary ? { summary } : {})
-			})
-			projectDialogOpen = false
-			projectName = ''
-			projectSummary = ''
-			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`))
+			});
+			projectDialogOpen = false;
+			projectName = '';
+			projectSummary = '';
+			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`));
 		} catch (error) {
-			console.error(error)
-			projectError = 'Could not create this project. Please try again.'
+			console.error(error);
+			projectError = 'Could not create this project. Please try again.';
 		} finally {
-			isCreatingProject = false
+			isCreatingProject = false;
 		}
-	}
+	};
 
 	const closeProjectDialog = () => {
-		if (isCreatingProject) return
+		if (isCreatingProject) return;
 
-		projectDialogOpen = false
-		projectName = ''
-		projectSummary = ''
-		projectError = ''
-	}
+		projectDialogOpen = false;
+		projectName = '';
+		projectSummary = '';
+		projectError = '';
+	};
 
 	const toggleThreadContext = async () => {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
 
 		if (contextPanelOpen) {
 			await goto(
@@ -152,8 +175,8 @@
 					noScroll: true,
 					keepFocus: true
 				}
-			)
-			return
+			);
+			return;
 		}
 
 		await goto(
@@ -164,28 +187,28 @@
 				noScroll: true,
 				keepFocus: true
 			}
-		)
-	}
+		);
+	};
 
 	const handleSignOut = async () => {
-		if (isSigningOut) return
+		if (isSigningOut) return;
 
-		isSigningOut = true
+		isSigningOut = true;
 
 		try {
-			await signOut()
-			await goto(resolve('/'))
+			await signOut();
+			await goto(resolve('/'));
 		} finally {
-			isSigningOut = false
+			isSigningOut = false;
 		}
-	}
+	};
 
 	$effect(() => {
 		if (!auth.isLoading && !auth.isAuthenticated) {
-			const nextPath = pathname.startsWith('/workspace') ? pathname : '/workspace'
-			void goto(resolve(`/auth?redirectTo=${encodeURIComponent(nextPath)}`))
+			const nextPath = pathname.startsWith('/workspace') ? pathname : '/workspace';
+			void goto(resolve(`/auth?redirectTo=${encodeURIComponent(nextPath)}`));
 		}
-	})
+	});
 </script>
 
 {#if auth.isLoading || !auth.isAuthenticated}
@@ -202,32 +225,19 @@
 		style="--sidebar-width: 15rem;"
 	>
 		<Sidebar.Root collapsible="icon" class="overflow-hidden">
-			<Sidebar.Header>
-				<Sidebar.Menu class="gap-4">
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton size="lg" class=" md:h-8 md:p-0">
+			<Sidebar.Header class="border-b border-sidebar-border/60 px-2 pb-2">
+				<Sidebar.Menu class="flex flex-row items-center gap-1">
+					<Sidebar.MenuItem class="min-w-0 flex-1">
+						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 							{#snippet child({ props })}
 								<a href={resolve('/workspace')} aria-label="Workspace home" {...props}>
 									<div
-										class="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
+										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
 									>
-										<LaunchpadMark class="size-4" />
+										<LaunchpadMark class="size-3.5" />
 									</div>
 									<span class="min-w-0 truncate font-semibold">Workspace</span>
 								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={isNewChatActive} class="min-w-0">
-							{#snippet child({ props })}
-								<a href={resolve('/workspace')} aria-label="New Chat" {...props}>
-									<MessageSquarePlusIcon />
-									<span class="min-w-0 truncate">New Chat</span>
-								</a>
-							{/snippet}
-							{#snippet tooltipContent()}
-								<span>New Chat</span>
 							{/snippet}
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
@@ -235,21 +245,42 @@
 			</Sidebar.Header>
 
 			<Sidebar.Content>
-				<Collapsible.Root bind:open={openSections.Projects}>
-					<Sidebar.Group>
-						<Collapsible.Trigger
-							class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-						>
+				<Sidebar.Group class="border-0 shadow-none ring-0">
+					<Sidebar.Menu>
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton
+								size="sm"
+								isActive={isNewChatActive}
+								class={cn(navPill, navPillPrimary)}
+								tooltipContent="New chat"
+							>
+								{#snippet child({ props })}
+									<a href={resolve('/workspace')} aria-label="New chat" {...props}>
+										<MessageSquarePlusIcon />
+										<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
+											>New chat</span
+										>
+									</a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					</Sidebar.Menu>
+				</Sidebar.Group>
+
+				<Collapsible.Root bind:open={openSections.Projects} class="border-0 shadow-none ring-0">
+					<Sidebar.Group class="border-0 shadow-none ring-0">
+						<Collapsible.Trigger class={sectionTrigger}>
 							<ChevronRightIcon
-								class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Projects</span>
 						</Collapsible.Trigger>
 						<Sidebar.GroupAction
+							class="top-1 right-2"
 							aria-label="New project"
 							aria-disabled={isCreatingProject}
 							onclick={() => {
-								if (!isCreatingProject) projectDialogOpen = true
+								if (!isCreatingProject) projectDialogOpen = true;
 							}}
 						>
 							<FolderPlusIcon />
@@ -261,22 +292,25 @@
 								<Sidebar.Menu>
 									{#if projects.data === undefined}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton aria-disabled class="min-w-0">
-												<span class="min-w-0 truncate">Loading projects...</span>
+											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+												<span class="min-w-0 truncate">Loading projects…</span>
 											</Sidebar.MenuButton>
 										</Sidebar.MenuItem>
 									{:else if projects.data.length === 0}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton aria-disabled class="min-w-0">
-												<span class="min-w-0 truncate">No projects yet</span>
+											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+												<span class="min-w-0 truncate text-sidebar-foreground/60"
+													>No projects yet</span
+												>
 											</Sidebar.MenuButton>
 										</Sidebar.MenuItem>
 									{:else}
 										{#each projects.data as project (project._id)}
 											<Sidebar.MenuItem>
 												<Sidebar.MenuButton
+													size="sm"
 													isActive={activeProjectId === project._id && !activeThreadId}
-													class="min-w-0"
+													class={cn(navPill, 'min-w-0')}
 												>
 													{#snippet child({ props })}
 														<a
@@ -294,20 +328,24 @@
 													{@const threadsForProject = projectThreads(project._id)}
 													{#if threads.data === undefined}
 														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton aria-disabled>
-																<span>Loading chats...</span>
+															<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
+																<span>Loading chats…</span>
 															</Sidebar.MenuSubButton>
 														</Sidebar.MenuSubItem>
 													{:else if threadsForProject.length === 0}
 														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton aria-disabled>
-																<span>No chats yet</span>
+															<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
+																<span class="text-sidebar-foreground/60">No chats yet</span>
 															</Sidebar.MenuSubButton>
 														</Sidebar.MenuSubItem>
 													{:else}
 														{#each threadsForProject as thread (thread._id)}
-															<Sidebar.MenuSubItem>
-																<Sidebar.MenuSubButton isActive={activeThreadId === thread._id}>
+															<Sidebar.MenuSubItem class="flex min-w-0 items-center gap-0.5">
+																<Sidebar.MenuSubButton
+																	size="sm"
+																	isActive={activeThreadId === thread._id}
+																	class={cn(subNavPill, 'min-w-0 flex-1')}
+																>
 																	{#snippet child({ props })}
 																		<a
 																			href={resolve(
@@ -316,10 +354,30 @@
 																			{...props}
 																		>
 																			<MessageSquareTextIcon />
-																			<span>{thread.title}</span>
+																			<span class="truncate">{thread.title}</span>
 																		</a>
 																	{/snippet}
 																</Sidebar.MenuSubButton>
+																<DropdownMenu.Root>
+																	<DropdownMenu.Trigger>
+																		{#snippet child({ props })}
+																			<button
+																				type="button"
+																				class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-offset-0 md:opacity-0 md:group-focus-within/menu-sub-item:opacity-100 md:group-hover/menu-sub-item:opacity-100"
+																				aria-label="Chat options"
+																				{...props}
+																			>
+																				<MoreVerticalIcon class="size-3.5" />
+																			</button>
+																		{/snippet}
+																	</DropdownMenu.Trigger>
+																	<DropdownMenu.Content align="end" class="min-w-[8rem]">
+																		<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
+																		<DropdownMenu.Item disabled variant="destructive"
+																			>Delete</DropdownMenu.Item
+																		>
+																	</DropdownMenu.Content>
+																</DropdownMenu.Root>
 															</Sidebar.MenuSubItem>
 														{/each}
 													{/if}
@@ -333,15 +391,13 @@
 					</Sidebar.Group>
 				</Collapsible.Root>
 
-				<Collapsible.Root bind:open={openSections.Chats}>
-					<Sidebar.Group>
-						<Collapsible.Trigger
-							class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-						>
+				<Collapsible.Root bind:open={openSections.Chats} class="border-0 shadow-none ring-0">
+					<Sidebar.Group class="border-0 shadow-none ring-0">
+						<Collapsible.Trigger class={sectionTrigger}>
 							<ChevronRightIcon
-								class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
-							<span class="min-w-0 truncate">General chats</span>
+							<span class="min-w-0 truncate">Inbox</span>
 						</Collapsible.Trigger>
 						<Collapsible.Content
 							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
@@ -350,22 +406,24 @@
 								<Sidebar.Menu>
 									{#if threads.data === undefined}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton aria-disabled class="min-w-0">
-												<span class="min-w-0 truncate">Loading chats...</span>
+											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+												<span class="min-w-0 truncate">Loading chats…</span>
 											</Sidebar.MenuButton>
 										</Sidebar.MenuItem>
 									{:else if generalThreads.length === 0}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton aria-disabled class="min-w-0">
-												<span class="min-w-0 truncate">No chats yet</span>
+											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+												<span class="min-w-0 truncate text-sidebar-foreground/60">No chats yet</span
+												>
 											</Sidebar.MenuButton>
 										</Sidebar.MenuItem>
 									{:else}
 										{#each generalThreads as thread (thread._id)}
 											<Sidebar.MenuItem>
 												<Sidebar.MenuButton
+													size="sm"
 													isActive={activeThreadId === thread._id}
-													class="min-w-0"
+													class={cn(navPill, 'min-w-0')}
 												>
 													{#snippet child({ props })}
 														<a
@@ -377,6 +435,21 @@
 														</a>
 													{/snippet}
 												</Sidebar.MenuButton>
+												<DropdownMenu.Root>
+													<DropdownMenu.Trigger>
+														{#snippet child({ props })}
+															<Sidebar.MenuAction {...props} showOnHover>
+																<MoreVerticalIcon class="size-3.5" />
+															</Sidebar.MenuAction>
+														{/snippet}
+													</DropdownMenu.Trigger>
+													<DropdownMenu.Content align="end" class="min-w-[8rem]">
+														<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
+														<DropdownMenu.Item disabled variant="destructive"
+															>Delete</DropdownMenu.Item
+														>
+													</DropdownMenu.Content>
+												</DropdownMenu.Root>
 											</Sidebar.MenuItem>
 										{/each}
 									{/if}
@@ -386,13 +459,11 @@
 					</Sidebar.Group>
 				</Collapsible.Root>
 
-				<Collapsible.Root bind:open={openSections.Artifacts}>
-					<Sidebar.Group>
-						<Collapsible.Trigger
-							class="group/section flex h-8 w-full items-center gap-1 rounded-md px-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
-						>
+				<Collapsible.Root bind:open={openSections.Artifacts} class="border-0 shadow-none ring-0">
+					<Sidebar.Group class="border-0 shadow-none ring-0">
+						<Collapsible.Trigger class={sectionTrigger}>
 							<ChevronRightIcon
-								class="size-3.5 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Artifacts</span>
 						</Collapsible.Trigger>
@@ -403,22 +474,24 @@
 								<Sidebar.Menu>
 									{#if artifacts.data === undefined}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton aria-disabled class="min-w-0">
-												<span class="min-w-0 truncate">Loading artifacts...</span>
+											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+												<span class="min-w-0 truncate">Loading artifacts…</span>
 											</Sidebar.MenuButton>
 										</Sidebar.MenuItem>
 									{:else if artifacts.data.length === 0}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton aria-disabled class="min-w-0">
-												<span class="min-w-0 truncate">No artifacts yet</span>
+											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+												<span class="min-w-0 truncate text-sidebar-foreground/60"
+													>No artifacts yet</span
+												>
 											</Sidebar.MenuButton>
 										</Sidebar.MenuItem>
 									{:else}
 										{#each artifactGroups as group (group.key)}
 											{#if group.artifacts.length > 0}
-												<li class="list-none px-2 pb-0.5 pt-2 first:pt-0" role="presentation">
+												<li class="list-none px-2 pt-2 pb-0.5 first:pt-0" role="presentation">
 													<p
-														class="text-[11px] font-medium tracking-wide text-sidebar-foreground/50 uppercase"
+														class="text-[11px] font-medium tracking-wide text-sidebar-foreground/55 uppercase"
 													>
 														{group.label}
 													</p>
@@ -426,8 +499,9 @@
 												{#each group.artifacts as artifact (artifact._id)}
 													<Sidebar.MenuItem>
 														<Sidebar.MenuButton
+															size="sm"
 															isActive={activeArtifactId === artifact._id && !activeThreadId}
-															class="min-w-0 gap-2"
+															class={cn(navPill, 'min-w-0 gap-2')}
 															tooltipContent={artifact.title}
 														>
 															{#snippet child({ props })}
@@ -445,6 +519,21 @@
 																</a>
 															{/snippet}
 														</Sidebar.MenuButton>
+														<DropdownMenu.Root>
+															<DropdownMenu.Trigger>
+																{#snippet child({ props })}
+																	<Sidebar.MenuAction {...props} showOnHover>
+																		<MoreVerticalIcon class="size-3.5" />
+																	</Sidebar.MenuAction>
+																{/snippet}
+															</DropdownMenu.Trigger>
+															<DropdownMenu.Content align="end" class="min-w-[8rem]">
+																<DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
+																<DropdownMenu.Item disabled variant="destructive"
+																	>Delete</DropdownMenu.Item
+																>
+															</DropdownMenu.Content>
+														</DropdownMenu.Root>
 													</Sidebar.MenuItem>
 												{/each}
 											{/if}
@@ -457,52 +546,62 @@
 				</Collapsible.Root>
 			</Sidebar.Content>
 
-			<Sidebar.Footer>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-							<HoverCard.Root openDelay={120} closeDelay={60}>
-								<HoverCard.Trigger>
-								<Sidebar.MenuButton tooltipContent="Usage" class="min-w-0">
-									<CircleDollarSignIcon />
-									<span class="min-w-0 truncate">Usage</span>
-								</Sidebar.MenuButton>
-							</HoverCard.Trigger>
-							<HoverCard.Content align="start" side="right" class="w-64">
-								{#if budget.data}
-									<div class="space-y-1.5 p-0.5">
-										<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-											AI usage
-										</p>
-										<div class="flex items-center justify-between gap-3">
-											<span class="text-xs">Today</span>
-											<span class="text-xs font-medium">
-												{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
-											</span>
-										</div>
-										<div class="flex items-center justify-between gap-3">
-											<span class="text-xs text-muted-foreground">Remaining</span>
-											<span class="text-xs text-muted-foreground">
-												{money.format(budget.data.remainingUsd)}
-											</span>
-										</div>
-										<p class="pt-1 text-[11px] text-muted-foreground">Resets daily ({budget.data.dateKey}).</p>
-									</div>
-								{:else}
-									<p class="p-1 text-xs text-muted-foreground">Loading usage...</p>
-								{/if}
-							</HoverCard.Content>
-						</HoverCard.Root>
-					</Sidebar.MenuItem>
+			<Sidebar.Footer class="border-t border-sidebar-border/60 p-2">
+				<div class="group-data-[collapsible=icon]:hidden">
+					{#if budget.data}
+						<a
+							href={resolve('/workspace/settings')}
+							class="mb-2 block rounded-md px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+							aria-label={usageTooltip}
+						>
+							<div
+								class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/70"
+							>
+								<span class="font-medium tracking-wide uppercase">AI today</span>
+								<span class="text-sidebar-foreground tabular-nums">
+									{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
+								</span>
+							</div>
+							<div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+								<div
+									class="h-full rounded-full bg-primary transition-[width]"
+									style="width: {usageBarPct}%"
+								></div>
+							</div>
+						</a>
+					{:else}
+						<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/50">Loading usage…</p>
+					{/if}
+				</div>
+
+				<div class="mb-1 hidden justify-center group-data-[collapsible=icon]:flex">
+					<Sidebar.Menu>
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton size="sm" class={navPill} tooltipContent={usageTooltip}>
+								{#snippet child({ props })}
+									<a href={resolve('/workspace/settings')} aria-label={usageTooltip} {...props}>
+										<CircleDollarSignIcon />
+									</a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					</Sidebar.Menu>
+				</div>
+
+				<Sidebar.Menu class="gap-0.5">
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
+							size="sm"
 							isActive={isSettingsActive}
 							tooltipContent="Settings"
-							class="min-w-0"
+							class={cn(navPill, 'min-w-0')}
 						>
 							{#snippet child({ props })}
 								<a href={resolve('/workspace/settings')} aria-label="Settings" {...props}>
 									<SettingsIcon />
-									<span class="min-w-0 truncate">Settings</span>
+									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
+										>Settings</span
+									>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
@@ -510,12 +609,16 @@
 					<ThemeMenu variant="sidebar-label" />
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
+							size="sm"
 							tooltipContent="Sign out"
+							class={cn(navPill, 'min-w-0')}
 							aria-disabled={isSigningOut}
 							onclick={handleSignOut}
 						>
 							<LogOutIcon />
-							<span>{isSigningOut ? 'Signing out' : 'Sign out'}</span>
+							<span class="group-data-[collapsible=icon]:sr-only">
+								{isSigningOut ? 'Signing out…' : 'Sign out'}
+							</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
@@ -549,9 +652,7 @@
 								<ChevronLeftIcon class="size-4" />
 							</Button>
 						{/if}
-						<div
-							class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5"
-						>
+						<div class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5">
 							<Button
 								type="button"
 								size="sm"
@@ -609,8 +710,8 @@
 				<form
 					class="space-y-4"
 					onsubmit={(event) => {
-						event.preventDefault()
-						void createProject()
+						event.preventDefault();
+						void createProject();
 					}}
 				>
 					<Dialog.Header>

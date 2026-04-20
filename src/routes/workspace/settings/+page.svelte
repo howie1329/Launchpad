@@ -5,12 +5,14 @@
 	import { Input } from '$lib/components/ui/input'
 	import { Label } from '$lib/components/ui/label'
 	import { Separator } from '$lib/components/ui/separator'
+	import { Textarea } from '$lib/components/ui/textarea'
 	import { getAiBudgetStatusQuery } from '$lib/usage'
 	import { getMyUserSettingsQuery, upsertMyUserSettingsMutation } from '$lib/user-settings'
 	import { useQuery } from 'convex-svelte'
 
 	const detectedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+	const maxAiPreferenceChars = 2000
 
 	const settings = useQuery(getMyUserSettingsQuery, () => (auth.isAuthenticated ? {} : 'skip'))
 	const budget = useQuery(getAiBudgetStatusQuery, () => (auth.isAuthenticated ? {} : 'skip'))
@@ -20,6 +22,8 @@
 
 	let timeZone = $state(detectedTimeZone)
 	let dailyCapUsd = $state('0.50')
+	let aiContextMarkdown = $state('')
+	let aiBehaviorMarkdown = $state('')
 	let saveError = $state('')
 	let isSaving = $state(false)
 	let didAutofillTimeZone = $state(false)
@@ -28,6 +32,8 @@
 		if (!settings.data) return
 		timeZone = settings.data.timeZone || detectedTimeZone
 		dailyCapUsd = String(settings.data.dailyAiCapUsd)
+		aiContextMarkdown = settings.data.aiContextMarkdown ?? ''
+		aiBehaviorMarkdown = settings.data.aiBehaviorMarkdown ?? ''
 	})
 
 	$effect(() => {
@@ -46,7 +52,12 @@
 		}
 	})
 
-	async function upsert(payload: { timeZone: string; dailyAiCapUsd?: number }) {
+	async function upsert(payload: {
+		timeZone: string
+		dailyAiCapUsd?: number
+		aiContextMarkdown?: string
+		aiBehaviorMarkdown?: string
+	}) {
 		if (isSaving) return
 		saveError = ''
 		isSaving = true
@@ -55,7 +66,10 @@
 			await getConvexClient().mutation(upsertMyUserSettingsMutation, payload)
 		} catch (error) {
 			console.error(error)
-			saveError = 'Could not save settings. Please try again.'
+			saveError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not save settings. Please try again.'
 		} finally {
 			isSaving = false
 		}
@@ -64,13 +78,25 @@
 	const save = async () => {
 		const cleanTimeZone = timeZone.trim() || detectedTimeZone
 		const cap = Number(dailyCapUsd)
+		const ctx = aiContextMarkdown.trim()
+		const beh = aiBehaviorMarkdown.trim()
 
 		if (!Number.isFinite(cap) || cap < 0) {
 			saveError = 'Daily cap must be a valid number.'
 			return
 		}
 
-		await upsert({ timeZone: cleanTimeZone, dailyAiCapUsd: cap })
+		if (ctx.length > maxAiPreferenceChars || beh.length > maxAiPreferenceChars) {
+			saveError = `Each preference field must be at most ${maxAiPreferenceChars} characters (after trimming).`
+			return
+		}
+
+		await upsert({
+			timeZone: cleanTimeZone,
+			dailyAiCapUsd: cap,
+			aiContextMarkdown: ctx,
+			aiBehaviorMarkdown: beh
+		})
 	}
 
 	function activityLabel(eventType: string, metadata?: Record<string, unknown>) {
@@ -141,18 +167,64 @@
 				<p class="text-[11px] text-muted-foreground">Applies per user, per day.</p>
 			</div>
 		</div>
+	</section>
 
-		<div class="flex items-center justify-between gap-3">
-			{#if saveError}
-				<p class="text-xs text-destructive">{saveError}</p>
-			{:else}
-				<span></span>
-			{/if}
-			<Button type="button" size="sm" disabled={isSaving} onclick={save}>
-				{isSaving ? 'Saving…' : 'Save'}
-			</Button>
+	<section class="space-y-4">
+		<div class="space-y-1">
+			<h2 class="text-sm font-semibold tracking-tight">AI assistant preferences</h2>
+			<p class="text-xs leading-5 text-muted-foreground">
+				Optional text included with workspace chat instructions. Do not paste passwords, API keys, or
+				regulated personal data.
+			</p>
+		</div>
+
+		<div class="space-y-2">
+			<div class="flex items-end justify-between gap-2">
+				<Label for="ai-context">Background & context</Label>
+				<span class="text-[11px] tabular-nums text-muted-foreground">
+					{aiContextMarkdown.trim().length} / {maxAiPreferenceChars}
+				</span>
+			</div>
+			<Textarea
+				id="ai-context"
+				bind:value={aiContextMarkdown}
+				class="min-h-28"
+				placeholder="Role, product, users, constraints the assistant should keep in mind."
+			/>
+			<p class="text-[11px] text-muted-foreground">
+				Stable facts about you or your work—assumed true for every thread unless you correct it in chat.
+			</p>
+		</div>
+
+		<div class="space-y-2">
+			<div class="flex items-end justify-between gap-2">
+				<Label for="ai-behavior">How to respond</Label>
+				<span class="text-[11px] tabular-nums text-muted-foreground">
+					{aiBehaviorMarkdown.trim().length} / {maxAiPreferenceChars}
+				</span>
+			</div>
+			<Textarea
+				id="ai-behavior"
+				bind:value={aiBehaviorMarkdown}
+				class="min-h-28"
+				placeholder="Tone, length, language, when to ask questions, how you like artifacts suggested."
+			/>
+			<p class="text-[11px] text-muted-foreground">
+				Style and behavior preferences. Launchpad’s safety and product rules still apply first.
+			</p>
 		</div>
 	</section>
+
+	<div class="flex items-center justify-between gap-3">
+		{#if saveError}
+			<p class="text-xs text-destructive">{saveError}</p>
+		{:else}
+			<span></span>
+		{/if}
+		<Button type="button" size="sm" disabled={isSaving} onclick={save}>
+			{isSaving ? 'Saving…' : 'Save'}
+		</Button>
+	</div>
 
 	<Separator class="my-2" />
 

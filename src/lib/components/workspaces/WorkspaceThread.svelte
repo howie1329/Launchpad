@@ -1,14 +1,20 @@
 <script lang="ts">
-	import { browser } from '$app/environment'
-	import { goto } from '$app/navigation'
-	import { resolve } from '$app/paths'
-	import { page } from '$app/stores'
-	import { auth, getConvexClient } from '$lib/auth.svelte'
-	import { listThreadArtifactsQuery } from '$lib/artifacts'
-	import { formatArtifactCreatedAt } from '$lib/artifact-display'
-	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat'
-	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte'
-	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte'
+	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/stores';
+	import { auth, getConvexClient } from '$lib/auth.svelte';
+	import { listThreadArtifactsQuery, type ThreadArtifact } from '$lib/artifacts';
+	import {
+		buildOutgoingUserMessageWithTokens,
+		formatArtifactMentionToken,
+		parseComposedUserMessage
+	} from '$lib/artifact-mention-tokens';
+	import { cn } from '$lib/utils';
+	import { formatArtifactCreatedAt } from '$lib/artifact-display';
+	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
+	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
+	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
 	import {
 		Context,
 		ContextContent,
@@ -17,13 +23,17 @@
 		ContextContentHeader,
 		ContextInputUsage,
 		ContextTrigger
-	} from '$lib/components/ai-elements/context'
+	} from '$lib/components/ai-elements/context';
 	import {
 		Conversation,
 		ConversationContent,
 		ConversationScrollButton
-	} from '$lib/components/ai-elements/conversation'
-	import { Message, MessageContent, MessageResponse } from '$lib/components/ai-elements/new-message'
+	} from '$lib/components/ai-elements/conversation';
+	import {
+		Message,
+		MessageContent,
+		MessageResponse
+	} from '$lib/components/ai-elements/new-message';
 	import {
 		ModelSelector,
 		ModelSelectorContent,
@@ -34,7 +44,7 @@
 		ModelSelectorList,
 		ModelSelectorName,
 		ModelSelectorTrigger
-	} from '$lib/components/ai-elements/model-selector'
+	} from '$lib/components/ai-elements/model-selector';
 	import {
 		PromptInput,
 		PromptInputSubmit,
@@ -42,192 +52,311 @@
 		PromptInputToolbar,
 		PromptInputTools,
 		type PromptInputMessage
-	} from '$lib/components/ai-elements/prompt-input'
-	import { Button } from '$lib/components/ui/button'
-	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable'
+	} from '$lib/components/ai-elements/prompt-input';
+	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
 	import {
 		defaultIdeaAiModelId,
 		ideaAiModels,
 		isIdeaAiModelId,
 		type IdeaAiModelId
-	} from '$lib/idea-ai-models'
+	} from '$lib/idea-ai-models';
 	import {
 		assistantSegmentsHaveContent,
 		buildAssistantSegments
-	} from '$lib/idea-chat-assistant-parts'
-	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up'
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down'
-	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle'
-	import SearchIcon from '@lucide/svelte/icons/search'
-	import { Chat } from '@ai-sdk/svelte'
-	import { DefaultChatTransport, type UIMessage } from 'ai'
-	import { useQuery } from 'convex-svelte'
-	import type { Id } from '../../../convex/_generated/dataModel'
+	} from '$lib/idea-chat-assistant-parts';
+	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import XIcon from '@lucide/svelte/icons/x';
+	import { Chat } from '@ai-sdk/svelte';
+	import { DefaultChatTransport, type UIMessage } from 'ai';
+	import { useQuery } from 'convex-svelte';
+	import { tick } from 'svelte';
+	import type { Id } from '../../../convex/_generated/dataModel';
 
-	let composerText = $state('')
-	let textareaRef = $state<HTMLTextAreaElement | null>(null)
-	let chat = $state<Chat<UIMessage> | null>(null)
-	let chatKey = $state('')
-	let startedThreadId = $state('')
-	let modelSelectorOpen = $state(false)
-	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId)
-	let chatError = $state('')
-	let saveError = $state('')
-	let contextArtifactId = $state('')
-	let lastThreadIdForContext = $state('')
+	let composerText = $state('');
+	let textareaRef = $state<HTMLTextAreaElement | null>(null);
+	let chat = $state<Chat<UIMessage> | null>(null);
+	let chatKey = $state('');
+	let startedThreadId = $state('');
+	let modelSelectorOpen = $state(false);
+	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId);
+	let chatError = $state('');
+	let saveError = $state('');
+	let contextArtifactId = $state('');
+	let lastThreadIdForContext = $state('');
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
-	let mediaMinLg = $state(false)
+	let mediaMinLg = $state(false);
 
-	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '')
-	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '')
-	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1')
-	const startRequested = $derived($page.url.searchParams.get('start') === '1')
+	/** @artifact mention picker (thread-linked artifacts only) */
+	let mentionOpen = $state(false);
+	let mentionStart = $state(0);
+	let mentionFilter = $state('');
+	let mentionHighlight = $state(0);
+	/** Composer chips (persisted as trailing @artifact: lines on send) */
+	let mentionChips = $state<Array<{ id: string; title: string }>>([]);
+
+	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
+	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
+	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
+	const startRequested = $derived($page.url.searchParams.get('start') === '1');
 	const selectedModel = $derived(
 		ideaAiModels.find((model) => model.id === selectedModelId) ?? ideaAiModels[0]
-	)
+	);
 	const threadMessages = useQuery(listMessagesQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
-	)
+	);
 	const threadArtifacts = useQuery(listThreadArtifactsQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
-	)
+	);
 	const sortedThreadArtifacts = $derived(
 		threadArtifacts.data
-			? [...threadArtifacts.data].sort(
-					(a, b) => b.artifact.createdAt - a.artifact.createdAt
-				)
+			? [...threadArtifacts.data].sort((a, b) => b.artifact.createdAt - a.artifact.createdAt)
 			: []
-	)
+	);
+
+	const filteredMentionArtifacts = $derived.by(() => {
+		const rows = threadArtifacts.data ?? [];
+		const q = mentionFilter.trim().toLowerCase();
+		if (!q) return rows;
+		return rows.filter((item) => item.artifact.title.toLowerCase().includes(q));
+	});
+
+	$effect(() => {
+		if (!mentionOpen) return;
+		mentionFilter;
+		mentionHighlight = 0;
+	});
 	const selectedThreadArtifact = $derived(
 		contextArtifactId
 			? (threadArtifacts.data?.find((item) => item.artifact._id === contextArtifactId) ?? null)
 			: null
-	)
+	);
 	const selectedContextArtifact = $derived(
 		contextArtifactId
 			? threadArtifacts.data === undefined
 				? undefined
 				: (selectedThreadArtifact?.artifact ?? null)
 			: null
-	)
-	const isChatBusy = $derived(chat?.status === 'submitted' || chat?.status === 'streaming')
-	const canSubmit = $derived(Boolean(composerText.trim()) && Boolean(chat) && !isChatBusy)
+	);
+	const isChatBusy = $derived(chat?.status === 'submitted' || chat?.status === 'streaming');
+	const canSubmit = $derived(
+		Boolean((composerText.trim() || mentionChips.length > 0) && chat && !isChatBusy)
+	);
 	const contextText = $derived(
-		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}`
-	)
-	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4))
+		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
+	);
+	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4));
 
 	$effect(() => {
-		if (!browser) return
-		const mq = window.matchMedia('(min-width: 1024px)')
-		mediaMinLg = mq.matches
+		if (!browser) return;
+		const mq = window.matchMedia('(min-width: 1024px)');
+		mediaMinLg = mq.matches;
 		const onChange = () => {
-			mediaMinLg = mq.matches
-		}
-		mq.addEventListener('change', onChange)
-		return () => mq.removeEventListener('change', onChange)
-	})
+			mediaMinLg = mq.matches;
+		};
+		mq.addEventListener('change', onChange);
+		return () => mq.removeEventListener('change', onChange);
+	});
 
 	$effect(() => {
 		if (activeThreadId !== lastThreadIdForContext) {
-			lastThreadIdForContext = activeThreadId
-			contextArtifactId = ''
+			lastThreadIdForContext = activeThreadId;
+			contextArtifactId = '';
 		}
-	})
+	});
 
 	$effect(() => {
 		if (!activeThreadId || !threadMessages.data) {
-			chat = null
-			chatKey = ''
-			return
+			chat = null;
+			chatKey = '';
+			return;
 		}
 
-		const savedModelId = threadMessages.data.map((row) => row.modelId).find(isIdeaAiModelId)
-		const nextMessages = threadMessages.data.map((row) => row.message)
+		const savedModelId = threadMessages.data.map((row) => row.modelId).find(isIdeaAiModelId);
+		const nextMessages = threadMessages.data.map((row) => row.message);
 		const nextKey = `${activeThreadId}:${threadMessages.data
 			.map((row) => `${row.messageId}:${row.updatedAt}`)
-			.join('|')}`
+			.join('|')}`;
 
 		if (savedModelId) {
-			selectedModelId = savedModelId
+			selectedModelId = savedModelId;
 		}
 
-		if (chatKey === nextKey || isChatBusy) return
+		if (chatKey === nextKey || isChatBusy) return;
 
-		chat = createChat(activeThreadId, nextMessages)
-		chatKey = nextKey
-		chatError = ''
-		saveError = ''
-	})
+		chat = createChat(activeThreadId, nextMessages);
+		chatKey = nextKey;
+		chatError = '';
+		saveError = '';
+	});
 
 	$effect(() => {
-		if (!startRequested || !activeThreadId || !chat || startedThreadId === activeThreadId) return
-		if (!threadMessages.data || threadMessages.data.length !== 1) return
-		if (chat.status !== 'ready') return
+		activeThreadId;
+		mentionChips = [];
+	});
 
-		startedThreadId = activeThreadId
-		void startInitialChat(activeThreadId)
-	})
+	$effect(() => {
+		if (!startRequested || !activeThreadId || !chat || startedThreadId === activeThreadId) return;
+		if (!threadMessages.data || threadMessages.data.length !== 1) return;
+		if (chat.status !== 'ready') return;
+
+		startedThreadId = activeThreadId;
+		void startInitialChat(activeThreadId);
+	});
 
 	const focusComposer = () => {
-		requestAnimationFrame(() => textareaRef?.focus())
+		requestAnimationFrame(() => textareaRef?.focus());
+	};
+
+	function syncMentionFromComposer(el: HTMLTextAreaElement) {
+		const text = el.value;
+		const cursor = el.selectionStart ?? text.length;
+		const before = text.slice(0, cursor);
+		const lastAt = before.lastIndexOf('@');
+		if (lastAt === -1) {
+			mentionOpen = false;
+			return;
+		}
+		if (lastAt > 0) {
+			const ch = text[lastAt - 1];
+			if (ch && !/\s/.test(ch)) {
+				mentionOpen = false;
+				return;
+			}
+		}
+		const afterAt = before.slice(lastAt + 1);
+		if (afterAt.includes('\n')) {
+			mentionOpen = false;
+			return;
+		}
+		mentionStart = lastAt;
+		mentionFilter = afterAt;
+		mentionOpen = true;
+	}
+
+	function handleComposerInputPost(event: Event & { currentTarget: HTMLTextAreaElement }) {
+		syncMentionFromComposer(event.currentTarget);
+	}
+
+	function handleComposerKeyDown(e: KeyboardEvent): boolean {
+		if (!mentionOpen) return false;
+		const list = filteredMentionArtifacts;
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			mentionOpen = false;
+			return true;
+		}
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			mentionHighlight = Math.min(mentionHighlight + 1, Math.max(0, list.length - 1));
+			return true;
+		}
+		if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			mentionHighlight = Math.max(mentionHighlight - 1, 0);
+			return true;
+		}
+		if (e.key === 'Enter' && !e.shiftKey && list.length > 0) {
+			e.preventDefault();
+			const item = list[mentionHighlight];
+			if (item) void pickArtifactMention(item);
+			return true;
+		}
+		return false;
+	}
+
+	function removeMentionChip(artifactId: string) {
+		mentionChips = mentionChips.filter((c) => c.id !== artifactId);
+	}
+
+	async function pickArtifactMention(item: ThreadArtifact) {
+		const el = textareaRef;
+		if (!el) return;
+		const text = composerText;
+		const cursor = el.selectionStart ?? text.length;
+		const start = mentionStart;
+		const next = text.slice(0, start) + text.slice(cursor);
+		composerText = next;
+		if (!mentionChips.some((c) => c.id === item.artifact._id)) {
+			mentionChips = [...mentionChips, { id: item.artifact._id, title: item.artifact.title }];
+		}
+		mentionOpen = false;
+		await tick();
+		el.setSelectionRange(start, start);
+		el.focus();
 	}
 
 	const selectModel = (modelId: IdeaAiModelId) => {
-		selectedModelId = modelId
-		modelSelectorOpen = false
-		focusComposer()
-	}
+		selectedModelId = modelId;
+		modelSelectorOpen = false;
+		focusComposer();
+	};
 
 	const submitMessage = async (message: PromptInputMessage) => {
-		const text = message.text.trim()
-		if (!chat || !text || isChatBusy) return
+		const prose = message.text.trim();
+		const outgoing = buildOutgoingUserMessageWithTokens(
+			prose,
+			mentionChips.map((c) => c.id)
+		);
+		if (!chat || !outgoing || isChatBusy) return;
 
-		chatError = ''
-		saveError = ''
+		chatError = '';
+		saveError = '';
+
+		const prevProse = prose;
+		const prevChips = mentionChips.slice();
 
 		try {
-			composerText = ''
-			await chat.sendMessage({ text })
+			composerText = '';
+			mentionChips = [];
+			await chat.sendMessage({ text: outgoing });
 		} catch (error) {
-			console.error(error)
-			composerText = text
-			chatError = buildChatErrorMessage(error)
-			throw error
+			console.error(error);
+			composerText = prevProse;
+			mentionChips = prevChips;
+			chatError = buildChatErrorMessage(error);
+			throw error;
 		}
+	};
+
+	function artifactTitleForId(artifactId: string): string {
+		return (
+			threadArtifacts.data?.find((x) => x.artifact._id === artifactId)?.artifact.title ?? 'Artifact'
+		);
 	}
 
 	function buildChatErrorMessage(error: unknown) {
 		if (error instanceof Error) {
 			try {
-				const parsed = JSON.parse(error.message) as unknown
+				const parsed = JSON.parse(error.message) as unknown;
 				if (parsed && typeof parsed === 'object') {
 					const data = parsed as {
-						error?: unknown
-						capUsd?: unknown
-						spentUsd?: unknown
-						dateKey?: unknown
-					}
+						error?: unknown;
+						capUsd?: unknown;
+						spentUsd?: unknown;
+						dateKey?: unknown;
+					};
 
 					if (typeof data.error === 'string') {
-						const capUsd = typeof data.capUsd === 'number' ? data.capUsd : undefined
-						const spentUsd = typeof data.spentUsd === 'number' ? data.spentUsd : undefined
-						const dateKey = typeof data.dateKey === 'string' ? data.dateKey : undefined
+						const capUsd = typeof data.capUsd === 'number' ? data.capUsd : undefined;
+						const spentUsd = typeof data.spentUsd === 'number' ? data.spentUsd : undefined;
+						const dateKey = typeof data.dateKey === 'string' ? data.dateKey : undefined;
 
 						if (capUsd !== undefined && spentUsd !== undefined) {
 							const money = new Intl.NumberFormat('en-US', {
 								style: 'currency',
 								currency: 'USD'
-							})
-							const base = `${data.error} (${money.format(spentUsd)} / ${money.format(capUsd)})`
-							return dateKey ? `${base} for ${dateKey}.` : `${base}.`
+							});
+							const base = `${data.error} (${money.format(spentUsd)} / ${money.format(capUsd)})`;
+							return dateKey ? `${base} for ${dateKey}.` : `${base}.`;
 						}
 
-						return data.error
+						return data.error;
 					}
 				}
 			} catch {
@@ -235,16 +364,16 @@
 			}
 		}
 
-		return 'Could not send this message. Please try again.'
+		return 'Could not send this message. Please try again.';
 	}
 
 	const openThreadArtifact = async (artifactId: string) => {
 		if (contextPanelOpen) {
-			contextArtifactId = artifactId
-			return
+			contextArtifactId = artifactId;
+			return;
 		}
 
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
 
 		await goto(
 			resolve(
@@ -254,13 +383,13 @@
 				noScroll: true,
 				keepFocus: true
 			}
-		)
-		contextArtifactId = artifactId
-	}
+		);
+		contextArtifactId = artifactId;
+	};
 
 	const closeThreadArtifact = () => {
-		contextArtifactId = ''
-	}
+		contextArtifactId = '';
+	};
 
 	function createChat(threadId: string, messages: UIMessage[]) {
 		return new Chat<UIMessage>({
@@ -278,24 +407,24 @@
 				})
 			}),
 			onFinish: ({ messages, isError }) => {
-				if (isError) return
-				void persistMessages(threadId, messages)
+				if (isError) return;
+				void persistMessages(threadId, messages);
 			}
-		})
+		});
 	}
 
 	async function startInitialChat(threadId: string) {
 		try {
-			await removeStartParam(threadId)
-			await chat?.sendMessage()
+			await removeStartParam(threadId);
+			await chat?.sendMessage();
 		} catch (error) {
-			console.error(error)
-			chatError = 'Could not start the assistant response. Please try again.'
+			console.error(error);
+			chatError = 'Could not start the assistant response. Please try again.';
 		}
 	}
 
 	async function removeStartParam(threadId: string) {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : ''
+		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
 
 		await goto(
 			resolve(
@@ -306,7 +435,7 @@
 				noScroll: true,
 				keepFocus: true
 			}
-		)
+		);
 	}
 
 	async function persistMessages(threadId: string, messages: UIMessage[]) {
@@ -315,17 +444,17 @@
 				threadId: threadId as Id<'chatThreads'>,
 				messages,
 				modelId: selectedModelId
-			})
-			saveError = ''
+			});
+			saveError = '';
 		} catch (error) {
-			console.error(error)
-			saveError = 'Chat saved locally for now. Send another message to retry syncing.'
+			console.error(error);
+			saveError = 'Chat saved locally for now. Send another message to retry syncing.';
 		}
 	}
 
 	function authHeaders(): Record<string, string> {
-		if (!auth.token) return {}
-		return { Authorization: `Bearer ${auth.token}` }
+		if (!auth.token) return {};
+		return { Authorization: `Bearer ${auth.token}` };
 	}
 
 	function messageText(message: UIMessage) {
@@ -333,7 +462,7 @@
 			.filter((part) => part.type === 'text')
 			.map((part) => part.text)
 			.join('\n')
-			.trim()
+			.trim();
 	}
 
 	function assistantAwaitingStreamContent(
@@ -341,12 +470,11 @@
 		messageIndex: number,
 		messages: UIMessage[]
 	) {
-		if (message.role !== 'assistant') return false
-		if (messageIndex !== messages.length - 1) return false
-		if (chat?.status !== 'submitted' && chat?.status !== 'streaming') return false
-		return !assistantSegmentsHaveContent(buildAssistantSegments(message))
+		if (message.role !== 'assistant') return false;
+		if (messageIndex !== messages.length - 1) return false;
+		if (chat?.status !== 'submitted' && chat?.status !== 'streaming') return false;
+		return !assistantSegmentsHaveContent(buildAssistantSegments(message));
 	}
-
 </script>
 
 <section class="flex h-full min-h-0 flex-col bg-background text-foreground">
@@ -365,49 +493,70 @@
 				{#if chat}
 					<Conversation class="min-h-0 flex-1">
 						<ConversationContent
-							class="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6"
+							class="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-5 sm:px-6"
 						>
 							{#each chat.messages as message, messageIndex (message.id)}
-							<Message from={message.role}>
-								<MessageContent>
-									{#if message.role === 'assistant'}
-										{@const segments = buildAssistantSegments(message)}
-										{#if assistantSegmentsHaveContent(segments)}
-											<div class="flex w-full min-w-0 flex-col gap-3">
-												{#each segments as segment, segmentIndex (segmentIndex)}
-													{#if segment.kind === 'text'}
-														<MessageResponse
-															content={segment.text}
-															class="text-xs leading-relaxed"
-														/>
-													{:else}
-														<IdeaChatToolSteps tools={segment.tools} />
-													{/if}
-												{/each}
-											</div>
-										{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages)}
-											<MessageResponse
-												content="Thinking..."
-												class="text-xs leading-relaxed text-muted-foreground"
-											/>
+								<Message from={message.role}>
+									<MessageContent>
+										{#if message.role === 'assistant'}
+											{@const segments = buildAssistantSegments(message)}
+											{#if assistantSegmentsHaveContent(segments)}
+												<!-- gap-2: prose vs tools within one assistant turn; message gap-5 separates turns -->
+												<div class="flex w-full min-w-0 flex-col gap-2">
+													{#each segments as segment, segmentIndex (segmentIndex)}
+														{#if segment.kind === 'text'}
+															<MessageResponse
+																content={segment.text}
+																class="text-xs leading-relaxed"
+															/>
+														{:else}
+															<div class="border-l border-border/40 pl-4 sm:pl-5">
+																<IdeaChatToolSteps tools={segment.tools} />
+															</div>
+														{/if}
+													{/each}
+												</div>
+											{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages)}
+												<MessageResponse
+													content="Thinking..."
+													class="text-xs leading-relaxed text-muted-foreground"
+												/>
+											{:else}
+												<p class="text-xs text-muted-foreground">No response yet.</p>
+											{/if}
 										{:else}
-											<p class="text-xs text-muted-foreground">No response yet.</p>
+											{@const composed = parseComposedUserMessage(messageText(message))}
+											<div class="flex w-full min-w-0 flex-col gap-2">
+												{#if composed.artifactIds.length > 0}
+													<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
+														{#each composed.artifactIds as aid (aid)}
+															<span
+																class="inline-flex max-w-full items-center rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground"
+															>
+																<span class="truncate">{artifactTitleForId(aid)}</span>
+															</span>
+														{/each}
+													</div>
+												{/if}
+												{#if composed.body}
+													<p class="text-xs leading-5 whitespace-pre-wrap">{composed.body}</p>
+												{/if}
+											</div>
 										{/if}
-									{:else}
-										<p class="text-xs leading-5 whitespace-pre-wrap">{messageText(message)}</p>
-									{/if}
-								</MessageContent>
-							</Message>
-						{/each}
+									</MessageContent>
+								</Message>
+							{/each}
 
-						{#if chat.status === 'submitted'}
-							<Message from="assistant">
-								<MessageContent class="flex-row items-center gap-2 text-xs text-muted-foreground">
-									<LoaderCircleIcon class="size-3.5 animate-spin" />
-									Thinking...
-								</MessageContent>
-							</Message>
-						{/if}
+							{#if chat.status === 'submitted'}
+								<Message from="assistant">
+									<MessageContent
+										class="flex w-full min-w-0 flex-row items-center gap-2 text-muted-foreground"
+									>
+										<LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" />
+										Thinking...
+									</MessageContent>
+								</Message>
+							{/if}
 						</ConversationContent>
 						<ConversationScrollButton />
 					</Conversation>
@@ -488,10 +637,64 @@
 				{/if}
 			</div>
 
-			<div class="shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
+			<div class="relative shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
+				{#if mentionOpen}
+					<div
+						class="absolute right-0 bottom-full left-0 z-20 mb-1 max-h-40 overflow-y-auto rounded-md border border-border/60 bg-popover text-popover-foreground shadow-md"
+						role="listbox"
+						aria-label="Thread artifacts"
+					>
+						{#if threadArtifacts.data === undefined}
+							<p class="px-3 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
+						{:else if filteredMentionArtifacts.length === 0}
+							<p class="px-3 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
+						{:else}
+							{#each filteredMentionArtifacts as item, i (item.artifact._id)}
+								<button
+									type="button"
+									role="option"
+									aria-selected={i === mentionHighlight}
+									class={cn(
+										'flex w-full flex-col gap-0.5 px-3 py-2 text-left text-xs transition-colors',
+										i === mentionHighlight ? 'bg-accent/60' : 'hover:bg-accent/50'
+									)}
+									onmouseenter={() => {
+										mentionHighlight = i;
+									}}
+									onclick={() => void pickArtifactMention(item)}
+								>
+									<span class="truncate font-medium">{item.artifact.title}</span>
+									<span class="text-[10px] text-muted-foreground">
+										{formatArtifactCreatedAt(item.artifact.createdAt)}
+									</span>
+								</button>
+							{/each}
+						{/if}
+					</div>
+				{/if}
 				<div class="w-full space-y-2">
 					{#if chatError || saveError}
 						<p class="text-xs text-destructive">{chatError || saveError}</p>
+					{/if}
+
+					{#if mentionChips.length > 0}
+						<div class="flex flex-wrap gap-1.5" aria-label="Artifacts to include in this message">
+							{#each mentionChips as chip (chip.id)}
+								<span
+									class="inline-flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-muted/40 py-0.5 pr-0.5 pl-2 text-[11px] font-medium text-foreground"
+								>
+									<span class="max-w-[min(100%,14rem)] truncate">{chip.title}</span>
+									<button
+										type="button"
+										class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										aria-label="Remove artifact reference"
+										onclick={() => removeMentionChip(chip.id)}
+									>
+										<XIcon class="size-3" />
+									</button>
+								</span>
+							{/each}
+						</div>
 					{/if}
 
 					<PromptInput
@@ -503,20 +706,12 @@
 							bind:ref={textareaRef}
 							bind:value={composerText}
 							class="min-h-20 px-4 py-4 text-sm"
-							placeholder="Continue shaping this thread..."
+							placeholder="Continue shaping this thread… (@ to cite a thread artifact)"
+							onInputPost={handleComposerInputPost}
+							onKeyDownIntercept={handleComposerKeyDown}
 						/>
 						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 							<PromptInputTools>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									class="gap-1.5 text-muted-foreground"
-								>
-									<SearchIcon data-icon="inline-start" />
-									Tools
-									<ChevronDownIcon data-icon="inline-end" />
-								</Button>
 								<ModelSelector bind:open={modelSelectorOpen}>
 									<ModelSelectorTrigger
 										class="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -548,10 +743,7 @@
 									usage={{ inputTokens: estimatedInputTokens }}
 									modelId={selectedModelId}
 								>
-									<ContextTrigger
-										size="sm"
-										class="h-6 gap-1 px-2 text-xs text-muted-foreground"
-									/>
+									<ContextTrigger size="sm" class="h-6 gap-1 px-2 text-xs text-muted-foreground" />
 									<ContextContent align="start">
 										<ContextContentHeader />
 										<ContextContentBody>
@@ -575,4 +767,3 @@
 		{/if}
 	</div>
 </section>
-

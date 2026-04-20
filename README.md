@@ -1,8 +1,10 @@
 # Launchpad
 
-Launchpad helps solo developers and indie hackers turn rough ideas into scoped work **before** over-building. The product is a **chat-first workspace**: you think in threads, persist decisions as **artifacts** (ideas, PRDs, and other markdown), and organize work under **projects** when it matures.
+Launchpad helps solo developers and indie hackers turn rough ideas into scoped work **before** over-building. It is a **chat-first workspace**: you think in **threads**, persist decisions as **artifacts** (markdown ideas, PRDs, and more), organize under **projects** when work matures, and use an **AI assistant** that reads and writes workspace data through tools—not a disconnected chat window.
 
-**Where things stand in the repo:** [docs/current-state.md](docs/current-state.md)
+**Full product breakdown (what it is now, features, routes, data model):** [docs/product-overview.md](docs/product-overview.md)
+
+**Maintainer snapshot (architecture, schema, env):** [docs/current-state.md](docs/current-state.md)
 
 **Product direction (north star):** [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md)
 
@@ -10,11 +12,13 @@ Launchpad helps solo developers and indie hackers turn rough ideas into scoped w
 
 ## Routes
 
-- **`/`** — Marketing home (still describes a PRD-oriented workflow for visitors).
+- **`/`** — Marketing home (chat-first workspace positioning; links into the app).
 - **`/auth`** — Sign in and sign up (Convex Auth).
-- **`/workspace`** — Signed-in app: sidebar (projects, chats, artifacts), thread UI, artifact reader, and AI chat. Navigation uses query params such as `project`, `thread`, `artifact`, and `context`.
+- **`/workspace`** — Signed-in shell: sidebar (projects, chats, artifacts), new-chat landing or active thread, optional **context** panel for thread-linked artifacts. Query params include `project`, `thread`, `context`, and `start` (auto-send after creating a thread).
+- **`/workspace/settings`** — Timezone, daily AI spend cap, usage vs cap, and workspace activity history.
+- **`/workspace/artifacts/[artifactId]`** — Full-page artifact reader (edit, preview, draft compare).
 
-There is no separate dashboard, ideas, scope, or settings route; the workspace is the app shell.
+The workspace is the primary app surface; there is no separate dashboard or ideas-only area outside this shell.
 
 ---
 
@@ -25,6 +29,7 @@ There is no separate dashboard, ideas, scope, or settings route; the workspace i
 - **Backend:** [Convex](https://convex.dev) — data, realtime queries, and Convex Auth (`@convex-dev/auth`)
 - **Client:** `convex-svelte`
 - **AI:** Vercel AI SDK (`ai`, `@ai-sdk/svelte`), models via [Vercel AI Gateway](https://vercel.com/docs/ai-gateway); workspace streaming in `src/routes/api/workspace/chat/+server.ts`
+- **Artifacts:** CodeMirror (markdown / diff), Streamdown (preview)
 
 ---
 
@@ -32,7 +37,8 @@ There is no separate dashboard, ideas, scope, or settings route; the workspace i
 
 | Doc | Purpose |
 | --- | --- |
-| [docs/current-state.md](docs/current-state.md) | Maintainer snapshot: architecture, data model, env vars |
+| [docs/product-overview.md](docs/product-overview.md) | **Product breakdown:** audience, concepts, features, routes, AI, settings, stack, data model |
+| [docs/current-state.md](docs/current-state.md) | Maintainer snapshot: architecture, data model, env vars, PRD gaps |
 | [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md) | Product vision and MVP scope |
 | [docs/design-system.md](docs/design-system.md) | Visual and interaction principles (tokens live in `src/routes/layout.css`) |
 | [docs/shadcn-svelte.md](docs/shadcn-svelte.md) | Index of shadcn-svelte docs |
