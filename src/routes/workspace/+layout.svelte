@@ -341,7 +341,7 @@
 		style="--sidebar-width: 15rem;"
 	>
 		<Sidebar.Root collapsible="icon" class="overflow-hidden">
-			<Sidebar.Header class="border-b border-sidebar-border/60 px-2 pb-2">
+			<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
 				<Sidebar.Menu class="flex flex-row items-center gap-1">
 					<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
