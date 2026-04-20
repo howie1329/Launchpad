@@ -15,7 +15,7 @@
 		parseComposedUserMessage
 	} from '$lib/artifact-mention-tokens';
 	import { cn } from '$lib/utils';
-	import { formatArtifactCreatedAt } from '$lib/artifact-display';
+	import { artifactTypeLabel, formatArtifactCreatedAt } from '$lib/artifact-display';
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
@@ -58,6 +58,8 @@
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
 	import {
 		defaultIdeaAiModelId,
@@ -92,6 +94,9 @@
 	let saveError = $state('');
 	let contextArtifactId = $state('');
 	let lastThreadIdForContext = $state('');
+	let contextSearch = $state('');
+	let contextTypeFilter = $state('all');
+	let contextDateSort = $state<'newest' | 'oldest'>('newest');
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
 	let mediaMinLg = $state(false);
 
@@ -130,6 +135,35 @@
 			? [...threadArtifacts.data].sort((a, b) => b.artifact.createdAt - a.artifact.createdAt)
 			: []
 	);
+	const contextArtifactTypes = $derived.by(() => {
+		const types: string[] = [];
+		for (const item of threadArtifacts.data ?? []) {
+			const type = item.artifact.type.trim();
+			if (type && !types.includes(type)) types.push(type);
+		}
+		return types.sort((a, b) => artifactTypeLabel(a).localeCompare(artifactTypeLabel(b)));
+	});
+	const filteredContextArtifacts = $derived.by(() => {
+		const query = contextSearch.trim().toLowerCase();
+		const rows = sortedThreadArtifacts.filter((item) => {
+			const type = item.artifact.type.trim();
+			const typeLabel = artifactTypeLabel(type);
+			const matchesType = contextTypeFilter === 'all' || type === contextTypeFilter;
+			const matchesQuery =
+				!query ||
+				item.artifact.title.toLowerCase().includes(query) ||
+				type.toLowerCase().includes(query) ||
+				typeLabel.toLowerCase().includes(query);
+
+			return matchesType && matchesQuery;
+		});
+
+		if (contextDateSort === 'oldest') {
+			return [...rows].sort((a, b) => a.artifact.createdAt - b.artifact.createdAt);
+		}
+
+		return rows;
+	});
 	const sortedThreadDraftChanges = $derived(
 		threadDraftChanges.data
 			? [...threadDraftChanges.data].sort(
@@ -647,7 +681,37 @@
 							onBack={closeThreadArtifact}
 						/>
 					{:else}
-						<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+						<div class="flex min-h-0 flex-1 flex-col">
+							<div class="shrink-0 space-y-2 border-b border-border/50 px-3 py-3">
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Chat context
+									</p>
+									<p class="mt-1 text-[11px] text-muted-foreground">
+										Artifacts linked to this thread.
+									</p>
+								</div>
+								<Input
+									bind:value={contextSearch}
+									type="search"
+									placeholder="Search title or type"
+									class="h-7 text-xs"
+								/>
+								<div class="grid grid-cols-2 gap-2">
+									<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
+										<NativeSelectOption value="all">All types</NativeSelectOption>
+										{#each contextArtifactTypes as type (type)}
+											<NativeSelectOption value={type}>{artifactTypeLabel(type)}</NativeSelectOption>
+										{/each}
+									</NativeSelect>
+									<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
+										<NativeSelectOption value="newest">Newest first</NativeSelectOption>
+										<NativeSelectOption value="oldest">Oldest first</NativeSelectOption>
+									</NativeSelect>
+								</div>
+							</div>
+
+							<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 							{#if threadArtifacts.error}
 								<div class="space-y-2 px-2 py-2">
 									<p class="text-xs text-destructive">{threadArtifacts.error.message}</p>
@@ -666,7 +730,7 @@
 							{:else if threadArtifacts.data === undefined}
 								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
 							{:else}
-								<div class="space-y-4">
+								<div class="space-y-3">
 									{#if threadDraftChanges.error}
 										<p class="px-2 py-1.5 text-xs text-destructive">
 											{threadDraftChanges.error.message}
@@ -683,7 +747,7 @@
 											{#each sortedThreadDraftChanges as item (item.draftChange._id)}
 												<button
 													type="button"
-													class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 													onclick={() => openThreadArtifact(item.artifact._id)}
 												>
 													<span class="truncate text-xs font-medium tracking-tight">
@@ -702,23 +766,26 @@
 											No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
 											when the shape is clear.
 										</p>
+									{:else if filteredContextArtifacts.length === 0}
+										<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+											No artifacts match those filters.
+										</p>
 									{:else}
 										<div class="space-y-1">
-											<p
-												class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-											>
-												Chat context
-											</p>
-											{#each sortedThreadArtifacts as item (item.link._id)}
+											{#each filteredContextArtifacts as item (item.link._id)}
 												<button
 													type="button"
-													class="flex w-full flex-col gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													class="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 													onclick={() => openThreadArtifact(item.artifact._id)}
 												>
-													<span class="truncate text-xs font-medium tracking-tight">
+													<span class="size-1.5 shrink-0 rounded-full bg-primary/70"></span>
+													<span class="min-w-0 flex-1 truncate text-xs font-medium tracking-tight">
 														{item.artifact.title}
 													</span>
-													<span class="text-[11px] text-muted-foreground">
+													<span class="shrink-0 text-[10px] text-muted-foreground">
+														{artifactTypeLabel(item.artifact.type)}
+													</span>
+													<span class="shrink-0 text-[10px] text-muted-foreground">
 														{formatArtifactCreatedAt(item.artifact.createdAt)}
 													</span>
 												</button>
@@ -727,6 +794,7 @@
 									{/if}
 								</div>
 							{/if}
+							</div>
 						</div>
 					{/if}
 				</aside>
