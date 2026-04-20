@@ -23,7 +23,6 @@
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import {
 		createProjectFromThreadMutation,
-		createProjectMutation,
 		listProjectsQuery
 	} from '$lib/projects';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
@@ -32,7 +31,6 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import FolderIcon from '@lucide/svelte/icons/folder';
-	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
@@ -47,11 +45,6 @@
 
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
-	let isCreatingProject = $state(false);
-	let projectDialogOpen = $state(false);
-	let projectName = $state('');
-	let projectSummary = $state('');
-	let projectError = $state('');
 	let promoteDialogOpen = $state(false);
 	let promoteName = $state('');
 	let promoteSummary = $state('');
@@ -121,7 +114,7 @@
 			: (selectedThread?.title ??
 					selectedArtifact?.title ??
 					selectedProject?.name ??
-					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat'))
+					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
 	);
 	const headerDescription = $derived(
 		isSettingsActive
@@ -130,7 +123,7 @@
 				? ''
 				: activeProjectId
 					? 'Start a new chat in this project.'
-					: 'Start from a rough thought.'
+					: ''
 	);
 
 	const projectThreads = (projectId: string) =>
@@ -139,7 +132,6 @@
 	const setProjectOpen = (projectId: string, open: boolean) => {
 		openProjectIds = { ...openProjectIds, [projectId]: open };
 	};
-	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject);
 
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -163,47 +155,6 @@
 			? `AI usage today: ${money.format(budget.data.spentUsd)} / ${money.format(budget.data.capUsd)} · ${budget.data.dateKey}`
 			: 'Usage'
 	);
-
-	const createProject = async () => {
-		if (isCreatingProject) return;
-
-		const name = projectName.trim();
-		const summary = projectSummary.trim();
-
-		if (!name) {
-			projectError = 'Project name is required.';
-			return;
-		}
-
-		isCreatingProject = true;
-		projectError = '';
-
-		try {
-			const result = await getConvexClient().mutation(createProjectMutation, {
-				name,
-				...(summary ? { summary } : {})
-			});
-			projectDialogOpen = false;
-			projectName = '';
-			projectSummary = '';
-			workspaceNotice = 'Project created.';
-			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`));
-		} catch (error) {
-			console.error(error);
-			projectError = 'Could not create this project. Please try again.';
-		} finally {
-			isCreatingProject = false;
-		}
-	};
-
-	const closeProjectDialog = () => {
-		if (isCreatingProject) return;
-
-		projectDialogOpen = false;
-		projectName = '';
-		projectSummary = '';
-		projectError = '';
-	};
 
 	const openPromoteDialog = () => {
 		if (!selectedThread || selectedThread.projectId) return;
@@ -418,16 +369,6 @@
 							/>
 							<span class="min-w-0 truncate">Projects</span>
 						</Collapsible.Trigger>
-						<Sidebar.GroupAction
-							class="top-1 right-2"
-							aria-label="New project"
-							aria-disabled={isCreatingProject}
-							onclick={() => {
-								if (!isCreatingProject) projectDialogOpen = true;
-							}}
-						>
-							<FolderPlusIcon />
-						</Sidebar.GroupAction>
 						<Collapsible.Content
 							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 						>
@@ -445,17 +386,6 @@
 												<p class="text-[11px] leading-snug text-sidebar-foreground/60">
 													Promote a useful chat when the idea is ready for focused work.
 												</p>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													class="h-7 w-full justify-start px-2 text-xs"
-													onclick={() => {
-														projectDialogOpen = true;
-													}}
-												>
-													Create project
-												</Button>
 											</div>
 										</Sidebar.MenuItem>
 									{:else}
@@ -802,7 +732,9 @@
 			>
 				<Sidebar.Trigger class="-ms-1" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+					{#if headerTitle}
+						<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+					{/if}
 					{#if headerDescription}
 						<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
 					{/if}
@@ -960,64 +892,5 @@
 			</Dialog.Content>
 		</Dialog.Root>
 
-		<Dialog.Root bind:open={projectDialogOpen}>
-			<Dialog.Content class="sm:max-w-md">
-				<form
-					class="space-y-4"
-					onsubmit={(event) => {
-						event.preventDefault();
-						void createProject();
-					}}
-				>
-					<Dialog.Header>
-						<Dialog.Title>Create project</Dialog.Title>
-						<Dialog.Description>
-							Add a workspace for chats and artifacts that belong together.
-						</Dialog.Description>
-					</Dialog.Header>
-
-					<div class="space-y-3">
-						<div class="space-y-1.5">
-							<Label for="project-name">Name</Label>
-							<Input
-								id="project-name"
-								bind:value={projectName}
-								placeholder="Project name"
-								aria-invalid={projectError ? 'true' : undefined}
-								disabled={isCreatingProject}
-							/>
-						</div>
-						<div class="space-y-1.5">
-							<Label for="project-summary">Summary</Label>
-							<Textarea
-								id="project-summary"
-								bind:value={projectSummary}
-								placeholder="Optional project context"
-								class="min-h-20"
-								disabled={isCreatingProject}
-							/>
-						</div>
-					</div>
-
-					{#if projectError}
-						<p class="text-xs text-destructive">{projectError}</p>
-					{/if}
-
-					<Dialog.Footer>
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={isCreatingProject}
-							onclick={closeProjectDialog}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={!canCreateProject}>
-							{isCreatingProject ? 'Creating...' : 'Create project'}
-						</Button>
-					</Dialog.Footer>
-				</form>
-			</Dialog.Content>
-		</Dialog.Root>
 	</Sidebar.Provider>
 {/if}
