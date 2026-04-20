@@ -8,6 +8,10 @@ Launchpad helps solo developers and indie hackers turn rough ideas into scoped w
 
 **Product direction (north star):** [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md)
 
+**AI chat tools (implemented + planned):** [docs/ai-chat-tools-and-vercel-workflows.md](docs/ai-chat-tools-and-vercel-workflows.md)
+
+**Durable workflows (design / not shipped):** [docs/durable-workflows-and-orchestration.md](docs/durable-workflows-and-orchestration.md)
+
 ---
 
 ## Routes
@@ -40,6 +44,8 @@ The workspace is the primary app surface; there is no separate dashboard or idea
 | [docs/product-overview.md](docs/product-overview.md) | **Product breakdown:** audience, concepts, features, routes, AI, settings, stack, data model |
 | [docs/current-state.md](docs/current-state.md) | Maintainer snapshot: architecture, data model, env vars, PRD gaps |
 | [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md) | Product vision and MVP scope |
+| [docs/ai-chat-tools-and-vercel-workflows.md](docs/ai-chat-tools-and-vercel-workflows.md) | Workspace chat tools (implemented + planned) and in-chat orchestration patterns |
+| [docs/durable-workflows-and-orchestration.md](docs/durable-workflows-and-orchestration.md) | Durable background workflows, runtime options, catalog, guardrails |
 | [docs/design-system.md](docs/design-system.md) | Visual and interaction principles (tokens live in `src/routes/layout.css`) |
 | [docs/shadcn-svelte.md](docs/shadcn-svelte.md) | Index of shadcn-svelte docs |
 | [docs/artifact-schema-plan.md](docs/artifact-schema-plan.md) | Rationale for artifact fields and markdown-first storage |

@@ -4,6 +4,8 @@ _Last updated: April 19, 2026_
 
 This revision focuses on one question: **what should the AI chat toolset be, given what already exists today**.
 
+**Durable workflows (separate concern):** Multi-step and background orchestration (polish pipelines, promotion gates, backlog generation) should **not** overload the live chat tool loop. See **[durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md)** for runtime comparison (Convex Workflow, Trigger.dev, Vercel Workflow SDK) and product-shaped workflow catalog.
+
 ---
 
 ## 1) Current toolset in the chat API (implemented)
@@ -20,6 +22,24 @@ From `src/routes/api/workspace/chat/+server.ts`, the current ToolLoopAgent expos
 8. `proposeArtifactEdit`
 
 These are already aligned with Launchpad’s core product rules (thread-scoped context, explicit imports, draft-then-apply edits).
+
+**Implementation location:** `src/routes/api/workspace/chat/+server.ts` (`workspaceTools`). System instructions for when to call tools are in the same file (`baseInstructions`).
+
+**Convex mutations/queries used by tools (representative):** artifact and thread helpers in `src/lib/artifacts.ts` and `src/lib/projects.ts` reference Convex functions such as `createArtifact`, `linkArtifactToThread`, `createArtifactDraftChange`, `createProjectFromThread`, and listing queries—see `src/convex/artifacts.ts` and `src/convex/projects.ts`.
+
+---
+
+## 1b) Enhancing existing tools (without adding new names)
+
+These improvements keep the same tool **names** but make them safer or cheaper for the model:
+
+| Tool | Enhancement idea |
+| --- | --- |
+| `readThreadArtifact` | Optional **range or section** parameters (or a follow-on tool) so the model does not pull full large markdown every time; today the handler returns full `contentMarkdown`. |
+| `listThreadArtifacts` / `listProjectArtifacts` | Richer list payload: **char counts**, **section headings**, or **last edited** hints so the model can choose what to read next without an extra read. |
+| `createPrdArtifact` | Optional **validation mode**: respond with missing-field checklist **before** persisting when inputs are thin (product choice: strict vs lenient). |
+| `proposeArtifactEdit` | Server-side **size warnings** or truncation policy in tool result metadata so the model prefers smaller edits when docs are huge. |
+| `importProjectArtifactToThread` | Return a short **summary line count** after import so the model knows how heavy the new context is. |
 
 ---
 
@@ -100,6 +120,21 @@ Why next:
 
 ---
 
+### E) Further tool ideas (backlog / workflow-adjacent)
+
+These are **not** in the canonical 14-tool freeze below; use them when a clear user story appears. Several pair naturally with [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md) (e.g. backlog generation may be a **workflow** first, then optionally exposed as a one-click chat tool).
+
+| Tool | Purpose |
+| --- | --- |
+| `listPendingDrafts` | List `artifactDraftChanges` with status `pending` for the active thread so the assistant can point users at unresolved drafts. |
+| `linkThreadArtifact` (reference-only) | Mark a project artifact as in-thread context **without** implying full import semantics—if product differentiates “reference” vs `importProjectArtifactToThread`. |
+| `proposeAppendToArtifact` | Safer than full replace: append a dated “Decisions from chat” block via **`createArtifactDraftChange`** with merged body. |
+| `duplicateArtifactAsDraft` | Fork an idea or PRD into a new artifact for exploration without touching the original until the user deletes or archives. |
+
+**Chat UI:** When adding or renaming tools, update human-readable titles and summaries in `src/lib/idea-chat-assistant-parts.ts` (`WORKSPACE_TOOL_TITLES`, `WORKSPACE_RUNNING_SUMMARIES`, `summarizeWorkspaceTool`) so the workspace chat tool rail stays clear.
+
+---
+
 ## 4) Recommended “set tool set” (single canonical list)
 
 If we freeze one canonical list for roadmap alignment, it should be:
@@ -123,15 +158,12 @@ This set keeps the current product principles intact (chat-first, explicit conte
 
 ---
 
-## 5) Vercel AI workflow fit (kept concise)
+## 5) In-chat orchestration patterns (AI SDK / ToolLoopAgent)
 
-For this toolset, the most useful workflow patterns are:
+Inside a **single** chat request, the most useful patterns for this toolset are:
 
-1. **Routing**: classify user intent, then expose only relevant tools per turn.
-2. **Sequential chain**: convert chat -> structured output -> quality pass.
-3. **Evaluator-optimizer (bounded)**: 1–2 refinement passes for PRD quality checks.
+1. **Routing:** infer intent, then prefer the smallest set of tools (list → read one artifact → act).
+2. **Sequential chain:** structured PRD inputs → `createPrdArtifact`; or read → `proposeArtifactEdit`.
+3. **Evaluator-optimizer (bounded):** at most one or two refinement passes within the agent step limit (`stepCountIs` in `+server.ts`) so the request still completes quickly.
 
-For durable background execution (Vercel Workflows), start with one workflow only:
-- **Artifact quality pipeline** that generates draft proposals asynchronously and logs progress.
-
-Keep all durable outputs as drafts unless user explicitly applies changes.
+Heavy multi-pass work (many model calls, long merges, batch imports) belongs in a **durable workflow** instead—see [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md). Recommended first background workflow there: **artifact quality pipeline** with outputs as **drafts** or **new artifacts** only, until the user applies changes in the artifact reader.

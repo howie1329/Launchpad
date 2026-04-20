@@ -76,6 +76,8 @@ The chat UI shows tool activity in expandable steps with human-readable summarie
 
 **Usage and limits:** runs are metered (tokens and estimated cost). Users have a **daily AI spend cap** in USD (per user, per calendar day in their timezone). The shell and settings show **budget status**; exceeding the cap blocks new chat requests until the next day or a higher cap.
 
+**Roadmap (engineering):** Planned additions to the tool surface and patterns for durable background work are documented in [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md) and [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md).
+
 ---
 
 ## Settings and activity
@@ -171,6 +173,8 @@ Quality checks: `npm run check`, `npm run lint`, `npm run format`.
 | [README.md](../README.md) | Quick start, stack, env, tooling |
 | [current-state.md](current-state.md) | Maintainer snapshot vs PRD, architecture notes |
 | [chat-first-launchpad-prd.md](chat-first-launchpad-prd.md) | Original product vision and MVP scope |
+| [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md) | Workspace AI tools: implemented set, planned tools, UI notes |
+| [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md) | Background workflows, runtime comparison, product catalog |
 | [design-system.md](design-system.md) | Visual and interaction principles |
 | [artifact-schema-plan.md](artifact-schema-plan.md) | Markdown-first artifact rationale |
 

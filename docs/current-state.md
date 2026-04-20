@@ -40,6 +40,7 @@ Ownership uses `ownerId` string from Convex Auth (`getAuthUserId` in app code—
 - Browser chat UI calls `POST /api/workspace/chat` with `threadId` and model id.
 - Server builds context from Convex (thread, messages, linked artifacts, optional project artifacts), runs a `ToolLoopAgent`, and streams the response.
 - Tools create/link artifacts and create draft changes for edits; mutations go through Convex.
+- **Durable / background workflows** (multi-step polish, promotion pipelines, scheduled jobs) are **not implemented** in the repo yet; see [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md). Planned chat tools (search, section reads, backlog helpers) live in [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md).
 
 ## Auth
 
@@ -64,6 +65,8 @@ Treat the chat-first PRD as **direction**; this file is the **inventory**.
 
 ## Related docs
 
+- [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md) — workspace chat tools (implemented + roadmap)
+- [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md) — background workflows and runtime options
 - [design-system.md](design-system.md) — layout, tokens, interaction principles
 - [shadcn-svelte.md](shadcn-svelte.md) — component library doc index
 - [artifact-schema-plan.md](artifact-schema-plan.md) — why markdown + metadata shape
