@@ -184,7 +184,7 @@
 							</ContextContent>
 						</Context>
 					</PromptInputTools>
-					<PromptInputSubmit class="size-8 shrink-0 rounded-full" disabled={!canSubmit}>
+					<PromptInputSubmit class="size-8 shrink-0" disabled={!canSubmit}>
 						<ArrowUpIcon class="size-4" />
 					</PromptInputSubmit>
 				</PromptInputToolbar>
@@ -199,7 +199,7 @@
 					<Suggestion
 						suggestion={suggestion.label}
 						variant="ghost"
-						class="h-6 rounded-full px-2.5 text-[11px] text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+						class="h-6 px-2.5 text-[11px] text-muted-foreground hover:bg-accent/50 hover:text-foreground"
 						onclick={() => fillComposer(suggestion.prompt)}
 					>
 						{suggestion.label}

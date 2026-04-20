@@ -921,7 +921,7 @@
 									</ContextContent>
 								</Context>
 							</PromptInputTools>
-							<PromptInputSubmit class="rounded-full" disabled={!canSubmit}>
+							<PromptInputSubmit disabled={!canSubmit}>
 								{#if isChatBusy}
 									<LoaderCircleIcon class="size-4 animate-spin" />
 								{:else}

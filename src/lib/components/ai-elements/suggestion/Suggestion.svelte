@@ -28,7 +28,7 @@
 </script>
 
 <Button
-	class={cn("cursor-pointer rounded-full px-4", className)}
+	class={cn("cursor-pointer px-4", className)}
 	onclick={handleClick}
 	{size}
 	type="button"

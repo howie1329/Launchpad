@@ -510,8 +510,7 @@
 																			)}
 																			{...props}
 																		>
-																			<MessageSquareTextIcon />
-																			<span class="truncate">{thread.title}</span>
+																			<span class="min-w-0 truncate">{thread.title}</span>
 																		</a>
 																	{/snippet}
 																</Sidebar.MenuSubButton>
