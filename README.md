@@ -39,17 +39,17 @@ The workspace is the primary app surface; there is no separate dashboard or idea
 
 ## Documentation
 
-| Doc | Purpose |
-| --- | --- |
-| [docs/product-overview.md](docs/product-overview.md) | **Product breakdown:** audience, concepts, features, routes, AI, settings, stack, data model |
-| [docs/current-state.md](docs/current-state.md) | Maintainer snapshot: architecture, data model, env vars, PRD gaps |
-| [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md) | Product vision and MVP scope |
-| [docs/ai-chat-tools-and-vercel-workflows.md](docs/ai-chat-tools-and-vercel-workflows.md) | Workspace chat tools (implemented + planned) and in-chat orchestration patterns |
-| [docs/durable-workflows-and-orchestration.md](docs/durable-workflows-and-orchestration.md) | Durable background workflows, runtime options, catalog, guardrails |
-| [docs/design-system.md](docs/design-system.md) | Visual and interaction principles (tokens live in `src/routes/layout.css`) |
-| [docs/shadcn-svelte.md](docs/shadcn-svelte.md) | Index of shadcn-svelte docs |
-| [docs/artifact-schema-plan.md](docs/artifact-schema-plan.md) | Rationale for artifact fields and markdown-first storage |
-| [docs/tech-debt-followup.md](docs/tech-debt-followup.md) | Optional cleanup notes |
+| Doc                                                                                        | Purpose                                                                                      |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| [docs/product-overview.md](docs/product-overview.md)                                       | **Product breakdown:** audience, concepts, features, routes, AI, settings, stack, data model |
+| [docs/current-state.md](docs/current-state.md)                                             | Maintainer snapshot: architecture, data model, env vars, PRD gaps                            |
+| [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md)                       | Product vision and MVP scope                                                                 |
+| [docs/ai-chat-tools-and-vercel-workflows.md](docs/ai-chat-tools-and-vercel-workflows.md)   | Workspace chat tools (implemented + planned) and in-chat orchestration patterns              |
+| [docs/durable-workflows-and-orchestration.md](docs/durable-workflows-and-orchestration.md) | Durable background workflows, runtime options, catalog, guardrails                           |
+| [docs/design-system.md](docs/design-system.md)                                             | Visual and interaction principles (tokens live in `src/routes/layout.css`)                   |
+| [docs/shadcn-svelte.md](docs/shadcn-svelte.md)                                             | Index of shadcn-svelte docs                                                                  |
+| [docs/artifact-schema-plan.md](docs/artifact-schema-plan.md)                               | Rationale for artifact fields and markdown-first storage                                     |
+| [docs/tech-debt-followup.md](docs/tech-debt-followup.md)                                   | Optional cleanup notes                                                                       |
 
 ---
 
@@ -89,6 +89,7 @@ Set variables in `.env.local` or your host environment (names must match what Sv
 
 - **`PUBLIC_CONVEX_URL`** — Convex deployment URL (required for auth and client queries; see `src/lib/auth.svelte.ts`).
 - **`AI_GATEWAY_API_KEY`** — Private key for Vercel AI Gateway (required for workspace chat streaming; see `src/routes/api/workspace/chat/+server.ts`).
+- **`TAVILY_API_KEY`** — Private Tavily key for optional workspace chat web search and page extraction.
 
 Configure the Convex project with `npx convex dev` and follow [Convex environment variables](https://docs.convex.dev/production/environment-variables) for deployment. For AI Gateway, see [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).
 

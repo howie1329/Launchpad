@@ -1,4 +1,5 @@
 import { AI_GATEWAY_API_KEY } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { getThreadQuery } from '$lib/chat';
 import {
@@ -15,8 +16,20 @@ import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
+import { syncArtifactMemory } from '$lib/server/launchpad-memory';
+import {
+	addUserMemoryDocument,
+	assertDocumentForgettable,
+	buildSupermemoryProfileInstructions,
+	composeRetrievedMemoryInstructions,
+	deleteSupermemoryDocument,
+	memoryLog,
+	retrieveRelevantMemories,
+	userMemoryTextAllowedForMessage
+} from '$lib/server/memory';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
+import { tavilyExtract, tavilySearch } from '@tavily/ai-sdk';
 import { ConvexHttpClient } from 'convex/browser';
 import {
 	createAgentUIStreamResponse,
@@ -68,7 +81,12 @@ You have tools for durable workspace memory:
 - Read or import project artifacts only when the user asks or clearly references project memory.
 - Only propose edits for artifacts already linked to this thread.
 - Future artifacts created after project promotion belong to that project automatically through the active thread.
-- PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.`;
+- PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.
+
+Supermemory (automatic + optional tools):
+- Retrieved memory and profile snippets may appear below; they are hints only and can be wrong.
+- addMemory: only when the user clearly wants something remembered. The text argument must be copied verbatim from their latest message (substring match is enforced server-side).
+- forgetMemory: only when the user asks to remove a memory; pass the documentId from the retrieved memory list.`;
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -103,11 +121,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			thread.scopeType === 'project' && thread.projectId
 				? await convex.query(getProjectQuery, { projectId: thread.projectId })
 				: null;
-		const tools = workspaceTools({
-			convex,
-			threadId: thread._id,
-			project: project as WorkspaceProject | null
-		});
 
 		const budget = await convex.query(getAiBudgetStatusQuery, {});
 		if (budget.isOverLimit) {
@@ -136,13 +149,43 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: referenced.error }, { status: 400 });
 		}
 
-		const coreInstructions =
-			referenced.block.length > 0
-				? `${workspaceInstructions(project)}\n\n${referenced.block}`
-				: workspaceInstructions(project);
+		const profileBlock = await buildSupermemoryProfileInstructions({
+			ownerId: thread.ownerId,
+			...(project?._id ? { projectId: project._id } : {})
+		});
+
+		const memories = await retrieveRelevantMemories({
+			ownerId: thread.ownerId,
+			...(project?._id ? { projectId: project._id } : {}),
+			query: lastUserText
+		});
+		const memoryBlock = composeRetrievedMemoryInstructions(memories);
+		const webSearchRequested = body.webSearchRequested === true;
+		const webSearchApiKey = env.TAVILY_API_KEY?.trim() ?? '';
+		const webSearchAvailable = Boolean(webSearchApiKey);
+		const coreInstructions = [
+			workspaceInstructions(project),
+			webSearchInstructions(webSearchRequested, webSearchAvailable),
+			referenced.block,
+			profileBlock,
+			memoryBlock
+		]
+			.filter((part) => part.length > 0)
+			.join('\n\n');
 
 		const userSettingsRow = await convex.query(getMyUserSettingsQuery, {});
 		const instructions = appendUserAiPreferenceInstructions(coreInstructions, userSettingsRow);
+
+		const tools = workspaceTools({
+			convex,
+			threadId: thread._id,
+			project: project as WorkspaceProject | null,
+			ownerId: thread.ownerId,
+			projectId: project?._id,
+			lastUserText,
+			webSearchAvailable,
+			webSearchApiKey
+		});
 
 		const agent = new ToolLoopAgent({
 			model: gateway(body.modelId),
@@ -223,6 +266,35 @@ function workspaceInstructions(project: WorkspaceProject | null) {
 ${projectContext}`;
 }
 
+function webSearchInstructions(webSearchRequested: boolean, webSearchAvailable: boolean) {
+	const availability = webSearchAvailable
+		? [
+				'Web search tools:',
+				'- tavilySearch: search the web for current or source-backed context.',
+				'- tavilyExtract: read specific source URLs after search or when the user provides URLs.',
+				'- Use tavilySearch for current events, prices, laws, product docs/specs, competitor facts, or claims likely to have changed.',
+				'- Use tavilySearch when the user asks to search, browse, look up, verify, or check the latest information.',
+				'- Use tavilyExtract only for explicit URLs or when search results need deeper reading.',
+				'- Cite source links in your final answer whenever you use web search or extraction.',
+				'- Do not save web results as artifacts unless the user explicitly asks.'
+			]
+		: [
+				'Web search tools are not configured for this workspace.',
+				'- If the user asks for current or external information, say web search is unavailable and answer only if you can do so safely from existing context.',
+				'- Do not imply that you searched the web.'
+			];
+
+	if (webSearchRequested) {
+		availability.push(
+			webSearchAvailable
+				? 'The user enabled Search web for this message. Use tavilySearch before answering unless the request does not need external information.'
+				: 'The user enabled Search web for this message, but web search is unavailable because Tavily is not configured.'
+		);
+	}
+
+	return availability.join('\n');
+}
+
 function appendUserAiPreferenceInstructions(
 	base: string,
 	userSettings: { aiContextMarkdown?: string; aiBehaviorMarkdown?: string } | null
@@ -253,17 +325,47 @@ function appendUserAiPreferenceInstructions(
 function workspaceTools({
 	convex,
 	threadId,
-	project
+	project,
+	ownerId,
+	projectId,
+	lastUserText,
+	webSearchAvailable,
+	webSearchApiKey
 }: {
 	convex: ConvexHttpClient;
 	threadId: Id<'chatThreads'>;
 	project: WorkspaceProject | null;
+	ownerId: Id<'users'>;
+	projectId?: Id<'projects'>;
+	lastUserText: string;
+	webSearchAvailable: boolean;
+	webSearchApiKey: string;
 }) {
 	const artifactIdSchema = z.object({
 		artifactId: z.string().describe('The artifact id.')
 	});
 
 	return {
+		...(webSearchAvailable
+			? {
+					tavilySearch: tavilySearch({
+						apiKey: webSearchApiKey,
+						searchDepth: 'basic',
+						maxResults: 5,
+						includeAnswer: false,
+						includeImages: false,
+						includeFavicon: true
+					}),
+					tavilyExtract: tavilyExtract({
+						apiKey: webSearchApiKey,
+						extractDepth: 'basic',
+						format: 'markdown',
+						includeImages: false,
+						chunksPerSource: 3,
+						timeout: 10
+					})
+				}
+			: {}),
 		listThreadArtifacts: tool({
 			description: 'List artifacts already linked to the active thread.',
 			inputSchema: z.object({}),
@@ -338,6 +440,7 @@ function workspaceTools({
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' }
 				});
+				await syncArtifactMemoryForTool(convex, result.artifactId);
 
 				return {
 					artifactId: result.artifactId,
@@ -369,6 +472,7 @@ function workspaceTools({
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' }
 				});
+				await syncArtifactMemoryForTool(convex, result.artifactId);
 
 				return {
 					artifactId: result.artifactId,
@@ -434,8 +538,72 @@ function workspaceTools({
 					summary: summary?.trim() || 'Created draft change.'
 				};
 			}
+		}),
+		addMemory: tool({
+			description:
+				'Persist a short phrase the user asked to remember. The text must be copied verbatim from their latest message.',
+			inputSchema: z.object({
+				text: z.string().min(1).describe('Exact substring from the latest user message.')
+			}),
+			execute: async ({ text }) => {
+				if (!userMemoryTextAllowedForMessage(lastUserText, text)) {
+					memoryLog('supermemory.add_memory_denied', { reason: 'not_in_user_message' });
+					return {
+						ok: false as const,
+						reason: 'Text must appear verbatim in the user latest message.'
+					};
+				}
+				const result = await addUserMemoryDocument({
+					ownerId,
+					...(projectId ? { projectId } : {}),
+					threadId,
+					text
+				});
+				if (result.status === 'blocked') {
+					memoryLog('supermemory.add_memory_denied', { reason: result.reason });
+					return { ok: false as const, reason: result.reason };
+				}
+				if (result.status === 'disabled') {
+					return { ok: false as const, reason: 'Memory service is not configured.' };
+				}
+				if (result.status === 'failed') {
+					memoryLog('supermemory.add_memory_failed', { error: result.error });
+					return { ok: false as const, reason: result.error };
+				}
+				return { ok: true as const, documentId: result.documentId };
+			}
+		}),
+		forgetMemory: tool({
+			description:
+				'Delete a Supermemory document when the user asks to forget it. Use documentId from the retrieved memory list.',
+			inputSchema: z.object({
+				documentId: z.string().min(1).describe('Supermemory document id.')
+			}),
+			execute: async ({ documentId }) => {
+				const gate = await assertDocumentForgettable({
+					documentId,
+					ownerId,
+					...(projectId ? { projectId } : {})
+				});
+				if (!gate.ok) {
+					memoryLog('supermemory.forget_denied', { reason: gate.reason });
+					return { ok: false as const, reason: gate.reason };
+				}
+				const del = await deleteSupermemoryDocument(documentId);
+				if (!del.ok) {
+					return { ok: false as const, reason: del.error };
+				}
+				return { ok: true as const };
+			}
 		})
 	};
+}
+
+async function syncArtifactMemoryForTool(convex: ConvexHttpClient, artifactId: Id<'artifacts'>) {
+	const result = await syncArtifactMemory(convex, artifactId);
+	if (result && result.status !== 'synced' && result.status !== 'disabled') {
+		console.info('Artifact memory sync skipped', result);
+	}
 }
 
 function artifactSummary(artifact: SavedArtifact, reason?: string) {

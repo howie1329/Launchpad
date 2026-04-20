@@ -71,6 +71,7 @@
 	} from '$lib/idea-chat-assistant-parts';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { Chat } from '@ai-sdk/svelte';
@@ -86,6 +87,7 @@
 	let startedThreadId = $state('');
 	let modelSelectorOpen = $state(false);
 	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId);
+	let webSearchRequested = $state(false);
 	let chatError = $state('');
 	let saveError = $state('');
 	let contextArtifactId = $state('');
@@ -340,15 +342,18 @@
 
 		const prevProse = prose;
 		const prevChips = mentionChips.slice();
+		const prevWebSearchRequested = webSearchRequested;
 
 		try {
 			composerText = '';
 			mentionChips = [];
 			await chat.sendMessage({ text: outgoing });
+			webSearchRequested = false;
 		} catch (error) {
 			console.error(error);
 			composerText = prevProse;
 			mentionChips = prevChips;
+			webSearchRequested = prevWebSearchRequested;
 			chatError = buildChatErrorMessage(error);
 			throw error;
 		}
@@ -431,7 +436,8 @@
 					body: {
 						threadId,
 						modelId: selectedModelId,
-						messages
+						messages,
+						webSearchRequested
 					},
 					headers: authHeaders()
 				})
@@ -856,6 +862,24 @@
 						/>
 						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
 							<PromptInputTools>
+								<button
+									type="button"
+									class={cn(
+										'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+										webSearchRequested
+											? 'bg-muted text-foreground'
+											: 'text-muted-foreground hover:bg-muted hover:text-foreground'
+									)}
+									aria-pressed={webSearchRequested}
+									disabled={isChatBusy}
+									onclick={() => {
+										webSearchRequested = !webSearchRequested;
+										focusComposer();
+									}}
+								>
+									<GlobeIcon class="size-3" aria-hidden="true" />
+									Search web
+								</button>
 								<ModelSelector bind:open={modelSelectorOpen}>
 									<ModelSelectorTrigger
 										class="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"

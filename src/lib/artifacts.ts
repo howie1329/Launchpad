@@ -129,6 +129,12 @@ export const updateArtifactMutation = makeFunctionReference<
 	{ ok: true }
 >('artifacts:updateArtifact')
 
+export const deleteArtifactMutation = makeFunctionReference<
+	'mutation',
+	{ artifactId: Id<'artifacts'> },
+	{ ok: true }
+>('artifacts:deleteArtifact')
+
 export const linkArtifactToThreadMutation = makeFunctionReference<
 	'mutation',
 	LinkArtifactToThreadArgs,
