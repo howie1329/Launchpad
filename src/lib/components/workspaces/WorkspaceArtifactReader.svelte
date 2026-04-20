@@ -226,9 +226,22 @@
 				Authorization: `Bearer ${auth.token}`
 			},
 			body: JSON.stringify({ artifactId })
-		}).catch((error) => {
-			console.info('Artifact memory sync skipped', error)
 		})
+			.then(async (response) => {
+				const body = await response.json().catch(() => null)
+				if (!response.ok) {
+					console.info('Artifact memory sync failed', body ?? response.statusText)
+					return
+				}
+
+				const status = body?.result?.status
+				if (status && status !== 'synced' && status !== 'disabled') {
+					console.info('Artifact memory sync skipped', body.result)
+				}
+			})
+			.catch((error) => {
+				console.info('Artifact memory sync skipped', error)
+			})
 	}
 
 	$effect(() => {

@@ -22,11 +22,17 @@ export const POST: RequestHandler = async ({ request }) => {
 		const convex = new ConvexHttpClient(PUBLIC_CONVEX_URL);
 		convex.setAuth(token);
 
-		await syncArtifactMemory(convex, artifactId as Id<'artifacts'>);
-		return json({ ok: true });
+		const result = await syncArtifactMemory(convex, artifactId as Id<'artifacts'>);
+		return json({ ok: true, result });
 	} catch (error) {
 		console.info('Artifact memory sync skipped', error);
-		return json({ ok: true });
+		return json(
+			{
+				ok: false,
+				error: error instanceof Error && error.message ? error.message : 'Memory sync failed'
+			},
+			{ status: 500 }
+		);
 	}
 };
 

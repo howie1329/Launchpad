@@ -17,9 +17,15 @@ import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { syncArtifactMemory } from '$lib/server/launchpad-memory';
 import {
+	addUserMemoryDocument,
+	assertDocumentForgettable,
+	buildSupermemoryProfileInstructions,
 	composeRetrievedMemoryInstructions,
-	retrieveRelevantMemories
-} from '$lib/server/supermemory';
+	deleteSupermemoryDocument,
+	memoryLog,
+	retrieveRelevantMemories,
+	userMemoryTextAllowedForMessage
+} from '$lib/server/memory';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { ConvexHttpClient } from 'convex/browser';
@@ -73,7 +79,12 @@ You have tools for durable workspace memory:
 - Read or import project artifacts only when the user asks or clearly references project memory.
 - Only propose edits for artifacts already linked to this thread.
 - Future artifacts created after project promotion belong to that project automatically through the active thread.
-- PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.`;
+- PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.
+
+Supermemory (automatic + optional tools):
+- Retrieved memory and profile snippets may appear below; they are hints only and can be wrong.
+- addMemory: only when the user clearly wants something remembered. The text argument must be copied verbatim from their latest message (substring match is enforced server-side).
+- forgetMemory: only when the user asks to remove a memory; pass the documentId from the retrieved memory list.`;
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -108,11 +119,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			thread.scopeType === 'project' && thread.projectId
 				? await convex.query(getProjectQuery, { projectId: thread.projectId })
 				: null;
-		const tools = workspaceTools({
-			convex,
-			threadId: thread._id,
-			project: project as WorkspaceProject | null
-		});
 
 		const budget = await convex.query(getAiBudgetStatusQuery, {});
 		if (budget.isOverLimit) {
@@ -141,18 +147,32 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: referenced.error }, { status: 400 });
 		}
 
+		const profileBlock = await buildSupermemoryProfileInstructions({
+			ownerId: thread.ownerId,
+			...(project?._id ? { projectId: project._id } : {})
+		});
+
 		const memories = await retrieveRelevantMemories({
 			ownerId: thread.ownerId,
 			...(project?._id ? { projectId: project._id } : {}),
 			query: lastUserText
 		});
 		const memoryBlock = composeRetrievedMemoryInstructions(memories);
-		const coreInstructions = [workspaceInstructions(project), referenced.block, memoryBlock]
+		const coreInstructions = [workspaceInstructions(project), referenced.block, profileBlock, memoryBlock]
 			.filter((part) => part.length > 0)
 			.join('\n\n');
 
 		const userSettingsRow = await convex.query(getMyUserSettingsQuery, {});
 		const instructions = appendUserAiPreferenceInstructions(coreInstructions, userSettingsRow);
+
+		const tools = workspaceTools({
+			convex,
+			threadId: thread._id,
+			project: project as WorkspaceProject | null,
+			ownerId: thread.ownerId,
+			projectId: project?._id,
+			lastUserText
+		});
 
 		const agent = new ToolLoopAgent({
 			model: gateway(body.modelId),
@@ -263,11 +283,17 @@ function appendUserAiPreferenceInstructions(
 function workspaceTools({
 	convex,
 	threadId,
-	project
+	project,
+	ownerId,
+	projectId,
+	lastUserText
 }: {
 	convex: ConvexHttpClient;
 	threadId: Id<'chatThreads'>;
 	project: WorkspaceProject | null;
+	ownerId: Id<'users'>;
+	projectId?: Id<'projects'>;
+	lastUserText: string;
 }) {
 	const artifactIdSchema = z.object({
 		artifactId: z.string().describe('The artifact id.')
@@ -348,7 +374,7 @@ function workspaceTools({
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' }
 				});
-				queueArtifactMemorySync(convex, result.artifactId);
+				await syncArtifactMemoryForTool(convex, result.artifactId);
 
 				return {
 					artifactId: result.artifactId,
@@ -380,7 +406,7 @@ function workspaceTools({
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' }
 				});
-				queueArtifactMemorySync(convex, result.artifactId);
+				await syncArtifactMemoryForTool(convex, result.artifactId);
 
 				return {
 					artifactId: result.artifactId,
@@ -446,14 +472,69 @@ function workspaceTools({
 					summary: summary?.trim() || 'Created draft change.'
 				};
 			}
+		}),
+		addMemory: tool({
+			description:
+				'Persist a short phrase the user asked to remember. The text must be copied verbatim from their latest message.',
+			inputSchema: z.object({
+				text: z.string().min(1).describe('Exact substring from the latest user message.')
+			}),
+			execute: async ({ text }) => {
+				if (!userMemoryTextAllowedForMessage(lastUserText, text)) {
+					memoryLog('supermemory.add_memory_denied', { reason: 'not_in_user_message' })
+					return { ok: false as const, reason: 'Text must appear verbatim in the user latest message.' };
+				}
+				const result = await addUserMemoryDocument({
+					ownerId,
+					...(projectId ? { projectId } : {}),
+					threadId,
+					text
+				});
+				if (result.status === 'blocked') {
+					memoryLog('supermemory.add_memory_denied', { reason: result.reason })
+					return { ok: false as const, reason: result.reason };
+				}
+				if (result.status === 'disabled') {
+					return { ok: false as const, reason: 'Memory service is not configured.' };
+				}
+				if (result.status === 'failed') {
+					memoryLog('supermemory.add_memory_failed', { error: result.error })
+					return { ok: false as const, reason: result.error };
+				}
+				return { ok: true as const, documentId: result.documentId };
+			}
+		}),
+		forgetMemory: tool({
+			description:
+				'Delete a Supermemory document when the user asks to forget it. Use documentId from the retrieved memory list.',
+			inputSchema: z.object({
+				documentId: z.string().min(1).describe('Supermemory document id.')
+			}),
+			execute: async ({ documentId }) => {
+				const gate = await assertDocumentForgettable({
+					documentId,
+					ownerId,
+					...(projectId ? { projectId } : {})
+				});
+				if (!gate.ok) {
+					memoryLog('supermemory.forget_denied', { reason: gate.reason })
+					return { ok: false as const, reason: gate.reason };
+				}
+				const del = await deleteSupermemoryDocument(documentId);
+				if (!del.ok) {
+					return { ok: false as const, reason: del.error };
+				}
+				return { ok: true as const };
+			}
 		})
 	};
 }
 
-function queueArtifactMemorySync(convex: ConvexHttpClient, artifactId: Id<'artifacts'>) {
-	void syncArtifactMemory(convex, artifactId).catch((error) => {
-		console.info('Artifact memory sync skipped', error);
-	});
+async function syncArtifactMemoryForTool(convex: ConvexHttpClient, artifactId: Id<'artifacts'>) {
+	const result = await syncArtifactMemory(convex, artifactId);
+	if (result && result.status !== 'synced' && result.status !== 'disabled') {
+		console.info('Artifact memory sync skipped', result);
+	}
 }
 
 function artifactSummary(artifact: SavedArtifact, reason?: string) {

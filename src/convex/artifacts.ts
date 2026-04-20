@@ -189,6 +189,56 @@ export const updateArtifact = mutation({
 	}
 })
 
+export const deleteArtifact = mutation({
+	args: {
+		artifactId: v.id('artifacts')
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireAuthUserId(ctx)
+		await getOwnedArtifact(ctx, args.artifactId, ownerId)
+
+		const links = await ctx.db
+			.query('threadArtifactLinks')
+			.withIndex('by_artifactId_and_updatedAt', (q) => q.eq('artifactId', args.artifactId))
+			.collect()
+		for (const link of links) {
+			await ctx.db.delete(link._id)
+		}
+
+		const drafts = await ctx.db
+			.query('artifactDraftChanges')
+			.withIndex('by_artifactId_and_updatedAt', (q) => q.eq('artifactId', args.artifactId))
+			.collect()
+		for (const draft of drafts) {
+			await ctx.db.delete(draft._id)
+		}
+
+		const memoryRow = await ctx.db
+			.query('memorySyncs')
+			.withIndex('by_sourceType_and_sourceId', (q) =>
+				q.eq('sourceType', 'artifact').eq('sourceId', args.artifactId)
+			)
+			.unique()
+		if (memoryRow) {
+			await ctx.db.delete(memoryRow._id)
+		}
+
+		await ctx.db.delete(args.artifactId)
+
+		const now = Date.now()
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'artifact_deleted',
+			metadata: {
+				artifactId: args.artifactId
+			},
+			occurredAtMs: now
+		})
+
+		return { ok: true as const }
+	}
+})
+
 export const linkArtifactToThread = mutation({
 	args: {
 		threadId: v.id('chatThreads'),
