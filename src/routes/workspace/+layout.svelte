@@ -65,6 +65,7 @@
 		Chats: true,
 		Artifacts: true
 	});
+	let openProjectIds = $state<Record<string, boolean>>({});
 
 	const pathname = $derived($page.url.pathname);
 	const isSettingsActive = $derived(pathname === '/workspace/settings');
@@ -134,6 +135,10 @@
 
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
+	const isProjectOpen = (projectId: string) => openProjectIds[projectId] ?? true;
+	const setProjectOpen = (projectId: string, open: boolean) => {
+		openProjectIds = { ...openProjectIds, [projectId]: open };
+	};
 	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject);
 
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -456,70 +461,90 @@
 									{:else}
 										{#each projects.data as project (project._id)}
 											<Sidebar.MenuItem>
-												<Sidebar.MenuButton
-													size="sm"
-													isActive={activeProjectId === project._id && !activeThreadId}
-													class={cn(navPill, 'min-w-0')}
+												<Collapsible.Root
+													open={isProjectOpen(project._id)}
+													onOpenChange={(open) => setProjectOpen(project._id, open)}
 												>
-													{#snippet child({ props })}
-														<a
-															href={resolve(
-																`/workspace?project=${encodeURIComponent(project._id)}`
-															)}
-															{...props}
-														>
-															<FolderIcon />
-															<span class="min-w-0 truncate">{project.name}</span>
-														</a>
-													{/snippet}
-												</Sidebar.MenuButton>
-												<Sidebar.MenuSub>
-													{@const threadsForProject = projectThreads(project._id)}
-													{#if threads.data === undefined}
-														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
-																<span>Loading chats…</span>
-															</Sidebar.MenuSubButton>
-														</Sidebar.MenuSubItem>
-													{:else if threadsForProject.length === 0}
-														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton class={subNavPill}>
-																{#snippet child({ props })}
-																	<a
-																		href={resolve(
-																			`/workspace?project=${encodeURIComponent(project._id)}`
-																		)}
-																		{...props}
-																	>
-																		<MessageSquarePlusIcon />
-																		<span class="text-sidebar-foreground/60">Start chat</span>
-																	</a>
-																{/snippet}
-															</Sidebar.MenuSubButton>
-														</Sidebar.MenuSubItem>
-													{:else}
-														{#each threadsForProject as thread (thread._id)}
-															<Sidebar.MenuSubItem>
-																<Sidebar.MenuSubButton
-																	size="sm"
-																	isActive={activeThreadId === thread._id}
-																	class={cn(subNavPill, 'min-w-0')}
-																>
-																	{#snippet child({ props })}
-																		<a
-																			href={resolve(
-																				`/workspace?project=${encodeURIComponent(project._id)}&thread=${encodeURIComponent(thread._id)}`
-																			)}
-																			{...props}
+													<Collapsible.Trigger>
+														{#snippet child({ props })}
+															<Sidebar.MenuButton
+																size="sm"
+																isActive={activeProjectId === project._id && !activeThreadId}
+																class={cn(navPill, 'min-w-0 pr-8')}
+																{...props}
+															>
+																<ChevronRightIcon
+																	class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
+																	data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
+																/>
+																<FolderIcon />
+																<span class="min-w-0 truncate">{project.name}</span>
+															</Sidebar.MenuButton>
+														{/snippet}
+													</Collapsible.Trigger>
+													<Sidebar.MenuAction aria-label={`New chat in ${project.name}`}>
+														{#snippet child({ props })}
+															<a
+																href={resolve(
+																	`/workspace?project=${encodeURIComponent(project._id)}`
+																)}
+																{...props}
+															>
+																<MessageSquarePlusIcon />
+															</a>
+														{/snippet}
+													</Sidebar.MenuAction>
+													<Collapsible.Content
+														class="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+													>
+														<Sidebar.MenuSub>
+															{@const threadsForProject = projectThreads(project._id)}
+															{#if threads.data === undefined}
+																<Sidebar.MenuSubItem>
+																	<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
+																		<span>Loading chats…</span>
+																	</Sidebar.MenuSubButton>
+																</Sidebar.MenuSubItem>
+															{:else if threadsForProject.length === 0}
+																<Sidebar.MenuSubItem>
+																	<Sidebar.MenuSubButton class={subNavPill}>
+																		{#snippet child({ props })}
+																			<a
+																				href={resolve(
+																					`/workspace?project=${encodeURIComponent(project._id)}`
+																				)}
+																				{...props}
+																			>
+																				<span class="text-sidebar-foreground/60">Start chat</span>
+																			</a>
+																		{/snippet}
+																	</Sidebar.MenuSubButton>
+																</Sidebar.MenuSubItem>
+															{:else}
+																{#each threadsForProject as thread (thread._id)}
+																	<Sidebar.MenuSubItem>
+																		<Sidebar.MenuSubButton
+																			size="sm"
+																			isActive={activeThreadId === thread._id}
+																			class={cn(subNavPill, 'min-w-0')}
 																		>
-																			<span class="min-w-0 truncate">{thread.title}</span>
-																		</a>
-																	{/snippet}
-																</Sidebar.MenuSubButton>
-															</Sidebar.MenuSubItem>
-														{/each}
-													{/if}
-												</Sidebar.MenuSub>
+																			{#snippet child({ props })}
+																				<a
+																					href={resolve(
+																						`/workspace?project=${encodeURIComponent(project._id)}&thread=${encodeURIComponent(thread._id)}`
+																					)}
+																					{...props}
+																				>
+																					<span class="min-w-0 truncate">{thread.title}</span>
+																				</a>
+																			{/snippet}
+																		</Sidebar.MenuSubButton>
+																	</Sidebar.MenuSubItem>
+																{/each}
+															{/if}
+														</Sidebar.MenuSub>
+													</Collapsible.Content>
+												</Collapsible.Root>
 											</Sidebar.MenuItem>
 										{/each}
 									{/if}
