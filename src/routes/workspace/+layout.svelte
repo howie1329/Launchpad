@@ -138,15 +138,15 @@
 
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-	/** Design-system-aligned nav rows: pill, dense, 12px icons */
+	/** Design-system-aligned nav rows: dense, 12px icons */
 	const navPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
 	const navPillPrimary =
 		'bg-primary text-primary-foreground shadow-none hover:bg-primary/90 hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground';
 	const sectionTrigger =
 		'group/section flex h-7 w-full items-center gap-1 rounded-md px-2 text-left text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
 	const subNavPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
 
 	const usageBarPct = $derived(
 		budget.data && budget.data.capUsd > 0
