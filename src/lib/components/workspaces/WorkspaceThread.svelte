@@ -835,55 +835,8 @@
 				{/if}
 			</div>
 
-			<div class="relative shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
-				{#if mentionOpen}
-					<div
-						id={mentionListboxId}
-						class="absolute bottom-full left-4 z-20 mb-2 max-h-48 w-[min(28rem,calc(100%-2rem))] overflow-y-auto rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-none sm:left-6 sm:w-96"
-						role="listbox"
-						aria-label="Thread artifacts"
-					>
-						{#if threadArtifacts.error}
-							<p class="px-2 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
-						{:else if threadArtifacts.data === undefined}
-							<p class="px-2 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
-						{:else if filteredMentionArtifacts.length === 0}
-							<p class="px-2 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
-						{:else}
-							{#each filteredMentionArtifacts as item, i (item.artifact._id)}
-								<button
-									type="button"
-									id={`workspace-mention-opt-${item.artifact._id}`}
-									role="option"
-									aria-selected={i === mentionHighlight}
-									class={cn(
-										'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left text-xs transition-colors',
-										i === mentionHighlight
-											? 'bg-accent/50 text-accent-foreground'
-											: 'hover:bg-accent/40'
-									)}
-									onmouseenter={() => {
-										mentionHighlight = i;
-									}}
-									onclick={() => void pickArtifactMention(item)}
-								>
-									<span
-										class={cn(
-											'size-1.5 shrink-0 rounded-full',
-											i === mentionHighlight ? 'bg-primary' : 'bg-muted-foreground/50'
-										)}
-										aria-hidden="true"
-									></span>
-									<span class="min-w-0 flex-1 truncate font-medium">{item.artifact.title}</span>
-									<span class="shrink-0 text-[10px] text-muted-foreground">
-										{formatArtifactCreatedAt(item.artifact.createdAt)}
-									</span>
-								</button>
-							{/each}
-						{/if}
-					</div>
-				{/if}
-				<div class="w-full space-y-2">
+			<div class="shrink-0 bg-background px-4 py-4 sm:px-6">
+				<div class="relative mx-auto w-full max-w-4xl space-y-2">
 					{#if chatError || saveError}
 						<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 							<p class="text-xs text-destructive">{chatError || saveError}</p>
@@ -903,37 +856,84 @@
 						</div>
 					{/if}
 
-					{#if mentionChips.length > 0}
-						<div class="flex flex-wrap gap-1.5" aria-label="Artifacts to include in this message">
-							{#each mentionChips as chip (chip.id)}
-								<span class={artifactMentionPill}>
-									<span
-										class="size-1.5 shrink-0 rounded-full bg-primary/70"
-										aria-hidden="true"
-									></span>
-									<span class="min-w-0 max-w-56 truncate">{chip.title}</span>
+					{#if mentionOpen}
+						<div
+							id={mentionListboxId}
+							class="absolute bottom-full left-0 z-20 mb-2 max-h-48 w-[min(28rem,100%)] overflow-y-auto rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-none"
+							role="listbox"
+							aria-label="Thread artifacts"
+						>
+							{#if threadArtifacts.error}
+								<p class="px-2 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
+							{:else if threadArtifacts.data === undefined}
+								<p class="px-2 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
+							{:else if filteredMentionArtifacts.length === 0}
+								<p class="px-2 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
+							{:else}
+								{#each filteredMentionArtifacts as item, i (item.artifact._id)}
 									<button
 										type="button"
-										class="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-										aria-label="Remove artifact reference"
-										onclick={() => removeMentionChip(chip.id)}
+										id={`workspace-mention-opt-${item.artifact._id}`}
+										role="option"
+										aria-selected={i === mentionHighlight}
+										class={cn(
+											'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left text-xs transition-colors',
+											i === mentionHighlight
+												? 'bg-accent/50 text-accent-foreground'
+												: 'hover:bg-accent/40'
+										)}
+										onmouseenter={() => {
+											mentionHighlight = i;
+										}}
+										onclick={() => void pickArtifactMention(item)}
 									>
-										<XIcon class="size-3" />
+										<span
+											class={cn(
+												'size-1.5 shrink-0 rounded-full',
+												i === mentionHighlight ? 'bg-primary' : 'bg-muted-foreground/50'
+											)}
+											aria-hidden="true"
+										></span>
+										<span class="min-w-0 flex-1 truncate font-medium">{item.artifact.title}</span>
+										<span class="shrink-0 text-[10px] text-muted-foreground">
+											{formatArtifactCreatedAt(item.artifact.createdAt)}
+										</span>
 									</button>
-								</span>
-							{/each}
+								{/each}
+							{/if}
 						</div>
 					{/if}
 
 					<PromptInput
-						class="rounded-lg border-border/70 bg-background shadow-none"
+						class="overflow-hidden rounded-lg border-0 bg-card/80 shadow-none ring-1 ring-border/70 backdrop-blur-sm"
 						clearOnSubmit={false}
 						onSubmit={submitMessage}
 					>
+						{#if mentionChips.length > 0}
+							<div class="flex flex-wrap gap-1.5 px-3 pt-2" aria-label="Artifacts to include in this message">
+								{#each mentionChips as chip (chip.id)}
+									<span class={artifactMentionPill}>
+										<span
+											class="size-1.5 shrink-0 rounded-full bg-primary/70"
+											aria-hidden="true"
+										></span>
+										<span class="min-w-0 max-w-56 truncate">{chip.title}</span>
+										<button
+											type="button"
+											class="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+											aria-label="Remove artifact reference"
+											onclick={() => removeMentionChip(chip.id)}
+										>
+											<XIcon class="size-3" />
+										</button>
+									</span>
+								{/each}
+							</div>
+						{/if}
 						<PromptInputTextarea
 							bind:ref={textareaRef}
 							bind:value={composerText}
-							class="min-h-20 px-4 py-4 text-sm"
+							class="min-h-12 px-3 py-3 text-sm leading-5 focus-visible:ring-0"
 							placeholder="Continue shaping this thread… (@ to cite a thread artifact)"
 							onInputPost={handleComposerInputPost}
 							onKeyDownIntercept={handleComposerKeyDown}
@@ -943,12 +943,12 @@
 							aria-autocomplete="list"
 							aria-activedescendant={mentionActiveOptionId}
 						/>
-						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
-							<PromptInputTools>
+						<PromptInputToolbar class="gap-2 px-3 py-2">
+							<PromptInputTools class="min-w-0 flex-1 flex-wrap">
 								<button
 									type="button"
 									class={cn(
-										'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+										'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 										webSearchRequested
 											? 'bg-muted text-foreground'
 											: 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -965,7 +965,7 @@
 								</button>
 								<ModelSelector bind:open={modelSelectorOpen}>
 									<ModelSelectorTrigger
-										class="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 									>
 										{selectedModel.label}
 										<ChevronDownIcon class="size-3" />
@@ -994,7 +994,7 @@
 									usage={{ inputTokens: estimatedInputTokens }}
 									modelId={selectedModelId}
 								>
-									<ContextTrigger size="sm" class="h-6 gap-1 px-2 text-xs text-muted-foreground" />
+									<ContextTrigger size="sm" class="h-7 gap-1 px-2 text-xs text-muted-foreground" />
 									<ContextContent align="start">
 										<ContextContentHeader />
 										<ContextContentBody>
@@ -1004,7 +1004,7 @@
 									</ContextContent>
 								</Context>
 							</PromptInputTools>
-							<PromptInputSubmit disabled={!canSubmit}>
+							<PromptInputSubmit class="size-8 shrink-0" disabled={!canSubmit}>
 								{#if isChatBusy}
 									<LoaderCircleIcon class="size-4 animate-spin" />
 								{:else}
