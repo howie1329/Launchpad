@@ -20,22 +20,22 @@ const WORKSPACE_TOOL_TITLES: Record<string, string> = {
 	listThreadArtifacts: 'List thread artifacts',
 	readThreadArtifact: 'Read thread artifact',
 	listProjectArtifacts: 'List project artifacts',
-	importProjectArtifactToThread: 'Import project artifact',
-	createIdeaArtifact: 'Create idea artifact',
-	createPrdArtifact: 'Create PRD artifact',
-	createProjectFromThread: 'Create project',
-	proposeArtifactEdit: 'Propose artifact edit'
+	importProjectArtifactToThread: 'Use project artifact',
+	createIdeaArtifact: 'Save idea artifact',
+	createPrdArtifact: 'Save PRD artifact',
+	createProjectFromThread: 'Promote chat to project',
+	proposeArtifactEdit: 'Draft artifact changes'
 };
 
 const WORKSPACE_RUNNING_SUMMARIES: Record<string, string> = {
 	listThreadArtifacts: 'Checking thread artifacts…',
 	readThreadArtifact: 'Reading artifact…',
 	listProjectArtifacts: 'Checking project artifacts…',
-	importProjectArtifactToThread: 'Importing artifact…',
-	createIdeaArtifact: 'Creating idea artifact…',
-	createPrdArtifact: 'Creating PRD artifact…',
-	createProjectFromThread: 'Creating project…',
-	proposeArtifactEdit: 'Creating draft change…'
+	importProjectArtifactToThread: 'Adding artifact to this chat…',
+	createIdeaArtifact: 'Saving idea artifact…',
+	createPrdArtifact: 'Saving PRD artifact…',
+	createProjectFromThread: 'Promoting chat to project…',
+	proposeArtifactEdit: 'Drafting artifact changes…'
 };
 
 function toolTitleForName(toolName: string): string {
@@ -135,24 +135,35 @@ function summarizeWorkspaceTool(
 		case 'readThreadArtifact':
 			return { summary: title ? `Read ${title}.` : 'Read artifact.', detailJson };
 		case 'importProjectArtifactToThread':
-			return { summary: title ? `Imported ${title}.` : 'Imported artifact.', detailJson };
+			return {
+				summary: title ? `Added ${title} to this chat.` : 'Added artifact to this chat.',
+				detailJson
+			};
 		case 'createIdeaArtifact':
-			return { summary: title ? `Created idea: ${title}` : 'Created idea artifact.', detailJson };
+			return {
+				summary: title ? `Saved idea artifact: ${title}` : 'Saved idea artifact.',
+				detailJson
+			};
 		case 'createPrdArtifact':
-			return { summary: title ? `Created PRD: ${title}` : 'Created PRD artifact.', detailJson };
+			return {
+				summary: title ? `Saved PRD artifact: ${title}` : 'Saved PRD artifact.',
+				detailJson
+			};
 		case 'createProjectFromThread': {
 			const linkedArtifactCount =
 				typeof out.linkedArtifactCount === 'number' ? out.linkedArtifactCount : 0;
 			return {
 				summary: name
-					? `Created project: ${name} with ${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}.`
-					: 'Created project.',
+					? `Promoted this chat to ${name} with ${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}.`
+					: 'Promoted chat to project.',
 				detailJson
 			};
 		}
 		case 'proposeArtifactEdit':
 			return {
-				summary: artifactTitle ? `Drafted edits for ${artifactTitle}.` : 'Created draft change.',
+				summary: artifactTitle
+					? `Drafted changes for ${artifactTitle}. Review before applying.`
+					: 'Drafted artifact changes for review.',
 				detailJson
 			};
 		default:

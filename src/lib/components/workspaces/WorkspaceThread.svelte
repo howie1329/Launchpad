@@ -4,7 +4,11 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { auth, getConvexClient } from '$lib/auth.svelte';
-	import { listThreadArtifactsQuery, type ThreadArtifact } from '$lib/artifacts';
+	import {
+		listThreadArtifactsQuery,
+		listThreadDraftChangesQuery,
+		type ThreadArtifact
+	} from '$lib/artifacts';
 	import {
 		buildOutgoingUserMessageWithTokens,
 		formatArtifactMentionToken,
@@ -114,9 +118,21 @@
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
 	);
+	const threadDraftChanges = useQuery(listThreadDraftChangesQuery, () =>
+		auth.isAuthenticated && activeThreadId
+			? { threadId: activeThreadId as Id<'chatThreads'> }
+			: 'skip'
+	);
 	const sortedThreadArtifacts = $derived(
 		threadArtifacts.data
 			? [...threadArtifacts.data].sort((a, b) => b.artifact.createdAt - a.artifact.createdAt)
+			: []
+	);
+	const sortedThreadDraftChanges = $derived(
+		threadDraftChanges.data
+			? [...threadDraftChanges.data].sort(
+					(a, b) => b.draftChange.createdAt - a.draftChange.createdAt
+				)
 			: []
 	);
 
@@ -639,26 +655,66 @@
 								</div>
 							{:else if threadArtifacts.data === undefined}
 								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
-							{:else if threadArtifacts.data.length === 0}
-								<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-									No artifacts attached to this thread yet.
-								</p>
 							{:else}
-								<div class="space-y-1">
-									{#each sortedThreadArtifacts as item (item.link._id)}
-										<button
-											type="button"
-											class="flex w-full flex-col gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-											onclick={() => openThreadArtifact(item.artifact._id)}
-										>
-											<span class="truncate text-xs font-medium tracking-tight">
-												{item.artifact.title}
-											</span>
-											<span class="text-[11px] text-muted-foreground">
-												{formatArtifactCreatedAt(item.artifact.createdAt)}
-											</span>
-										</button>
-									{/each}
+								<div class="space-y-4">
+									{#if threadDraftChanges.error}
+										<p class="px-2 py-1.5 text-xs text-destructive">
+											{threadDraftChanges.error.message}
+										</p>
+									{:else if threadDraftChanges.data === undefined}
+										<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading drafts...</p>
+									{:else if sortedThreadDraftChanges.length > 0}
+										<div class="space-y-1">
+											<p
+												class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+											>
+												Pending drafts
+											</p>
+											{#each sortedThreadDraftChanges as item (item.draftChange._id)}
+												<button
+													type="button"
+													class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													onclick={() => openThreadArtifact(item.artifact._id)}
+												>
+													<span class="truncate text-xs font-medium tracking-tight">
+														{item.draftChange.proposedTitle}
+													</span>
+													<span class="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+														{item.draftChange.summary ?? 'Review AI-proposed artifact changes.'}
+													</span>
+												</button>
+											{/each}
+										</div>
+									{/if}
+
+									{#if threadArtifacts.data.length === 0}
+										<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+											No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
+											when the shape is clear.
+										</p>
+									{:else}
+										<div class="space-y-1">
+											<p
+												class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
+											>
+												Chat context
+											</p>
+											{#each sortedThreadArtifacts as item (item.link._id)}
+												<button
+													type="button"
+													class="flex w-full flex-col gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													onclick={() => openThreadArtifact(item.artifact._id)}
+												>
+													<span class="truncate text-xs font-medium tracking-tight">
+														{item.artifact.title}
+													</span>
+													<span class="text-[11px] text-muted-foreground">
+														{formatArtifactCreatedAt(item.artifact.createdAt)}
+													</span>
+												</button>
+											{/each}
+										</div>
+									{/if}
 								</div>
 							{/if}
 						</div>

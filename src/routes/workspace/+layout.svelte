@@ -3,7 +3,11 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
-	import { listArtifactsQuery } from '$lib/artifacts';
+	import {
+		linkArtifactToThreadMutation,
+		listArtifactsQuery,
+		listThreadArtifactsQuery
+	} from '$lib/artifacts';
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display';
 	import { listThreadsQuery } from '$lib/chat';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
@@ -53,6 +57,9 @@
 	let promoteSummary = $state('');
 	let promoteError = $state('');
 	let isPromoting = $state(false);
+	let importingArtifactId = $state('');
+	let artifactActionError = $state('');
+	let workspaceNotice = $state('');
 	let openSections = $state({
 		Projects: true,
 		Chats: true,
@@ -73,6 +80,11 @@
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const threadArtifacts = useQuery(listThreadArtifactsQuery, () =>
+		auth.isAuthenticated && activeThreadId
+			? { threadId: activeThreadId as Id<'chatThreads'> }
+			: 'skip'
+	);
 	const budget = useQuery(getAiBudgetStatusQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const workspaceListError = $derived(
 		projects.error ?? threads.error ?? artifacts.error ?? budget.error
@@ -91,6 +103,9 @@
 			!isSettingsActive &&
 			!activeArtifactId
 		)
+	);
+	const activeThreadArtifactIds = $derived(
+		new Set(threadArtifacts.data?.map((item) => item.artifact._id) ?? [])
 	);
 	const selectedArtifact = $derived(
 		artifacts.data?.find((artifact) => artifact._id === activeArtifactId) ?? null
@@ -166,6 +181,7 @@
 			projectDialogOpen = false;
 			projectName = '';
 			projectSummary = '';
+			workspaceNotice = 'Project created.';
 			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`));
 		} catch (error) {
 			console.error(error);
@@ -222,6 +238,7 @@
 			promoteDialogOpen = false;
 			promoteName = '';
 			promoteSummary = '';
+			workspaceNotice = 'Project created. This chat and its artifacts now live in the project.';
 			await goto(
 				resolve(
 					`/workspace?project=${encodeURIComponent(result.projectId)}&thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
@@ -235,6 +252,27 @@
 					: 'Could not create a project from this chat. Please try again.';
 		} finally {
 			isPromoting = false;
+		}
+	};
+
+	const useArtifactInThread = async (artifactId: Id<'artifacts'>) => {
+		if (!activeThreadId || importingArtifactId) return;
+
+		importingArtifactId = artifactId;
+		artifactActionError = '';
+
+		try {
+			await getConvexClient().mutation(linkArtifactToThreadMutation, {
+				threadId: activeThreadId as Id<'chatThreads'>,
+				artifactId,
+				reason: 'imported'
+			});
+			workspaceNotice = 'Artifact added to this chat context.';
+		} catch (error) {
+			console.error(error);
+			artifactActionError = 'Could not add that artifact to this chat. Please try again.';
+		} finally {
+			importingArtifactId = '';
 		}
 	};
 
@@ -396,11 +434,22 @@
 										</Sidebar.MenuItem>
 									{:else if projects.data.length === 0}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
-												<span class="min-w-0 truncate text-sidebar-foreground/60"
-													>No projects yet</span
+											<div class="space-y-2 px-2 py-1.5">
+												<p class="text-[11px] leading-snug text-sidebar-foreground/60">
+													Promote a useful chat when the idea is ready for focused work.
+												</p>
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													class="h-7 w-full justify-start px-2 text-xs"
+													onclick={() => {
+														projectDialogOpen = true;
+													}}
 												>
-											</Sidebar.MenuButton>
+													Create project
+												</Button>
+											</div>
 										</Sidebar.MenuItem>
 									{:else}
 										{#each projects.data as project (project._id)}
@@ -432,8 +481,18 @@
 														</Sidebar.MenuSubItem>
 													{:else if threadsForProject.length === 0}
 														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
-																<span class="text-sidebar-foreground/60">No chats yet</span>
+															<Sidebar.MenuSubButton class={subNavPill}>
+																{#snippet child({ props })}
+																	<a
+																		href={resolve(
+																			`/workspace?project=${encodeURIComponent(project._id)}`
+																		)}
+																		{...props}
+																	>
+																		<MessageSquarePlusIcon />
+																		<span class="text-sidebar-foreground/60">Start chat</span>
+																	</a>
+																{/snippet}
 															</Sidebar.MenuSubButton>
 														</Sidebar.MenuSubItem>
 													{:else}
@@ -490,10 +549,19 @@
 										</Sidebar.MenuItem>
 									{:else if generalThreads.length === 0}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
-												<span class="min-w-0 truncate text-sidebar-foreground/60">No chats yet</span
-												>
-											</Sidebar.MenuButton>
+											<div class="space-y-2 px-2 py-1.5">
+												<p class="text-[11px] leading-snug text-sidebar-foreground/60">
+													Start with a messy note. Launchpad will help turn it into a project.
+												</p>
+												<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
+													{#snippet child({ props })}
+														<a href={resolve('/workspace')} {...props}>
+															<MessageSquarePlusIcon />
+															<span class="min-w-0 truncate">Start first chat</span>
+														</a>
+													{/snippet}
+												</Sidebar.MenuButton>
+											</div>
 										</Sidebar.MenuItem>
 									{:else}
 										{#each generalThreads as thread (thread._id)}
@@ -543,11 +611,9 @@
 										</Sidebar.MenuItem>
 									{:else if artifacts.data.length === 0}
 										<Sidebar.MenuItem>
-											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
-												<span class="min-w-0 truncate text-sidebar-foreground/60"
-													>No artifacts yet</span
-												>
-											</Sidebar.MenuButton>
+											<p class="px-2 py-1.5 text-[11px] leading-snug text-sidebar-foreground/60">
+												Artifacts appear when a chat saves an idea, PRD, or draftable document.
+											</p>
 										</Sidebar.MenuItem>
 									{:else}
 										{#each artifactGroups as group (group.key)}
@@ -560,6 +626,12 @@
 													</p>
 												</li>
 												{#each group.artifacts as artifact (artifact._id)}
+													{@const canUseArtifactInThread =
+														Boolean(activeThreadId) &&
+														(activeProjectId
+															? artifact.projectId === activeProjectId
+															: !artifact.projectId) &&
+														!activeThreadArtifactIds.has(artifact._id)}
 													<Sidebar.MenuItem>
 														<Sidebar.MenuButton
 															size="sm"
@@ -582,6 +654,16 @@
 																</a>
 															{/snippet}
 														</Sidebar.MenuButton>
+														{#if canUseArtifactInThread}
+															<Sidebar.MenuAction
+																showOnHover
+																aria-label="Use artifact in this chat"
+																aria-disabled={Boolean(importingArtifactId)}
+																onclick={() => useArtifactInThread(artifact._id)}
+															>
+																{importingArtifactId === artifact._id ? '…' : '+'}
+															</Sidebar.MenuAction>
+														{/if}
 													</Sidebar.MenuItem>
 												{/each}
 											{/if}
@@ -777,6 +859,16 @@
 			</header>
 
 			<main class="min-h-0 flex-1 overflow-hidden bg-background text-foreground">
+				{#if workspaceNotice || artifactActionError}
+					<div
+						class="border-b border-border/50 px-4 py-2 text-xs {artifactActionError
+							? 'text-destructive'
+							: 'text-muted-foreground'}"
+						role="status"
+					>
+						{artifactActionError || workspaceNotice}
+					</div>
+				{/if}
 				{@render children()}
 			</main>
 		</Sidebar.Inset>

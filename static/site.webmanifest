@@ -1,11 +1,11 @@
 {
 	"name": "Launchpad",
 	"short_name": "Launchpad",
-	"description": "Turn a raw idea into a focused MVP scope.",
+	"description": "Turn rough ideas into scoped projects with chat, artifacts, and AI-assisted drafts.",
 	"start_url": "/",
 	"display": "standalone",
 	"background_color": "#ffffff",
-	"theme_color": "#0f172a",
+	"theme_color": "#0b78b6",
 	"icons": [
 		{
 			"src": "/favicon-192x192.png",

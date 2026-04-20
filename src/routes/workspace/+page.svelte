@@ -20,8 +20,9 @@
 
 	const suggestions = [
 		{
-			label: 'Ask next question',
-			prompt: 'Ask me the next best question to sharpen this project.'
+			label: 'Shape project',
+			prompt:
+				'Help me turn this rough idea into a project. Ask only the next best questions until the first version is clear.'
 		},
 		{
 			label: 'Find the risk',
@@ -29,32 +30,33 @@
 		},
 		{
 			label: 'Make PRD',
-			prompt: 'Turn this into a focused first-version PRD.'
+			prompt:
+				'Turn this into a focused first-version PRD, then tell me when it is ready to promote into a project.'
 		},
 		{
 			label: 'Scope MVP',
-			prompt: 'Reduce this to the smallest useful MVP scope.'
+			prompt: 'Reduce this to the smallest useful MVP scope for a project I could start building.'
 		}
 	] as const;
 
 	const examples = [
 		{
 			title: 'Start from a thought',
-			description: 'Turn a messy note into a clear problem',
+			description: 'Find the project hiding inside a messy note',
 			prompt:
-				'I keep noticing a messy workflow that might be worth building around. Help me turn the rough thought into a clear problem and audience.',
+				'I keep noticing a messy workflow that might be worth building around. Help me turn the rough thought into a clear project with a target user and first version.',
 			icon: BoxIcon
 		},
 		{
 			title: 'Validate the pain',
-			description: 'Find the first assumption to test',
+			description: 'Decide if the project is worth promoting',
 			prompt:
 				'I have a possible project, but I am not sure if the pain is real. Help me find the riskiest assumption and the fastest validation path.',
 			icon: TargetIcon
 		},
 		{
-			title: 'Draft a PRD',
-			description: 'Shape the work into buildable scope',
+			title: 'Draft a project PRD',
+			description: 'Leave with scope you can build from',
 			prompt:
 				'This project feels promising. Help me shape it into a practical first-version PRD with clear must-haves and non-goals.',
 			icon: ClipboardListIcon
@@ -92,8 +94,8 @@
 	<WorkspaceThread />
 {:else}
 	<WorkspaceChatLanding
-		title="What are we building?"
-		description="Start with a rough thought, customer quote, project idea, or problem."
+		title="Turn a rough idea into a project."
+		description="Start with the messy version. Leave with a named project, useful context, and a tighter first build."
 		placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
 		{suggestions}
 		{examples}
