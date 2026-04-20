@@ -183,6 +183,8 @@
 		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
 	);
 	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4));
+	const artifactMentionPill =
+		'inline-flex w-fit max-w-full items-center gap-1.5 rounded-md bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground';
 
 	$effect(() => {
 		if (!browser) return;
@@ -601,10 +603,12 @@
 												{#if composed.artifactIds.length > 0}
 													<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
 														{#each composed.artifactIds as aid (aid)}
-															<span
-																class="inline-flex max-w-full items-center rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground"
-															>
-																<span class="truncate">{artifactTitleForId(aid)}</span>
+															<span class={artifactMentionPill}>
+																<span
+																	class="size-1.5 shrink-0 rounded-full bg-primary/70"
+																	aria-hidden="true"
+																></span>
+																<span class="min-w-0 max-w-56 truncate">{artifactTitleForId(aid)}</span>
 															</span>
 														{/each}
 													</div>
@@ -825,13 +829,15 @@
 					{#if mentionChips.length > 0}
 						<div class="flex flex-wrap gap-1.5" aria-label="Artifacts to include in this message">
 							{#each mentionChips as chip (chip.id)}
-								<span
-									class="inline-flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-muted/40 py-0.5 pr-0.5 pl-2 text-[11px] font-medium text-foreground"
-								>
-									<span class="max-w-[min(100%,14rem)] truncate">{chip.title}</span>
+								<span class={artifactMentionPill}>
+									<span
+										class="size-1.5 shrink-0 rounded-full bg-primary/70"
+										aria-hidden="true"
+									></span>
+									<span class="min-w-0 max-w-56 truncate">{chip.title}</span>
 									<button
 										type="button"
-										class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										class="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 										aria-label="Remove artifact reference"
 										onclick={() => removeMentionChip(chip.id)}
 									>
