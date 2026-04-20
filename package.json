@@ -71,6 +71,7 @@
 		"convex-svelte": "^0.0.12",
 		"mode-watcher": "^1.1.0",
 		"runed": "^0.37.1",
+		"supermemory": "^4.21.1",
 		"svelte-streamdown": "^3.0.1"
 	}
 }
