@@ -10,36 +10,27 @@
 		type ArtifactLinkReason,
 		type SavedArtifact
 	} from '$lib/artifacts';
-	import { draftPreview } from '$lib/artifact-display';
-	import ArtifactCodeEditor from '$lib/components/workspaces/ArtifactCodeEditor.svelte';
-	import ArtifactDiffRendererDiffs from '$lib/components/workspaces/ArtifactDiffRendererDiffs.svelte';
+	import ArtifactDraftList from '$lib/components/workspaces/ArtifactDraftList.svelte';
+	import ArtifactReadSurface from '$lib/components/workspaces/ArtifactReadSurface.svelte';
+	import ArtifactReviewSurface from '$lib/components/workspaces/ArtifactReviewSurface.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
-	import { cn } from '$lib/utils';
-	import githubDarkDefault from '@shikijs/themes/github-dark-default';
-	import githubLightDefault from '@shikijs/themes/github-light-default';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import Columns2Icon from '@lucide/svelte/icons/columns-2';
-	import Rows3Icon from '@lucide/svelte/icons/rows-3';
 	import SaveIcon from '@lucide/svelte/icons/save';
-	import { mode } from 'mode-watcher';
 	import { useQuery } from 'convex-svelte';
-	import Code from 'svelte-streamdown/code';
-	import MathRenderer from 'svelte-streamdown/math';
-	import Mermaid from 'svelte-streamdown/mermaid';
-	import { Streamdown, type StreamdownProps } from 'svelte-streamdown';
 	import type { Id } from '../../../convex/_generated/dataModel';
 
 	let {
 		artifact,
 		compact = false,
 		fullWidthContent = false,
+		initialSelectedDraftChangeId = null,
 		showHeader,
 		onBack
 	}: {
 		artifact: SavedArtifact | null | undefined;
 		compact?: boolean;
 		fullWidthContent?: boolean;
+		initialSelectedDraftChangeId?: Id<'artifactDraftChanges'> | null;
 		/** When `false`, never show the optional context toolbar. */
 		showHeader?: boolean;
 		linkReason?: ArtifactLinkReason;
@@ -62,17 +53,6 @@
 	let surfaceMode = $state<SurfaceMode>('read');
 	let readMode = $state<ReadSubMode>('editor');
 	let selectedDraftChangeId = $state<Id<'artifactDraftChanges'> | null>(null);
-
-	type StreamdownComponents = NonNullable<StreamdownProps['components']>;
-	const streamdownComponents = {
-		code: Code,
-		mermaid: Mermaid,
-		math: MathRenderer
-	} satisfies StreamdownComponents;
-
-	let streamdownTheme = $derived(
-		mode.current === 'dark' ? 'github-dark-default' : 'github-light-default'
-	);
 
 	const draftChanges = useQuery(listArtifactDraftChangesQuery, () =>
 		auth.isAuthenticated && artifact ? { artifactId: artifact._id as Id<'artifacts'> } : 'skip'
@@ -114,7 +94,10 @@
 			surfaceMode = 'read';
 			readMode = 'editor';
 			diffLayout = 'unified';
-			selectedDraftChangeId = null;
+			selectedDraftChangeId = initialSelectedDraftChangeId;
+			if (initialSelectedDraftChangeId) {
+				surfaceMode = 'compare';
+			}
 			return;
 		}
 
@@ -131,6 +114,15 @@
 			if (surfaceMode === 'compare') {
 				surfaceMode = 'read';
 			}
+			return;
+		}
+		if (
+			initialSelectedDraftChangeId &&
+			list.some((d) => d._id === initialSelectedDraftChangeId) &&
+			selectedDraftChangeId !== initialSelectedDraftChangeId
+		) {
+			selectedDraftChangeId = initialSelectedDraftChangeId;
+			surfaceMode = 'compare';
 			return;
 		}
 		if (selectedDraftChangeId == null || !list.some((d) => d._id === selectedDraftChangeId)) {
@@ -248,6 +240,7 @@
 
 	const selectDraftForCompare = (draftChangeId: Id<'artifactDraftChanges'>) => {
 		selectedDraftChangeId = draftChangeId;
+		surfaceMode = 'compare';
 	};
 
 	const setUnifiedDiffLayout = () => {
@@ -257,12 +250,6 @@
 	const setSplitDiffLayout = () => {
 		diffLayout = 'split';
 	};
-
-	function draftSummaryText(draftChange: ArtifactDraftChange) {
-		return (
-			draftChange.changeSummary ?? draftChange.summary ?? 'Review AI-proposed artifact changes.'
-		);
-	}
 
 	function getDraftErrorMessage(error: unknown, action: 'apply' | 'discard') {
 		const message = error instanceof Error ? error.message : '';
@@ -322,70 +309,6 @@
 	});
 </script>
 
-{#snippet DraftChangeRow(draftChange: ArtifactDraftChange, selected: boolean)}
-	<div
-		class={cn(
-			'relative rounded-md px-2 py-2.5 transition-colors',
-			selected ? 'bg-accent/60 ring-1 ring-ring/60' : 'hover:bg-accent/50'
-		)}
-	>
-		<button
-			type="button"
-			class="absolute inset-0 z-0 rounded-md"
-			aria-label={`Select draft “${draftChange.proposedTitle}” for compare`}
-			aria-pressed={selected}
-			onclick={() => selectDraftForCompare(draftChange._id)}
-		></button>
-		<div class="pointer-events-none relative z-10 flex items-start gap-3">
-			<div class="mt-0.5 flex size-7 shrink-0 items-center justify-center text-muted-foreground">
-				<FileTextIcon class="size-3" />
-			</div>
-			<div class="min-w-0 flex-1">
-				<div class="flex items-center justify-between gap-2">
-					<p class="truncate text-xs font-medium tracking-tight">{draftChange.proposedTitle}</p>
-					<span
-						class={cn(
-							'shrink-0 text-[10px]',
-							draftChange.isStale ? 'text-destructive' : 'text-muted-foreground'
-						)}
-					>
-						{draftChange.isStale ? 'Stale' : 'Draft'}
-					</span>
-				</div>
-				<p class="mt-1 text-xs leading-5 text-foreground">{draftSummaryText(draftChange)}</p>
-				<p class="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-					{draftPreview(draftChange.proposedContentMarkdown)}
-				</p>
-				{#if draftChange.isStale && draftChange.staleReason}
-					<p class="mt-2 text-xs leading-5 text-destructive">{draftChange.staleReason}</p>
-				{/if}
-				<div class="pointer-events-auto mt-2 flex gap-2">
-					<Button
-						type="button"
-						size="sm"
-						variant="ghost"
-						class="h-6 px-2 text-xs text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-						disabled={Boolean(busyDraftChangeId) || Boolean(draftChange.isStale)}
-						onclick={() => applyDraftChange(draftChange._id)}
-					>
-						{busyDraftChangeId === draftChange._id ? 'Applying...' : 'Apply'}
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						class="h-6 px-2 text-xs text-muted-foreground hover:bg-accent/70 hover:text-foreground"
-						disabled={Boolean(busyDraftChangeId)}
-						onclick={() => discardDraftChange(draftChange._id)}
-					>
-						{busyDraftChangeId === draftChange._id ? 'Working...' : 'Discard'}
-					</Button>
-				</div>
-			</div>
-		</div>
-	</div>
-{/snippet}
-
 <section class="flex h-full min-h-0 flex-col bg-background text-foreground">
 	{#if artifact === undefined}
 		<div class="flex min-h-0 flex-1 items-center justify-center px-4">
@@ -423,172 +346,43 @@
 							<p class="mt-1 text-xs text-muted-foreground">Loading drafts...</p>
 						</div>
 					{:else if pendingDraftChanges.length > 0 || draftError}
-						<div class="space-y-1">
-							<p class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-								Pending drafts
-							</p>
-							{#if draftError}
-								<p class="px-2 py-1 text-xs text-destructive">{draftError}</p>
-							{/if}
-							{#each pendingDraftChanges as draftChange (draftChange._id)}
-								{@render DraftChangeRow(draftChange, selectedDraftChangeId === draftChange._id)}
-							{/each}
-						</div>
+						<ArtifactDraftList
+							drafts={pendingDraftChanges}
+							{selectedDraftChangeId}
+							{busyDraftChangeId}
+							{draftError}
+							onSelect={selectDraftForCompare}
+							onApply={applyDraftChange}
+							onDiscard={discardDraftChange}
+						/>
 					{/if}
 
 					<div class="min-h-0 flex-1">
 						{#if surfaceMode === 'compare'}
-							{#if selectedDraft}
-								<div class="space-y-3">
-									<div
-										class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2"
-									>
-										<div class="space-y-1">
-											<p
-												class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-											>
-												Draft review
-											</p>
-											<p class="text-xs text-foreground">{draftSummaryText(selectedDraft)}</p>
-											{#if selectedDraft.isStale && selectedDraft.staleReason}
-												<p class="text-xs text-destructive">{selectedDraft.staleReason}</p>
-											{/if}
-										</div>
-										<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
-											<Button
-												type="button"
-												size="sm"
-												variant={diffLayout === 'unified' ? 'secondary' : 'ghost'}
-												class="h-7 gap-1 rounded-sm px-2 text-xs font-medium"
-												onclick={setUnifiedDiffLayout}
-											>
-												<Rows3Icon class="size-3" />
-												Unified
-											</Button>
-											<Button
-												type="button"
-												size="sm"
-												variant={diffLayout === 'split' ? 'secondary' : 'ghost'}
-												class="h-7 gap-1 rounded-sm px-2 text-xs font-medium"
-												onclick={setSplitDiffLayout}
-											>
-												<Columns2Icon class="size-3" />
-												Split
-											</Button>
-										</div>
-									</div>
-
-									{#if selectedDraft.baseTitle && selectedDraft.baseTitle !== selectedDraft.proposedTitle}
-										<div class="rounded-md border border-border/60 bg-background px-3 py-3">
-											<p
-												class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-											>
-												Title change
-											</p>
-											<div
-												class={cn(
-													'mt-2 grid gap-3',
-													diffLayout === 'split' ? 'md:grid-cols-2' : 'grid-cols-1'
-												)}
-											>
-												<div>
-													<p
-														class="text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
-													>
-														Saved
-													</p>
-													<p class="mt-1 text-sm font-medium text-foreground">
-														{selectedDraft.baseTitle}
-													</p>
-												</div>
-												<div>
-													<p
-														class="text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
-													>
-														Proposed
-													</p>
-													<p class="mt-1 text-sm font-medium text-foreground">
-														{selectedDraft.proposedTitle}
-													</p>
-												</div>
-											</div>
-										</div>
-									{/if}
-
-									{#if hydratingDraftChangeId === selectedDraft._id}
-										<p class="text-xs text-muted-foreground">Preparing legacy draft review...</p>
-									{:else if selectedDraft.isStale && !selectedDraft.patch}
-										<div class="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-3">
-											<p class="text-sm font-medium text-foreground">Draft review unavailable</p>
-											<p class="mt-1 text-xs leading-5 text-muted-foreground">
-												{selectedDraft.staleReason ??
-													'This draft cannot be safely compared because its original base content is unavailable.'}
-											</p>
-										</div>
-									{:else}
-										<div class={compact ? 'min-h-[14rem]' : 'min-h-[20rem]'}>
-											{#key `${artifact._id}-${selectedDraft._id}-${diffLayout}`}
-												<ArtifactDiffRendererDiffs
-													patch={selectedDraft.patch}
-													original={selectedDraft.baseContentMarkdown ?? artifact.contentMarkdown}
-													modified={selectedDraft.proposedContentMarkdown}
-													diffStyle={diffLayout}
-													{compact}
-												/>
-											{/key}
-										</div>
-									{/if}
-								</div>
-							{:else}
-								<p class="text-xs text-muted-foreground">
-									No draft selected. Pending drafts will appear above when the AI proposes changes.
-								</p>
-							{/if}
-						{:else if readMode === 'editor'}
-							<div class={compact ? 'min-h-[12rem]' : 'min-h-[18rem]'}>
-								{#key artifact._id}
-									<ArtifactCodeEditor
-										value={editorValue}
-										readOnly={false}
-										{compact}
-										onChange={(nextValue) => {
-											editorValue = nextValue;
-											contentDirty = true;
-										}}
-									/>
-								{/key}
-							</div>
+							<ArtifactReviewSurface
+								{artifact}
+								{selectedDraft}
+								{compact}
+								{diffLayout}
+								{hydratingDraftChangeId}
+								{busyDraftChangeId}
+								onSetUnified={setUnifiedDiffLayout}
+								onSetSplit={setSplitDiffLayout}
+								onApply={applyDraftChange}
+								onDiscard={discardDraftChange}
+							/>
 						{:else}
-							<div
-								class={cn('overflow-y-auto px-1 py-2', compact ? 'min-h-[12rem]' : 'min-h-[18rem]')}
-							>
-								{#if editorValue.trim().length === 0}
-									<p class="text-xs text-muted-foreground">Nothing to preview yet.</p>
-								{:else}
-									{#key artifact._id}
-										<div
-											class={cn(
-												'prose max-w-none prose-neutral dark:prose-invert',
-												compact ? 'prose-sm text-xs leading-relaxed' : 'text-sm'
-											)}
-										>
-											<Streamdown
-												content={editorValue}
-												baseTheme="shadcn"
-												components={streamdownComponents}
-												shikiTheme={streamdownTheme}
-												shikiThemes={{
-													'github-light-default': githubLightDefault,
-													'github-dark-default': githubDarkDefault
-												}}
-											/>
-										</div>
-									{/key}
-								{/if}
-							</div>
-						{/if}
-						{#if saveError}
-							<p class="mt-2 text-xs text-destructive">{saveError}</p>
+							<ArtifactReadSurface
+								artifactId={artifact._id}
+								value={editorValue}
+								{compact}
+								{readMode}
+								{saveError}
+								onChange={(nextValue) => {
+									editorValue = nextValue;
+									contentDirty = true;
+								}}
+							/>
 						{/if}
 					</div>
 				</div>
@@ -630,33 +424,6 @@
 					>
 						<SaveIcon class="size-3.5" />
 						{isSaving ? 'Saving...' : 'Save'}
-					</Button>
-				</div>
-			{:else if selectedDraft}
-				<div
-					class="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-border/50 bg-background {compact
-						? 'px-2 py-1.5'
-						: 'px-4 py-1.5'}"
-				>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						class="h-7 px-2.5 text-xs"
-						disabled={Boolean(busyDraftChangeId) || Boolean(selectedDraft.isStale)}
-						onclick={() => applyDraftChange(selectedDraft._id)}
-					>
-						{busyDraftChangeId === selectedDraft._id ? 'Applying...' : 'Apply draft'}
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						class="h-7 px-2.5 text-xs"
-						disabled={Boolean(busyDraftChangeId)}
-						onclick={() => discardDraftChange(selectedDraft._id)}
-					>
-						{busyDraftChangeId === selectedDraft._id ? 'Working...' : 'Discard draft'}
 					</Button>
 				</div>
 			{/if}

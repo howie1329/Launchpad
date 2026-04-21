@@ -320,6 +320,10 @@ export const createArtifactDraftChange = mutation({
 			baseContentMarkdown: reviewData.baseContentMarkdown,
 			patch: reviewData.patch,
 			changeSummary: reviewData.changeSummary,
+			hasTitleChange: reviewData.hasTitleChange,
+			changedSectionCount: reviewData.changedSectionCount,
+			additionCount: reviewData.additionCount,
+			deletionCount: reviewData.deletionCount,
 			status: 'pending',
 			createdAt: now,
 			updatedAt: now
@@ -359,44 +363,7 @@ export const listArtifactDraftChanges = query({
 		const artifact = await ctx.db.get(args.artifactId);
 		if (!artifact) return [];
 
-		return drafts.map((draftChange) => {
-			const patch = draftChange.patch as StoredArtifactPatch | undefined;
-			const hasReviewData =
-				draftChange.baseArtifactRevision !== undefined &&
-				draftChange.baseTitle !== undefined &&
-				draftChange.baseContentMarkdown !== undefined &&
-				patch !== undefined;
-
-			if (!hasReviewData) {
-				const derived = deriveLegacyArtifactDraftReviewData({ artifact, draftChange });
-				if (!derived.ok) {
-					return {
-						...draftChange,
-						isStale: true,
-						needsHydration: true,
-						staleReason: draftChange.staleReason ?? derived.staleReason
-					};
-				}
-
-				return {
-					...draftChange,
-					...derived.reviewData,
-					isStale: false,
-					needsHydration: true
-				};
-			}
-
-			const isStale = getArtifactRevision(artifact) !== draftChange.baseArtifactRevision;
-
-			return {
-				...draftChange,
-				isStale,
-				needsHydration: false,
-				staleReason: isStale
-					? (draftChange.staleReason ?? 'This draft is stale because the artifact changed.')
-					: draftChange.staleReason
-			};
-		});
+		return drafts.map((draftChange) => normalizeDraftChangeForArtifact(artifact, draftChange));
 	}
 });
 
@@ -439,6 +406,10 @@ export const hydrateArtifactDraftChangeReviewData = mutation({
 			baseContentMarkdown: legacyReviewData.reviewData.baseContentMarkdown,
 			patch: legacyReviewData.reviewData.patch,
 			changeSummary: legacyReviewData.reviewData.changeSummary,
+			hasTitleChange: legacyReviewData.reviewData.hasTitleChange,
+			changedSectionCount: legacyReviewData.reviewData.changedSectionCount,
+			additionCount: legacyReviewData.reviewData.additionCount,
+			deletionCount: legacyReviewData.reviewData.deletionCount,
 			staleReason: undefined,
 			updatedAt: now
 		});
@@ -477,7 +448,10 @@ export const listThreadDraftChanges = query({
 
 			const artifact = await ctx.db.get(draftChange.artifactId);
 			if (artifact && artifact.ownerId === ownerId) {
-				rows.push({ draftChange, artifact });
+				rows.push({
+					draftChange: normalizeDraftChangeForArtifact(artifact, draftChange),
+					artifact
+				});
 			}
 		}
 
@@ -517,6 +491,10 @@ export const applyArtifactDraftChange = mutation({
 				baseContentMarkdown: legacyReviewData.reviewData.baseContentMarkdown,
 				patch: legacyReviewData.reviewData.patch,
 				changeSummary: legacyReviewData.reviewData.changeSummary,
+				hasTitleChange: legacyReviewData.reviewData.hasTitleChange,
+				changedSectionCount: legacyReviewData.reviewData.changedSectionCount,
+				additionCount: legacyReviewData.reviewData.additionCount,
+				deletionCount: legacyReviewData.reviewData.deletionCount,
 				staleReason: undefined,
 				updatedAt: now
 			});
@@ -694,4 +672,46 @@ async function getOwnedDraftChange(
 	}
 
 	return draftChange;
+}
+
+function normalizeDraftChangeForArtifact(
+	artifact: Doc<'artifacts'>,
+	draftChange: Doc<'artifactDraftChanges'>
+) {
+	const patch = draftChange.patch as StoredArtifactPatch | undefined;
+	const hasReviewData =
+		draftChange.baseArtifactRevision !== undefined &&
+		draftChange.baseTitle !== undefined &&
+		draftChange.baseContentMarkdown !== undefined &&
+		patch !== undefined;
+
+	if (!hasReviewData) {
+		const derived = deriveLegacyArtifactDraftReviewData({ artifact, draftChange });
+		if (!derived.ok) {
+			return {
+				...draftChange,
+				isStale: true,
+				needsHydration: true,
+				staleReason: draftChange.staleReason ?? derived.staleReason
+			};
+		}
+
+		return {
+			...draftChange,
+			...derived.reviewData,
+			isStale: false,
+			needsHydration: true
+		};
+	}
+
+	const isStale = getArtifactRevision(artifact) !== draftChange.baseArtifactRevision;
+
+	return {
+		...draftChange,
+		isStale,
+		needsHydration: false,
+		staleReason: isStale
+			? (draftChange.staleReason ?? 'This draft is stale because the artifact changed.')
+			: draftChange.staleReason
+	};
 }

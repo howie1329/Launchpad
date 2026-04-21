@@ -25,6 +25,13 @@ export type SavedArtifact = {
 
 export type ArtifactDraftPatch = FileDiffMetadata;
 
+export type ArtifactDraftReviewStats = {
+	hasTitleChange?: boolean;
+	changedSectionCount?: number;
+	additionCount?: number;
+	deletionCount?: number;
+};
+
 export type ThreadArtifactLink = {
 	_id: Id<'threadArtifactLinks'>;
 	_creationTime: number;
@@ -50,6 +57,10 @@ export type ArtifactDraftChange = {
 	baseContentMarkdown?: string;
 	patch?: ArtifactDraftPatch;
 	changeSummary?: string;
+	hasTitleChange?: boolean;
+	changedSectionCount?: number;
+	additionCount?: number;
+	deletionCount?: number;
 	staleReason?: string;
 	isStale?: boolean;
 	needsHydration?: boolean;

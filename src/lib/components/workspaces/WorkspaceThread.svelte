@@ -9,6 +9,7 @@
 		listThreadDraftChangesQuery,
 		type ThreadArtifact
 	} from '$lib/artifacts';
+	import { draftStatItems, draftSummaryText } from '$lib/artifact-review';
 	import {
 		buildOutgoingUserMessageWithTokens,
 		formatArtifactMentionToken,
@@ -93,6 +94,7 @@
 	let chatError = $state('');
 	let saveError = $state('');
 	let contextArtifactId = $state('');
+	let contextDraftChangeId = $state<Id<'artifactDraftChanges'> | null>(null);
 	let lastThreadIdForContext = $state('');
 	let contextSearch = $state('');
 	let contextTypeFilter = $state('all');
@@ -235,6 +237,7 @@
 		if (activeThreadId !== lastThreadIdForContext) {
 			lastThreadIdForContext = activeThreadId;
 			contextArtifactId = '';
+			contextDraftChangeId = null;
 		}
 	});
 
@@ -438,9 +441,13 @@
 		return 'Could not send this message. Please try again.';
 	}
 
-	const openThreadArtifact = async (artifactId: string) => {
+	const openThreadArtifact = async (
+		artifactId: string,
+		draftChangeId?: Id<'artifactDraftChanges'>
+	) => {
 		if (contextPanelOpen) {
 			contextArtifactId = artifactId;
+			contextDraftChangeId = draftChangeId ?? null;
 			return;
 		}
 
@@ -456,10 +463,12 @@
 			}
 		);
 		contextArtifactId = artifactId;
+		contextDraftChangeId = draftChangeId ?? null;
 	};
 
 	const closeThreadArtifact = () => {
 		contextArtifactId = '';
+		contextDraftChangeId = null;
 	};
 
 	function createChat(threadId: string, messages: UIMessage[]) {
@@ -642,7 +651,9 @@
 																	class="size-1.5 shrink-0 rounded-full bg-primary/70"
 																	aria-hidden="true"
 																></span>
-																<span class="min-w-0 max-w-56 truncate">{artifactTitleForId(aid)}</span>
+																<span class="max-w-56 min-w-0 truncate"
+																	>{artifactTitleForId(aid)}</span
+																>
 															</span>
 														{/each}
 													</div>
@@ -678,6 +689,7 @@
 						<WorkspaceArtifactReader
 							artifact={selectedContextArtifact}
 							compact
+							initialSelectedDraftChangeId={contextDraftChangeId}
 							onBack={closeThreadArtifact}
 						/>
 					{:else}
@@ -701,7 +713,8 @@
 									<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
 										<NativeSelectOption value="all">All types</NativeSelectOption>
 										{#each contextArtifactTypes as type (type)}
-											<NativeSelectOption value={type}>{artifactTypeLabel(type)}</NativeSelectOption>
+											<NativeSelectOption value={type}>{artifactTypeLabel(type)}</NativeSelectOption
+											>
 										{/each}
 									</NativeSelect>
 									<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
@@ -712,88 +725,119 @@
 							</div>
 
 							<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-							{#if threadArtifacts.error}
-								<div class="space-y-2 px-2 py-2">
-									<p class="text-xs text-destructive">{threadArtifacts.error.message}</p>
-									<Button
-										type="button"
-										variant="secondary"
-										size="sm"
-										class="h-7 text-xs"
-										onclick={() => {
-											void invalidateAll();
-										}}
-									>
-										Retry
-									</Button>
-								</div>
-							{:else if threadArtifacts.data === undefined}
-								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
-							{:else}
-								<div class="space-y-3">
-									{#if threadDraftChanges.error}
-										<p class="px-2 py-1.5 text-xs text-destructive">
-											{threadDraftChanges.error.message}
-										</p>
-									{:else if threadDraftChanges.data === undefined}
-										<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading drafts...</p>
-									{:else if sortedThreadDraftChanges.length > 0}
-										<div class="space-y-1">
-											<p
-												class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-											>
-												Pending drafts
+								{#if threadArtifacts.error}
+									<div class="space-y-2 px-2 py-2">
+										<p class="text-xs text-destructive">{threadArtifacts.error.message}</p>
+										<Button
+											type="button"
+											variant="secondary"
+											size="sm"
+											class="h-7 text-xs"
+											onclick={() => {
+												void invalidateAll();
+											}}
+										>
+											Retry
+										</Button>
+									</div>
+								{:else if threadArtifacts.data === undefined}
+									<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
+								{:else}
+									<div class="space-y-3">
+										{#if threadDraftChanges.error}
+											<p class="px-2 py-1.5 text-xs text-destructive">
+												{threadDraftChanges.error.message}
 											</p>
-											{#each sortedThreadDraftChanges as item (item.draftChange._id)}
-												<button
-													type="button"
-													class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-													onclick={() => openThreadArtifact(item.artifact._id)}
+										{:else if threadDraftChanges.data === undefined}
+											<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading drafts...</p>
+										{:else if sortedThreadDraftChanges.length > 0}
+											<div class="space-y-1">
+												<p
+													class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
 												>
-													<span class="truncate text-xs font-medium tracking-tight">
-														{item.draftChange.proposedTitle}
-													</span>
-													<span class="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-														{item.draftChange.summary ?? 'Review AI-proposed artifact changes.'}
-													</span>
-												</button>
-											{/each}
-										</div>
-									{/if}
+													Pending drafts
+												</p>
+												{#each sortedThreadDraftChanges as item (item.draftChange._id)}
+													<button
+														type="button"
+														class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+														onclick={() =>
+															openThreadArtifact(item.artifact._id, item.draftChange._id)}
+													>
+														<div class="flex items-center justify-between gap-2">
+															<span class="truncate text-xs font-medium tracking-tight">
+																{item.draftChange.proposedTitle}
+															</span>
+															<span
+																class={cn(
+																	'shrink-0 text-[10px]',
+																	item.draftChange.isStale
+																		? 'text-destructive'
+																		: 'text-muted-foreground'
+																)}
+															>
+																{item.draftChange.isStale ? 'Stale' : 'Draft'}
+															</span>
+														</div>
+														<span class="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+															{draftSummaryText(item.draftChange)}
+														</span>
+														{#if draftStatItems(item.draftChange).length > 0}
+															<div class="flex flex-wrap gap-1">
+																{#each draftStatItems(item.draftChange) as stat, index (`${stat}-${index}`)}
+																	<span
+																		class="rounded-full border border-border/60 bg-muted/20 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+																	>
+																		{stat}
+																	</span>
+																{/each}
+															</div>
+														{/if}
+														{#if item.draftChange.isStale && item.draftChange.staleReason}
+															<span class="text-[11px] leading-4 text-destructive">
+																{item.draftChange.staleReason}
+															</span>
+														{/if}
+													</button>
+												{/each}
+											</div>
+										{/if}
 
-									{#if threadArtifacts.data.length === 0}
-										<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-											No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
-											when the shape is clear.
-										</p>
-									{:else if filteredContextArtifacts.length === 0}
-										<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-											No artifacts match those filters.
-										</p>
-									{:else}
-										<div class="space-y-1">
-											{#each filteredContextArtifacts as item (item.link._id)}
-												<button
-													type="button"
-													class="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-													onclick={() => openThreadArtifact(item.artifact._id)}
-												>
-													<span class="size-1.5 shrink-0 rounded-full bg-primary/70"></span>
-													<span class="min-w-0 flex-1 truncate text-xs font-medium tracking-tight">
-														{item.artifact.title}
-													</span>
-													<span class="shrink-0 text-[10px] text-muted-foreground">
-														{artifactTypeLabel(item.artifact.type)}
-													</span>
-													<span class="shrink-0 text-[10px] text-muted-foreground">
-														{formatArtifactCreatedAt(item.artifact.createdAt)}
-													</span>
-												</button>
-											{/each}
-										</div>
-									{/if}
-								</div>
-							{/if}
+										{#if threadArtifacts.data.length === 0}
+											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+												No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
+												when the shape is clear.
+											</p>
+										{:else if filteredContextArtifacts.length === 0}
+											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+												No artifacts match those filters.
+											</p>
+										{:else}
+											<div class="space-y-1">
+												{#each filteredContextArtifacts as item (item.link._id)}
+													<button
+														type="button"
+														class="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+														onclick={() => openThreadArtifact(item.artifact._id)}
+													>
+														<span class="size-1.5 shrink-0 rounded-full bg-primary/70"></span>
+														<span
+															class="min-w-0 flex-1 truncate text-xs font-medium tracking-tight"
+														>
+															{item.artifact.title}
+														</span>
+														<span class="shrink-0 text-[10px] text-muted-foreground">
+															{artifactTypeLabel(item.artifact.type)}
+														</span>
+														<span class="shrink-0 text-[10px] text-muted-foreground">
+															{formatArtifactCreatedAt(item.artifact.createdAt)}
+														</span>
+													</button>
+												{/each}
+											</div>
+										{/if}
+									</div>
+								{/if}
 							</div>
 						</div>
 					{/if}
@@ -910,14 +954,15 @@
 						onSubmit={submitMessage}
 					>
 						{#if mentionChips.length > 0}
-							<div class="flex flex-wrap gap-1.5 px-3 pt-2" aria-label="Artifacts to include in this message">
+							<div
+								class="flex flex-wrap gap-1.5 px-3 pt-2"
+								aria-label="Artifacts to include in this message"
+							>
 								{#each mentionChips as chip (chip.id)}
 									<span class={artifactMentionPill}>
-										<span
-											class="size-1.5 shrink-0 rounded-full bg-primary/70"
-											aria-hidden="true"
+										<span class="size-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden="true"
 										></span>
-										<span class="min-w-0 max-w-56 truncate">{chip.title}</span>
+										<span class="max-w-56 min-w-0 truncate">{chip.title}</span>
 										<button
 											type="button"
 											class="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"

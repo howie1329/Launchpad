@@ -21,6 +21,10 @@ export type ArtifactDraftReviewData = {
 	baseContentMarkdown: string;
 	patch: StoredArtifactPatch;
 	changeSummary: string;
+	hasTitleChange: boolean;
+	changedSectionCount: number;
+	additionCount: number;
+	deletionCount: number;
 };
 
 type LegacyReviewDataResult =
@@ -50,6 +54,10 @@ export function createArtifactDraftReviewData({
 		baseTitle: artifact.title,
 		baseContentMarkdown: artifact.contentMarkdown,
 		patch,
+		hasTitleChange: artifact.title !== proposedTitle,
+		changedSectionCount: patch.hunks.length,
+		additionCount: countChangedLines(patch, 'addition'),
+		deletionCount: countChangedLines(patch, 'deletion'),
 		changeSummary:
 			summary?.trim() ||
 			buildDraftChangeSummary({
