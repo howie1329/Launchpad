@@ -1,105 +1,69 @@
 # Diffs.com Integration Evaluation for Launchpad
 
-## Correction
+## Decision
 
-This evaluation is for **https://diffs.com** (the `@pierre/diffs` diff-rendering library), not diff.com.
+Launchpad now treats diffs for artifacts as a **product capability**, not just a compare-widget swap.
 
-## What Diffs.com is (as of April 21, 2026)
+We are using `@pierre/diffs` for the artifact draft review surface, but the meaningful product change is broader:
 
-`diffs.com` documents `@pierre/diffs` as an open-source code/diff rendering library built on Shiki, with package exports for:
+- artifact edits are revision-aware
+- draft changes persist canonical diff metadata
+- stale drafts are blocked from apply
+- legacy pending drafts are hydrated lazily when possible
 
-- `@pierre/diffs` (vanilla JS)
-- `@pierre/diffs/react`
-- `@pierre/diffs/ssr`
-- `@pierre/diffs/worker`
+## What changed
 
-It is a UI rendering library, not a backend diff API service.
+### Before
 
-## Current Launchpad diff implementation
+- Artifact drafts stored only proposed title/body
+- Compare view rendered a client-side read-only CodeMirror merge surface
+- No explicit artifact revision
+- No stale-draft protection beyond current pending/apply flow
 
-Launchpad already has a working artifact diff viewer at `src/lib/components/workspaces/ArtifactDiffEditor.svelte` using CodeMirror `MergeView`.
+### After
 
-Current behavior includes:
+- `artifacts` carry an explicit `revision`
+- `artifactDraftChanges` capture:
+  - `baseArtifactRevision`
+  - `baseTitle`
+  - `baseContentMarkdown`
+  - `patch`
+  - `changeSummary`
+  - optional `staleReason`
+- draft creation still accepts full revised markdown
+- server computes canonical diff metadata with `@pierre/diffs`
+- apply fails when the artifact revision no longer matches the draft base revision
+- review UI renders through a dedicated `@pierre/diffs` wrapper
 
-- Side-by-side compare (`orientation: 'a-b'`)
-- Change highlighting
-- Collapsing unchanged sections
-- Read-only rendering for saved vs proposed markdown
+## Why this is the right scope
 
-This means Diffs.com is a **visual rendering swap/upgrade opportunity**, not net-new product capability.
+Replacing only the visual renderer would have improved polish, but it would not have solved the actual artifact-review problem:
 
-## Integration options
+- users could still apply drafts created against outdated artifact state
+- the backend would still have no durable diff model
+- future selective-apply or change navigation work would still require another model rewrite
 
-### Option A (recommended): Keep CodeMirror now, run a focused Diffs spike
+This implementation fixes the model first and uses `@pierre/diffs` as the review surface on top of it.
 
-Why:
+## Renderer choice
 
-- Smallest-risk path
-- Existing component is stable and integrated with current Svelte UI
-- Diffs currently emphasizes vanilla JS + React docs; no first-class Svelte package is advertised
+`@pierre/diffs` is a good fit because it gives us:
 
-Spike scope:
+- unified and split review modes
+- strong markdown/code rendering for long documents
+- a durable diff metadata model we can store and reuse
+- a path to future selective apply without changing libraries again
 
-1. Build `ArtifactDiffRendererDiffs.svelte` as a wrapper around `@pierre/diffs` vanilla API.
-2. Render one sample draft comparison from existing artifact data.
-3. Validate parity on:
-   - readability
-   - load time
-   - large markdown behavior
-   - theme consistency (light/dark)
-4. Decide go/no-go before replacing `ArtifactDiffEditor.svelte`.
+## Known boundaries
 
-### Option B: Full replacement of CodeMirror MergeView
+- v1 remains all-or-nothing apply/discard
+- legacy drafts can only be hydrated safely when the current artifact still matches the pre-revision state we can infer
+- unsafe legacy drafts are marked stale instead of guessed into applicability
 
-Only do this if spike wins on UX/perf/maintainability. Otherwise keep current implementation.
+## Current implementation touchpoints
 
-### Option C: Hybrid
-
-Keep CodeMirror for editing-heavy/draft review paths; use Diffs for read-only previews where visual polish matters most.
-
-## Recommended implementation plan
-
-### Phase 0 — Dependency + spike (1-2 days)
-
-- Add `@pierre/diffs`
-- Create a new internal wrapper component (do not remove current editor)
-- Gate rendering with a local feature toggle
-
-### Phase 1 — A/B in artifact draft compare
-
-- Keep current route and data flow unchanged
-- Swap only presentation layer for diff block
-- Collect internal qualitative feedback
-
-### Phase 2 — Decide default renderer
-
-- If Diffs is clearly better: replace CodeMirror renderer and keep old component for rollback
-- If not better: remove spike code and stay on CodeMirror
-
-## What not to change
-
-- No Convex schema changes
-- No chat tool changes
-- No artifact type changes
-- No workflow changes
-
-This is purely a UI rendering-layer decision.
-
-## Concrete code touchpoints
-
-- `src/lib/components/workspaces/ArtifactDiffEditor.svelte` (current renderer)
-- Add `src/lib/components/workspaces/ArtifactDiffRendererDiffs.svelte` (spike wrapper)
-- Artifact page integration point (where `ArtifactDiffEditor` is mounted)
-
-## Decision criteria (ship only if all true)
-
-- Better readability for long markdown diffs
-- Equal or better interaction performance
-- No accessibility regressions
-- No theme regressions
-- Low maintenance burden in Svelte codebase
-
-## External references used
-
-- https://diffs.com/
-- https://diffs.com/docs
+- `src/convex/artifactDiffs.ts`
+- `src/convex/artifacts.ts`
+- `src/convex/schema.ts`
+- `src/lib/components/workspaces/ArtifactDiffRendererDiffs.svelte`
+- `src/lib/components/workspaces/WorkspaceArtifactReader.svelte`
