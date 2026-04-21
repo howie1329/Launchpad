@@ -65,7 +65,7 @@
 						tooltipContent="Color theme"
 						class={variant === 'sidebar'
 							? 'justify-center px-0 md:size-8 md:p-0'
-							: 'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3'}
+							: 'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3'}
 					>
 						<TriggerIcon class={variant === 'sidebar' ? 'size-4' : 'size-3'} />
 						<span

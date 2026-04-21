@@ -23,7 +23,6 @@
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import {
 		createProjectFromThreadMutation,
-		createProjectMutation,
 		listProjectsQuery
 	} from '$lib/projects';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
@@ -32,7 +31,6 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import FolderIcon from '@lucide/svelte/icons/folder';
-	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
@@ -47,11 +45,6 @@
 
 	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
-	let isCreatingProject = $state(false);
-	let projectDialogOpen = $state(false);
-	let projectName = $state('');
-	let projectSummary = $state('');
-	let projectError = $state('');
 	let promoteDialogOpen = $state(false);
 	let promoteName = $state('');
 	let promoteSummary = $state('');
@@ -65,6 +58,7 @@
 		Chats: true,
 		Artifacts: true
 	});
+	let openProjectIds = $state<Record<string, boolean>>({});
 
 	const pathname = $derived($page.url.pathname);
 	const isSettingsActive = $derived(pathname === '/workspace/settings');
@@ -120,7 +114,7 @@
 			: (selectedThread?.title ??
 					selectedArtifact?.title ??
 					selectedProject?.name ??
-					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : 'New Chat'))
+					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
 	);
 	const headerDescription = $derived(
 		isSettingsActive
@@ -129,24 +123,27 @@
 				? ''
 				: activeProjectId
 					? 'Start a new chat in this project.'
-					: 'Start from a rough thought.'
+					: ''
 	);
 
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
-	const canCreateProject = $derived(Boolean(projectName.trim()) && !isCreatingProject);
+	const isProjectOpen = (projectId: string) => openProjectIds[projectId] ?? true;
+	const setProjectOpen = (projectId: string, open: boolean) => {
+		openProjectIds = { ...openProjectIds, [projectId]: open };
+	};
 
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-	/** Design-system-aligned nav rows: pill, dense, 12px icons */
+	/** Design-system-aligned nav rows: dense, 12px icons */
 	const navPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
 	const navPillPrimary =
 		'bg-primary text-primary-foreground shadow-none hover:bg-primary/90 hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground';
 	const sectionTrigger =
 		'group/section flex h-7 w-full items-center gap-1 rounded-md px-2 text-left text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
 	const subNavPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
 
 	const usageBarPct = $derived(
 		budget.data && budget.data.capUsd > 0
@@ -158,47 +155,6 @@
 			? `AI usage today: ${money.format(budget.data.spentUsd)} / ${money.format(budget.data.capUsd)} · ${budget.data.dateKey}`
 			: 'Usage'
 	);
-
-	const createProject = async () => {
-		if (isCreatingProject) return;
-
-		const name = projectName.trim();
-		const summary = projectSummary.trim();
-
-		if (!name) {
-			projectError = 'Project name is required.';
-			return;
-		}
-
-		isCreatingProject = true;
-		projectError = '';
-
-		try {
-			const result = await getConvexClient().mutation(createProjectMutation, {
-				name,
-				...(summary ? { summary } : {})
-			});
-			projectDialogOpen = false;
-			projectName = '';
-			projectSummary = '';
-			workspaceNotice = 'Project created.';
-			await goto(resolve(`/workspace?project=${encodeURIComponent(result.projectId)}`));
-		} catch (error) {
-			console.error(error);
-			projectError = 'Could not create this project. Please try again.';
-		} finally {
-			isCreatingProject = false;
-		}
-	};
-
-	const closeProjectDialog = () => {
-		if (isCreatingProject) return;
-
-		projectDialogOpen = false;
-		projectName = '';
-		projectSummary = '';
-		projectError = '';
-	};
 
 	const openPromoteDialog = () => {
 		if (!selectedThread || selectedThread.projectId) return;
@@ -341,18 +297,20 @@
 		style="--sidebar-width: 15rem;"
 	>
 		<Sidebar.Root collapsible="icon" class="overflow-hidden">
-			<Sidebar.Header class="border-b border-sidebar-border/60 px-2 pb-2">
+			<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
 				<Sidebar.Menu class="flex flex-row items-center gap-1">
-					<Sidebar.MenuItem class="min-w-0 flex-1">
+					<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 							{#snippet child({ props })}
 								<a href={resolve('/workspace')} aria-label="Workspace home" {...props}>
 									<div
-										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
+										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
 									>
 										<LaunchpadMark class="size-3.5" />
 									</div>
-									<span class="min-w-0 truncate font-semibold">Workspace</span>
+									<span class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
+										>Workspace</span
+									>
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
@@ -411,16 +369,6 @@
 							/>
 							<span class="min-w-0 truncate">Projects</span>
 						</Collapsible.Trigger>
-						<Sidebar.GroupAction
-							class="top-1 right-2"
-							aria-label="New project"
-							aria-disabled={isCreatingProject}
-							onclick={() => {
-								if (!isCreatingProject) projectDialogOpen = true;
-							}}
-						>
-							<FolderPlusIcon />
-						</Sidebar.GroupAction>
 						<Collapsible.Content
 							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 						>
@@ -438,87 +386,95 @@
 												<p class="text-[11px] leading-snug text-sidebar-foreground/60">
 													Promote a useful chat when the idea is ready for focused work.
 												</p>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													class="h-7 w-full justify-start px-2 text-xs"
-													onclick={() => {
-														projectDialogOpen = true;
-													}}
-												>
-													Create project
-												</Button>
 											</div>
 										</Sidebar.MenuItem>
 									{:else}
 										{#each projects.data as project (project._id)}
 											<Sidebar.MenuItem>
-												<Sidebar.MenuButton
-													size="sm"
-													isActive={activeProjectId === project._id && !activeThreadId}
-													class={cn(navPill, 'min-w-0')}
+												<Collapsible.Root
+													open={isProjectOpen(project._id)}
+													onOpenChange={(open) => setProjectOpen(project._id, open)}
 												>
-													{#snippet child({ props })}
-														<a
-															href={resolve(
-																`/workspace?project=${encodeURIComponent(project._id)}`
-															)}
-															{...props}
-														>
-															<FolderIcon />
-															<span class="min-w-0 truncate">{project.name}</span>
-														</a>
-													{/snippet}
-												</Sidebar.MenuButton>
-												<Sidebar.MenuSub>
-													{@const threadsForProject = projectThreads(project._id)}
-													{#if threads.data === undefined}
-														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
-																<span>Loading chats…</span>
-															</Sidebar.MenuSubButton>
-														</Sidebar.MenuSubItem>
-													{:else if threadsForProject.length === 0}
-														<Sidebar.MenuSubItem>
-															<Sidebar.MenuSubButton class={subNavPill}>
-																{#snippet child({ props })}
-																	<a
-																		href={resolve(
-																			`/workspace?project=${encodeURIComponent(project._id)}`
-																		)}
-																		{...props}
-																	>
-																		<MessageSquarePlusIcon />
-																		<span class="text-sidebar-foreground/60">Start chat</span>
-																	</a>
-																{/snippet}
-															</Sidebar.MenuSubButton>
-														</Sidebar.MenuSubItem>
-													{:else}
-														{#each threadsForProject as thread (thread._id)}
-															<Sidebar.MenuSubItem>
-																<Sidebar.MenuSubButton
-																	size="sm"
-																	isActive={activeThreadId === thread._id}
-																	class={cn(subNavPill, 'min-w-0')}
-																>
-																	{#snippet child({ props })}
-																		<a
-																			href={resolve(
-																				`/workspace?project=${encodeURIComponent(project._id)}&thread=${encodeURIComponent(thread._id)}`
-																			)}
-																			{...props}
+													<Collapsible.Trigger>
+														{#snippet child({ props })}
+															<Sidebar.MenuButton
+																size="sm"
+																isActive={activeProjectId === project._id && !activeThreadId}
+																class={cn(navPill, 'min-w-0 pr-8')}
+																{...props}
+															>
+																<ChevronRightIcon
+																	class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
+																	data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
+																/>
+																<FolderIcon />
+																<span class="min-w-0 truncate">{project.name}</span>
+															</Sidebar.MenuButton>
+														{/snippet}
+													</Collapsible.Trigger>
+													<Sidebar.MenuAction aria-label={`New chat in ${project.name}`}>
+														{#snippet child({ props })}
+															<a
+																href={resolve(
+																	`/workspace?project=${encodeURIComponent(project._id)}`
+																)}
+																{...props}
+															>
+																<MessageSquarePlusIcon />
+															</a>
+														{/snippet}
+													</Sidebar.MenuAction>
+													<Collapsible.Content
+														class="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+													>
+														<Sidebar.MenuSub>
+															{@const threadsForProject = projectThreads(project._id)}
+															{#if threads.data === undefined}
+																<Sidebar.MenuSubItem>
+																	<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
+																		<span>Loading chats…</span>
+																	</Sidebar.MenuSubButton>
+																</Sidebar.MenuSubItem>
+															{:else if threadsForProject.length === 0}
+																<Sidebar.MenuSubItem>
+																	<Sidebar.MenuSubButton class={subNavPill}>
+																		{#snippet child({ props })}
+																			<a
+																				href={resolve(
+																					`/workspace?project=${encodeURIComponent(project._id)}`
+																				)}
+																				{...props}
+																			>
+																				<span class="text-sidebar-foreground/60">Start chat</span>
+																			</a>
+																		{/snippet}
+																	</Sidebar.MenuSubButton>
+																</Sidebar.MenuSubItem>
+															{:else}
+																{#each threadsForProject as thread (thread._id)}
+																	<Sidebar.MenuSubItem>
+																		<Sidebar.MenuSubButton
+																			size="sm"
+																			isActive={activeThreadId === thread._id}
+																			class={cn(subNavPill, 'min-w-0')}
 																		>
-																			<MessageSquareTextIcon />
-																			<span class="truncate">{thread.title}</span>
-																		</a>
-																	{/snippet}
-																</Sidebar.MenuSubButton>
-															</Sidebar.MenuSubItem>
-														{/each}
-													{/if}
-												</Sidebar.MenuSub>
+																			{#snippet child({ props })}
+																				<a
+																					href={resolve(
+																						`/workspace?project=${encodeURIComponent(project._id)}&thread=${encodeURIComponent(thread._id)}`
+																					)}
+																					{...props}
+																				>
+																					<span class="min-w-0 truncate">{thread.title}</span>
+																				</a>
+																			{/snippet}
+																		</Sidebar.MenuSubButton>
+																	</Sidebar.MenuSubItem>
+																{/each}
+															{/if}
+														</Sidebar.MenuSub>
+													</Collapsible.Content>
+												</Collapsible.Root>
 											</Sidebar.MenuItem>
 										{/each}
 									{/if}
@@ -776,7 +732,9 @@
 			>
 				<Sidebar.Trigger class="-ms-1" />
 				<div class="min-w-0 flex-1">
-					<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+					{#if headerTitle}
+						<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+					{/if}
 					{#if headerDescription}
 						<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
 					{/if}
@@ -934,64 +892,5 @@
 			</Dialog.Content>
 		</Dialog.Root>
 
-		<Dialog.Root bind:open={projectDialogOpen}>
-			<Dialog.Content class="sm:max-w-md">
-				<form
-					class="space-y-4"
-					onsubmit={(event) => {
-						event.preventDefault();
-						void createProject();
-					}}
-				>
-					<Dialog.Header>
-						<Dialog.Title>Create project</Dialog.Title>
-						<Dialog.Description>
-							Add a workspace for chats and artifacts that belong together.
-						</Dialog.Description>
-					</Dialog.Header>
-
-					<div class="space-y-3">
-						<div class="space-y-1.5">
-							<Label for="project-name">Name</Label>
-							<Input
-								id="project-name"
-								bind:value={projectName}
-								placeholder="Project name"
-								aria-invalid={projectError ? 'true' : undefined}
-								disabled={isCreatingProject}
-							/>
-						</div>
-						<div class="space-y-1.5">
-							<Label for="project-summary">Summary</Label>
-							<Textarea
-								id="project-summary"
-								bind:value={projectSummary}
-								placeholder="Optional project context"
-								class="min-h-20"
-								disabled={isCreatingProject}
-							/>
-						</div>
-					</div>
-
-					{#if projectError}
-						<p class="text-xs text-destructive">{projectError}</p>
-					{/if}
-
-					<Dialog.Footer>
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={isCreatingProject}
-							onclick={closeProjectDialog}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={!canCreateProject}>
-							{isCreatingProject ? 'Creating...' : 'Create project'}
-						</Button>
-					</Dialog.Footer>
-				</form>
-			</Dialog.Content>
-		</Dialog.Root>
 	</Sidebar.Provider>
 {/if}

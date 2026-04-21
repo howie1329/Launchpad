@@ -15,7 +15,7 @@
 		parseComposedUserMessage
 	} from '$lib/artifact-mention-tokens';
 	import { cn } from '$lib/utils';
-	import { formatArtifactCreatedAt } from '$lib/artifact-display';
+	import { artifactTypeLabel, formatArtifactCreatedAt } from '$lib/artifact-display';
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
@@ -58,6 +58,8 @@
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
 	import {
 		defaultIdeaAiModelId,
@@ -92,6 +94,9 @@
 	let saveError = $state('');
 	let contextArtifactId = $state('');
 	let lastThreadIdForContext = $state('');
+	let contextSearch = $state('');
+	let contextTypeFilter = $state('all');
+	let contextDateSort = $state<'newest' | 'oldest'>('newest');
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
 	let mediaMinLg = $state(false);
 
@@ -130,6 +135,35 @@
 			? [...threadArtifacts.data].sort((a, b) => b.artifact.createdAt - a.artifact.createdAt)
 			: []
 	);
+	const contextArtifactTypes = $derived.by(() => {
+		const types: string[] = [];
+		for (const item of threadArtifacts.data ?? []) {
+			const type = item.artifact.type.trim();
+			if (type && !types.includes(type)) types.push(type);
+		}
+		return types.sort((a, b) => artifactTypeLabel(a).localeCompare(artifactTypeLabel(b)));
+	});
+	const filteredContextArtifacts = $derived.by(() => {
+		const query = contextSearch.trim().toLowerCase();
+		const rows = sortedThreadArtifacts.filter((item) => {
+			const type = item.artifact.type.trim();
+			const typeLabel = artifactTypeLabel(type);
+			const matchesType = contextTypeFilter === 'all' || type === contextTypeFilter;
+			const matchesQuery =
+				!query ||
+				item.artifact.title.toLowerCase().includes(query) ||
+				type.toLowerCase().includes(query) ||
+				typeLabel.toLowerCase().includes(query);
+
+			return matchesType && matchesQuery;
+		});
+
+		if (contextDateSort === 'oldest') {
+			return [...rows].sort((a, b) => a.artifact.createdAt - b.artifact.createdAt);
+		}
+
+		return rows;
+	});
 	const sortedThreadDraftChanges = $derived(
 		threadDraftChanges.data
 			? [...threadDraftChanges.data].sort(
@@ -183,6 +217,8 @@
 		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
 	);
 	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4));
+	const artifactMentionPill =
+		'inline-flex w-fit max-w-full items-center gap-1.5 rounded-md bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground';
 
 	$effect(() => {
 		if (!browser) return;
@@ -601,10 +637,12 @@
 												{#if composed.artifactIds.length > 0}
 													<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
 														{#each composed.artifactIds as aid (aid)}
-															<span
-																class="inline-flex max-w-full items-center rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground"
-															>
-																<span class="truncate">{artifactTitleForId(aid)}</span>
+															<span class={artifactMentionPill}>
+																<span
+																	class="size-1.5 shrink-0 rounded-full bg-primary/70"
+																	aria-hidden="true"
+																></span>
+																<span class="min-w-0 max-w-56 truncate">{artifactTitleForId(aid)}</span>
 															</span>
 														{/each}
 													</div>
@@ -643,7 +681,37 @@
 							onBack={closeThreadArtifact}
 						/>
 					{:else}
-						<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+						<div class="flex min-h-0 flex-1 flex-col">
+							<div class="shrink-0 space-y-2 border-b border-border/50 px-3 py-3">
+								<div>
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Chat context
+									</p>
+									<p class="mt-1 text-[11px] text-muted-foreground">
+										Artifacts linked to this thread.
+									</p>
+								</div>
+								<Input
+									bind:value={contextSearch}
+									type="search"
+									placeholder="Search title or type"
+									class="h-7 text-xs"
+								/>
+								<div class="grid grid-cols-2 gap-2">
+									<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
+										<NativeSelectOption value="all">All types</NativeSelectOption>
+										{#each contextArtifactTypes as type (type)}
+											<NativeSelectOption value={type}>{artifactTypeLabel(type)}</NativeSelectOption>
+										{/each}
+									</NativeSelect>
+									<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
+										<NativeSelectOption value="newest">Newest first</NativeSelectOption>
+										<NativeSelectOption value="oldest">Oldest first</NativeSelectOption>
+									</NativeSelect>
+								</div>
+							</div>
+
+							<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 							{#if threadArtifacts.error}
 								<div class="space-y-2 px-2 py-2">
 									<p class="text-xs text-destructive">{threadArtifacts.error.message}</p>
@@ -662,7 +730,7 @@
 							{:else if threadArtifacts.data === undefined}
 								<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
 							{:else}
-								<div class="space-y-4">
+								<div class="space-y-3">
 									{#if threadDraftChanges.error}
 										<p class="px-2 py-1.5 text-xs text-destructive">
 											{threadDraftChanges.error.message}
@@ -679,7 +747,7 @@
 											{#each sortedThreadDraftChanges as item (item.draftChange._id)}
 												<button
 													type="button"
-													class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 													onclick={() => openThreadArtifact(item.artifact._id)}
 												>
 													<span class="truncate text-xs font-medium tracking-tight">
@@ -698,23 +766,26 @@
 											No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
 											when the shape is clear.
 										</p>
+									{:else if filteredContextArtifacts.length === 0}
+										<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
+											No artifacts match those filters.
+										</p>
 									{:else}
 										<div class="space-y-1">
-											<p
-												class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-											>
-												Chat context
-											</p>
-											{#each sortedThreadArtifacts as item (item.link._id)}
+											{#each filteredContextArtifacts as item (item.link._id)}
 												<button
 													type="button"
-													class="flex w-full flex-col gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+													class="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 													onclick={() => openThreadArtifact(item.artifact._id)}
 												>
-													<span class="truncate text-xs font-medium tracking-tight">
+													<span class="size-1.5 shrink-0 rounded-full bg-primary/70"></span>
+													<span class="min-w-0 flex-1 truncate text-xs font-medium tracking-tight">
 														{item.artifact.title}
 													</span>
-													<span class="text-[11px] text-muted-foreground">
+													<span class="shrink-0 text-[10px] text-muted-foreground">
+														{artifactTypeLabel(item.artifact.type)}
+													</span>
+													<span class="shrink-0 text-[10px] text-muted-foreground">
 														{formatArtifactCreatedAt(item.artifact.createdAt)}
 													</span>
 												</button>
@@ -723,6 +794,7 @@
 									{/if}
 								</div>
 							{/if}
+							</div>
 						</div>
 					{/if}
 				</aside>
@@ -763,46 +835,8 @@
 				{/if}
 			</div>
 
-			<div class="relative shrink-0 border-t border-border/50 bg-background px-4 py-4 sm:px-6">
-				{#if mentionOpen}
-					<div
-						id={mentionListboxId}
-						class="absolute right-0 bottom-full left-0 z-20 mb-1 max-h-40 overflow-y-auto rounded-md border border-border/60 bg-popover text-popover-foreground shadow-md"
-						role="listbox"
-						aria-label="Thread artifacts"
-					>
-						{#if threadArtifacts.error}
-							<p class="px-3 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
-						{:else if threadArtifacts.data === undefined}
-							<p class="px-3 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
-						{:else if filteredMentionArtifacts.length === 0}
-							<p class="px-3 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
-						{:else}
-							{#each filteredMentionArtifacts as item, i (item.artifact._id)}
-								<button
-									type="button"
-									id={`workspace-mention-opt-${item.artifact._id}`}
-									role="option"
-									aria-selected={i === mentionHighlight}
-									class={cn(
-										'flex w-full flex-col gap-0.5 px-3 py-2 text-left text-xs transition-colors',
-										i === mentionHighlight ? 'bg-accent/60' : 'hover:bg-accent/50'
-									)}
-									onmouseenter={() => {
-										mentionHighlight = i;
-									}}
-									onclick={() => void pickArtifactMention(item)}
-								>
-									<span class="truncate font-medium">{item.artifact.title}</span>
-									<span class="text-[10px] text-muted-foreground">
-										{formatArtifactCreatedAt(item.artifact.createdAt)}
-									</span>
-								</button>
-							{/each}
-						{/if}
-					</div>
-				{/if}
-				<div class="w-full space-y-2">
+			<div class="shrink-0 bg-background px-4 py-4 sm:px-6">
+				<div class="relative mx-auto w-full max-w-4xl space-y-2">
 					{#if chatError || saveError}
 						<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
 							<p class="text-xs text-destructive">{chatError || saveError}</p>
@@ -822,35 +856,84 @@
 						</div>
 					{/if}
 
-					{#if mentionChips.length > 0}
-						<div class="flex flex-wrap gap-1.5" aria-label="Artifacts to include in this message">
-							{#each mentionChips as chip (chip.id)}
-								<span
-									class="inline-flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-muted/40 py-0.5 pr-0.5 pl-2 text-[11px] font-medium text-foreground"
-								>
-									<span class="max-w-[min(100%,14rem)] truncate">{chip.title}</span>
+					{#if mentionOpen}
+						<div
+							id={mentionListboxId}
+							class="absolute bottom-full left-0 z-20 mb-2 max-h-48 w-[min(28rem,100%)] overflow-y-auto rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-none"
+							role="listbox"
+							aria-label="Thread artifacts"
+						>
+							{#if threadArtifacts.error}
+								<p class="px-2 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
+							{:else if threadArtifacts.data === undefined}
+								<p class="px-2 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
+							{:else if filteredMentionArtifacts.length === 0}
+								<p class="px-2 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
+							{:else}
+								{#each filteredMentionArtifacts as item, i (item.artifact._id)}
 									<button
 										type="button"
-										class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-										aria-label="Remove artifact reference"
-										onclick={() => removeMentionChip(chip.id)}
+										id={`workspace-mention-opt-${item.artifact._id}`}
+										role="option"
+										aria-selected={i === mentionHighlight}
+										class={cn(
+											'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left text-xs transition-colors',
+											i === mentionHighlight
+												? 'bg-accent/50 text-accent-foreground'
+												: 'hover:bg-accent/40'
+										)}
+										onmouseenter={() => {
+											mentionHighlight = i;
+										}}
+										onclick={() => void pickArtifactMention(item)}
 									>
-										<XIcon class="size-3" />
+										<span
+											class={cn(
+												'size-1.5 shrink-0 rounded-full',
+												i === mentionHighlight ? 'bg-primary' : 'bg-muted-foreground/50'
+											)}
+											aria-hidden="true"
+										></span>
+										<span class="min-w-0 flex-1 truncate font-medium">{item.artifact.title}</span>
+										<span class="shrink-0 text-[10px] text-muted-foreground">
+											{formatArtifactCreatedAt(item.artifact.createdAt)}
+										</span>
 									</button>
-								</span>
-							{/each}
+								{/each}
+							{/if}
 						</div>
 					{/if}
 
 					<PromptInput
-						class="rounded-lg border-border/70 bg-background shadow-none"
+						class="overflow-hidden rounded-lg border-0 bg-card/80 shadow-none ring-1 ring-border/70 backdrop-blur-sm"
 						clearOnSubmit={false}
 						onSubmit={submitMessage}
 					>
+						{#if mentionChips.length > 0}
+							<div class="flex flex-wrap gap-1.5 px-3 pt-2" aria-label="Artifacts to include in this message">
+								{#each mentionChips as chip (chip.id)}
+									<span class={artifactMentionPill}>
+										<span
+											class="size-1.5 shrink-0 rounded-full bg-primary/70"
+											aria-hidden="true"
+										></span>
+										<span class="min-w-0 max-w-56 truncate">{chip.title}</span>
+										<button
+											type="button"
+											class="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+											aria-label="Remove artifact reference"
+											onclick={() => removeMentionChip(chip.id)}
+										>
+											<XIcon class="size-3" />
+										</button>
+									</span>
+								{/each}
+							</div>
+						{/if}
 						<PromptInputTextarea
 							bind:ref={textareaRef}
 							bind:value={composerText}
-							class="min-h-20 px-4 py-4 text-sm"
+							class="min-h-12 px-3 py-3 text-sm leading-5 focus-visible:ring-0"
 							placeholder="Continue shaping this thread… (@ to cite a thread artifact)"
 							onInputPost={handleComposerInputPost}
 							onKeyDownIntercept={handleComposerKeyDown}
@@ -860,12 +943,12 @@
 							aria-autocomplete="list"
 							aria-activedescendant={mentionActiveOptionId}
 						/>
-						<PromptInputToolbar class="border-t border-border/50 px-2 py-2">
-							<PromptInputTools>
+						<PromptInputToolbar class="gap-2 px-3 py-2">
+							<PromptInputTools class="min-w-0 flex-1 flex-wrap">
 								<button
 									type="button"
 									class={cn(
-										'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+										'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 										webSearchRequested
 											? 'bg-muted text-foreground'
 											: 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -882,7 +965,7 @@
 								</button>
 								<ModelSelector bind:open={modelSelectorOpen}>
 									<ModelSelectorTrigger
-										class="inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+										class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 									>
 										{selectedModel.label}
 										<ChevronDownIcon class="size-3" />
@@ -911,7 +994,7 @@
 									usage={{ inputTokens: estimatedInputTokens }}
 									modelId={selectedModelId}
 								>
-									<ContextTrigger size="sm" class="h-6 gap-1 px-2 text-xs text-muted-foreground" />
+									<ContextTrigger size="sm" class="h-7 gap-1 px-2 text-xs text-muted-foreground" />
 									<ContextContent align="start">
 										<ContextContentHeader />
 										<ContextContentBody>
@@ -921,7 +1004,7 @@
 									</ContextContent>
 								</Context>
 							</PromptInputTools>
-							<PromptInputSubmit class="rounded-full" disabled={!canSubmit}>
+							<PromptInputSubmit class="size-8 shrink-0" disabled={!canSubmit}>
 								{#if isChatBusy}
 									<LoaderCircleIcon class="size-4 animate-spin" />
 								{:else}

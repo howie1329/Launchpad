@@ -11,6 +11,8 @@
 		'Artifacts stay as markdown memory: ideas, PRDs, and more.',
 		'Projects when you are ready to group work and context.'
 	];
+
+	const signInHref = `${resolve('/auth')}?redirectTo=${encodeURIComponent('/workspace')}`;
 </script>
 
 <svelte:head>
@@ -42,15 +44,8 @@
 				<LaunchpadLogo />
 			</a>
 			<div class="flex min-w-0 items-center gap-1">
-				<a
-					href={resolve('/workspace')}
-					class="rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-accent hover:text-foreground"
-				>
-					Workspace
-				</a>
 				<ThemeMenu variant="icon" />
 				<AuthControls />
-				<Button href={resolve('/workspace')} size="sm">Open workspace</Button>
 			</div>
 		</div>
 	</header>
@@ -80,7 +75,7 @@
 				{/each}
 			</ul>
 			<div class="mt-8 flex flex-wrap items-center gap-3">
-				<Button href={resolve('/workspace')} size="lg">Open workspace</Button>
+				<Button href={signInHref} size="lg">Sign in</Button>
 			</div>
 			<nav class="mt-8 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-muted-foreground">
 				<a class="hover:text-foreground" href={resolve('/privacy')}>Privacy</a>

@@ -116,7 +116,7 @@
 
 <section class="flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
 	<div class="flex flex-1 flex-col justify-center px-4 pt-4 pb-6 sm:px-6 sm:pt-6 lg:px-8">
-		<div class="mx-auto flex w-full max-w-2xl flex-col gap-5">
+		<div class="mx-auto flex w-full max-w-4xl flex-col gap-5">
 			<div class="text-center">
 				<p class="mb-1.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
 					{kicker}
@@ -128,21 +128,21 @@
 			</div>
 
 			<PromptInput
-				class="w-full rounded-xl border border-border/60 bg-background shadow-none"
+				class="w-full overflow-hidden rounded-lg border-0 bg-card/80 shadow-none ring-1 ring-border/70 backdrop-blur-sm"
 				clearOnSubmit={false}
 				onSubmit={submitMessage}
 			>
 				<PromptInputTextarea
 					bind:ref={textareaRef}
 					bind:value={text}
-					class="min-h-32 px-4 py-4 text-sm sm:min-h-36"
+					class="min-h-20 px-3 py-3 text-sm leading-5 focus-visible:ring-0 sm:min-h-24"
 					{placeholder}
 				/>
-				<PromptInputToolbar class="flex items-center gap-1.5 border-t border-border/50 px-2 py-1.5">
-					<PromptInputTools class="gap-1.5">
+				<PromptInputToolbar class="flex items-center gap-2 px-3 py-2">
+					<PromptInputTools class="min-w-0 flex-1 flex-wrap gap-1.5">
 						<ModelSelector bind:open={modelSelectorOpen}>
 							<ModelSelectorTrigger
-								class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 							>
 								{selectedModel.label}
 								<ChevronDownIcon class="size-3" />
@@ -173,7 +173,7 @@
 						>
 							<ContextTrigger
 								size="sm"
-								class="h-7 shrink-0 gap-1 px-2.5 text-xs text-muted-foreground"
+								class="h-7 shrink-0 gap-1 rounded-md px-2 text-xs text-muted-foreground shadow-none"
 							/>
 							<ContextContent align="start">
 								<ContextContentHeader />
@@ -184,7 +184,7 @@
 							</ContextContent>
 						</Context>
 					</PromptInputTools>
-					<PromptInputSubmit class="size-8 shrink-0 rounded-full" disabled={!canSubmit}>
+					<PromptInputSubmit class="size-8 shrink-0 rounded-md shadow-none" disabled={!canSubmit}>
 						<ArrowUpIcon class="size-4" />
 					</PromptInputSubmit>
 				</PromptInputToolbar>
@@ -199,7 +199,7 @@
 					<Suggestion
 						suggestion={suggestion.label}
 						variant="ghost"
-						class="h-6 rounded-full px-2.5 text-[11px] text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+						class="h-6 px-2.5 text-[11px] text-muted-foreground hover:bg-accent/50 hover:text-foreground"
 						onclick={() => fillComposer(suggestion.prompt)}
 					>
 						{suggestion.label}
@@ -209,7 +209,7 @@
 		</div>
 	</div>
 
-	<div class="mx-auto w-full max-w-2xl shrink-0 scroll-mt-8 px-4 pt-8 pb-16 sm:px-6 lg:px-8">
+	<div class="mx-auto w-full max-w-4xl shrink-0 scroll-mt-8 px-4 pt-8 pb-16 sm:px-6 lg:px-8">
 		<div class="mb-1.5 flex items-center justify-between gap-3">
 			<p class="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Examples</p>
 		</div>
