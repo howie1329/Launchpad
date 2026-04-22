@@ -58,7 +58,7 @@ Avoid hardcoded family names in components; keep stacks centralized in `layout.c
 
 | Role              | Size                    | Weight  |
 | ----------------- | ----------------------- | ------- |
-| Page heading      | `text-xl` (18px)        | 600     |
+| Page heading      | `text-xl` (20px)        | 600     |
 | Section heading   | `text-base` (16px)      | 600     |
 | Body / row label  | `text-xs` (12px)        | 400–500 |
 | Meta / secondary  | `text-[11px]`           | 400     |
