@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { cn } from "$lib/utils";
 	import type { ChatStatus } from "../context/types.js";
-	import LoaderIcon from "@lucide/svelte/icons/loader";
-	import SendIcon from "@lucide/svelte/icons/send";
-	import SquareIcon from "@lucide/svelte/icons/square";
-	import XIcon from "@lucide/svelte/icons/x";
+	import {
+		Cancel01Icon,
+		Loading03Icon,
+		SentIcon,
+		SquareIcon,
+	} from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/svelte";
 
 	import {
 		buttonVariants,
@@ -43,16 +46,15 @@
 
 	let isGenerating = $derived(status === "submitted" || status === "streaming");
 
-	let Icon = $derived.by(() => {
+	let submitIcon = $derived.by((): IconSvgElement => {
 		if (status === "submitted") {
-			return LoaderIcon;
+			return Loading03Icon;
 		} else if (status === "streaming") {
 			return SquareIcon;
 		} else if (status === "error") {
-			return XIcon;
+			return Cancel01Icon;
 		}
-		// for ready status, show send icon
-		return SendIcon;
+		return SentIcon;
 	});
 
 	let buttonType = $derived.by((): "button" | "submit" => {
@@ -93,6 +95,6 @@
 	{#if children}
 		{@render children()}
 	{:else}
-		<Icon class={iconClass} />
+		<HugeiconsIcon icon={submitIcon} strokeWidth={2} class={iconClass} />
 	{/if}
 </button>

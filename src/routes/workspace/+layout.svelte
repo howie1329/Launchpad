@@ -2,6 +2,15 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
+	import WorkspaceCommandPalette from '$lib/components/workspaces/WorkspaceCommandPalette.svelte';
+	import {
+		workspaceArtifactHref,
+		workspaceProjectHref,
+		workspaceRootHref,
+		workspaceSettingsHref,
+		workspaceThreadHref,
+		workspaceThreadViewHref
+	} from '$lib/workspace-nav';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import {
 		linkArtifactToThreadMutation,
@@ -10,8 +19,9 @@
 	} from '$lib/artifacts';
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display';
 	import { listThreadsQuery } from '$lib/chat';
+	import { formatThreadTitleForDisplay, PLACEHOLDER_THREAD_TITLE } from '$lib/thread-title';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
-	import { LaunchpadMark } from '$lib/components/brand';
+	import { LaunchpadMarkOutline } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -20,24 +30,26 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { cn } from '$lib/utils';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import * as Kbd from '$lib/components/ui/kbd';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
-	import {
-		createProjectFromThreadMutation,
-		listProjectsQuery
-	} from '$lib/projects';
+	import { createProjectFromThreadMutation, listProjectsQuery } from '$lib/projects';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import FolderIcon from '@lucide/svelte/icons/folder';
-	import LogOutIcon from '@lucide/svelte/icons/log-out';
-	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
-	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
-	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
-	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
-	import RocketIcon from '@lucide/svelte/icons/rocket';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import {
+		ArrowLeft01Icon,
+		ArrowRight01Icon,
+		Chat01Icon,
+		ChatAdd01Icon,
+		DollarCircleIcon,
+		File01Icon,
+		Folder01Icon,
+		Logout01Icon,
+		PanelRightCloseIcon,
+		PanelRightOpenIcon,
+		Rocket01Icon,
+		Search01Icon,
+		Settings01Icon
+	} from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { useQuery } from 'convex-svelte';
 	import type { Id } from '../../convex/_generated/dataModel';
 
@@ -59,6 +71,7 @@
 		Artifacts: true
 	});
 	let openProjectIds = $state<Record<string, boolean>>({});
+	let commandCenterOpen = $state(false);
 
 	const pathname = $derived($page.url.pathname);
 	const isSettingsActive = $derived(pathname === '/workspace/settings');
@@ -111,10 +124,11 @@
 	const headerTitle = $derived(
 		isSettingsActive
 			? 'Settings'
-			: (selectedThread?.title ??
-					selectedArtifact?.title ??
-					selectedProject?.name ??
-					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
+			: selectedThread
+				? formatThreadTitleForDisplay(selectedThread.title)
+				: (selectedArtifact?.title ??
+						selectedProject?.name ??
+						(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
 	);
 	const headerDescription = $derived(
 		isSettingsActive
@@ -125,6 +139,36 @@
 					? 'Start a new chat in this project.'
 					: ''
 	);
+
+	/** Outline Launchpad mark + contextual copy; a11y name comes from the link. */
+	const SIDEBAR_HOME_LABEL_MAX = 24;
+	const ellipsizeSidebarLabel = (text: string, max: number) => {
+		const t = text.trim();
+		if (t.length <= max) return t;
+		if (max <= 1) return '…';
+		return `${t.slice(0, max - 1)}…`;
+	};
+
+	const sidebarHomeTitleFull = $derived.by(() => {
+		if (isSettingsActive) return 'Settings';
+		if (activeThreadId) {
+			return formatThreadTitleForDisplay(selectedThread?.title ?? '');
+		}
+		if (activeArtifactId) {
+			const at = selectedArtifact?.title?.trim();
+			return at || 'Artifact';
+		}
+		if (activeProjectId) {
+			const pn = selectedProject?.name?.trim();
+			return pn || 'Project';
+		}
+		return 'Launchpad';
+	});
+
+	const sidebarHomeDisplayLabel = $derived(
+		ellipsizeSidebarLabel(sidebarHomeTitleFull, SIDEBAR_HOME_LABEL_MAX)
+	);
+	const sidebarHomeLinkAria = $derived(`Go to workspace home — ${sidebarHomeTitleFull}`);
 
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
@@ -158,7 +202,11 @@
 
 	const openPromoteDialog = () => {
 		if (!selectedThread || selectedThread.projectId) return;
-		promoteName = selectedThread.title?.trim() || 'New project';
+		const rawTitle = selectedThread.title?.trim() ?? '';
+		promoteName =
+			!rawTitle || rawTitle === PLACEHOLDER_THREAD_TITLE
+				? 'New project'
+				: formatThreadTitleForDisplay(selectedThread.title ?? '');
 		promoteSummary = '';
 		promoteError = '';
 		promoteDialogOpen = true;
@@ -196,9 +244,10 @@
 			promoteSummary = '';
 			workspaceNotice = 'Project created. This chat and its artifacts now live in the project.';
 			await goto(
-				resolve(
-					`/workspace?project=${encodeURIComponent(result.projectId)}&thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
-				)
+				workspaceThreadHref({
+					_id: activeThreadId as Id<'chatThreads'>,
+					projectId: result.projectId
+				})
 			);
 		} catch (error) {
 			console.error(error);
@@ -233,31 +282,86 @@
 	};
 
 	const toggleThreadContext = async () => {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
-
-		if (contextPanelOpen) {
-			await goto(
-				resolve(
-					`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
-				),
-				{
-					noScroll: true,
-					keepFocus: true
-				}
-			);
-			return;
-		}
-
+		if (!activeThreadId) return;
 		await goto(
-			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
-			),
+			workspaceThreadViewHref({
+				threadId: activeThreadId,
+				projectId: activeProjectId || null,
+				withContext: !contextPanelOpen
+			}),
 			{
 				noScroll: true,
 				keepFocus: true
 			}
 		);
 	};
+
+	function isWorkspaceTypableTarget(target: EventTarget | null) {
+		return (
+			target instanceof HTMLInputElement ||
+			target instanceof HTMLTextAreaElement ||
+			target instanceof HTMLSelectElement ||
+			(target instanceof HTMLElement && target.isContentEditable)
+		);
+	}
+
+	function handleWorkspaceKeydown(e: KeyboardEvent) {
+		if (auth.isLoading || !auth.isAuthenticated) return;
+		if (e.defaultPrevented) return;
+		const mod = e.metaKey || e.ctrlKey;
+		if (mod && (e.key === 'k' || e.key === 'K') && !e.shiftKey) {
+			e.preventDefault();
+			if (e.repeat) return;
+			commandCenterOpen = !commandCenterOpen;
+			return;
+		}
+		if (mod && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+			if (e.repeat || commandCenterOpen) return;
+			if (isWorkspaceTypableTarget(e.target)) return;
+			e.preventDefault();
+			document
+				.querySelector<HTMLElement>('#workspace-sidebar-nav [data-workspace-nav-item]')
+				?.focus();
+		}
+		trySidebarRovingKeydown(e);
+	}
+
+	function trySidebarRovingKeydown(e: KeyboardEvent) {
+		if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
+			return;
+		}
+		if (isWorkspaceTypableTarget(e.target)) return;
+
+		const nav = document.getElementById('workspace-sidebar-nav');
+		if (!nav) return;
+		if (!(e.target instanceof Node) || !nav.contains(e.target)) return;
+
+		const items = [
+			...nav.querySelectorAll<HTMLElement>('[data-workspace-nav-item]')
+		];
+		if (items.length === 0) return;
+		const active = document.activeElement;
+		if (!active || !nav.contains(active)) return;
+
+		const isNavItem = active.hasAttribute('data-workspace-nav-item');
+		const idx = isNavItem ? items.indexOf(active as HTMLElement) : -1;
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			if (idx < 0) items[0]?.focus();
+			else items[Math.min(idx + 1, items.length - 1)]?.focus();
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			if (idx < 0) items[items.length - 1]?.focus();
+			else items[Math.max(idx - 1, 0)]?.focus();
+		} else if (e.key === 'Home' && !e.metaKey && !e.ctrlKey) {
+			e.preventDefault();
+			items[0]?.focus();
+		} else if (e.key === 'End' && !e.metaKey && !e.ctrlKey) {
+			e.preventDefault();
+			items[items.length - 1]?.focus();
+		}
+	}
 
 	const handleSignOut = async () => {
 		if (isSigningOut) return;
@@ -283,6 +387,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={handleWorkspaceKeydown} />
+
 {#if auth.isLoading || !auth.isAuthenticated}
 	<main class="flex min-h-svh items-center justify-center bg-background px-5 text-foreground">
 		<div class="text-center">
@@ -296,20 +402,27 @@
 		class="h-svh overflow-hidden"
 		style="--sidebar-width: 15rem;"
 	>
-		<Sidebar.Root collapsible="icon" class="overflow-hidden">
+		<Sidebar.Root class="overflow-hidden" collapsible="icon">
+			<nav id="workspace-sidebar-nav" class="flex min-h-0 flex-1 flex-col" aria-label="Workspace">
 			<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
 				<Sidebar.Menu class="flex flex-row items-center gap-1">
 					<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 							{#snippet child({ props })}
-								<a href={resolve('/workspace')} aria-label="Workspace home" {...props}>
+								<a
+									href={workspaceRootHref()}
+									data-workspace-nav-item
+									aria-label={sidebarHomeLinkAria}
+									title={sidebarHomeTitleFull}
+									{...props}
+								>
 									<div
 										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
 									>
-										<LaunchpadMark class="size-3.5" />
+										<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
 									</div>
 									<span class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
-										>Workspace</span
+										>{sidebarHomeDisplayLabel}</span
 									>
 								</a>
 							{/snippet}
@@ -349,8 +462,13 @@
 								tooltipContent="New chat"
 							>
 								{#snippet child({ props })}
-									<a href={resolve('/workspace')} aria-label="New chat" {...props}>
-										<MessageSquarePlusIcon />
+									<a
+										href={workspaceRootHref()}
+										data-workspace-nav-item
+										aria-label="New chat"
+										{...props}
+									>
+										<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 										<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
 											>New chat</span
 										>
@@ -364,7 +482,9 @@
 				<Collapsible.Root bind:open={openSections.Projects} class="border-0 shadow-none ring-0">
 					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
-							<ChevronRightIcon
+							<HugeiconsIcon
+								icon={ArrowRight01Icon}
+								strokeWidth={2}
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Projects</span>
@@ -403,11 +523,13 @@
 																class={cn(navPill, 'min-w-0 pr-8')}
 																{...props}
 															>
-																<ChevronRightIcon
+																<HugeiconsIcon
+																	icon={ArrowRight01Icon}
+																	strokeWidth={2}
 																	class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
 																	data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
 																/>
-																<FolderIcon />
+																<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
 																<span class="min-w-0 truncate">{project.name}</span>
 															</Sidebar.MenuButton>
 														{/snippet}
@@ -415,12 +537,11 @@
 													<Sidebar.MenuAction aria-label={`New chat in ${project.name}`}>
 														{#snippet child({ props })}
 															<a
-																href={resolve(
-																	`/workspace?project=${encodeURIComponent(project._id)}`
-																)}
+																href={workspaceProjectHref(project._id)}
+																data-workspace-nav-item
 																{...props}
 															>
-																<MessageSquarePlusIcon />
+																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 															</a>
 														{/snippet}
 													</Sidebar.MenuAction>
@@ -440,9 +561,8 @@
 																	<Sidebar.MenuSubButton class={subNavPill}>
 																		{#snippet child({ props })}
 																			<a
-																				href={resolve(
-																					`/workspace?project=${encodeURIComponent(project._id)}`
-																				)}
+																				href={workspaceProjectHref(project._id)}
+																				data-workspace-nav-item
 																				{...props}
 																			>
 																				<span class="text-sidebar-foreground/60">Start chat</span>
@@ -460,12 +580,13 @@
 																		>
 																			{#snippet child({ props })}
 																				<a
-																					href={resolve(
-																						`/workspace?project=${encodeURIComponent(project._id)}&thread=${encodeURIComponent(thread._id)}`
-																					)}
-																					{...props}
-																				>
-																					<span class="min-w-0 truncate">{thread.title}</span>
+																						href={workspaceThreadHref(thread)}
+																						data-workspace-nav-item
+																						{...props}
+																					>
+																					<span class="min-w-0 truncate"
+																						>{formatThreadTitleForDisplay(thread.title)}</span
+																					>
 																				</a>
 																			{/snippet}
 																		</Sidebar.MenuSubButton>
@@ -487,7 +608,9 @@
 				<Collapsible.Root bind:open={openSections.Chats} class="border-0 shadow-none ring-0">
 					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
-							<ChevronRightIcon
+							<HugeiconsIcon
+								icon={ArrowRight01Icon}
+								strokeWidth={2}
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Inbox</span>
@@ -511,8 +634,12 @@
 												</p>
 												<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 													{#snippet child({ props })}
-														<a href={resolve('/workspace')} {...props}>
-															<MessageSquarePlusIcon />
+														<a
+															href={workspaceRootHref()}
+															data-workspace-nav-item
+															{...props}
+														>
+															<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 															<span class="min-w-0 truncate">Start first chat</span>
 														</a>
 													{/snippet}
@@ -529,11 +656,14 @@
 												>
 													{#snippet child({ props })}
 														<a
-															href={resolve(`/workspace?thread=${encodeURIComponent(thread._id)}`)}
+															href={workspaceThreadHref(thread)}
+															data-workspace-nav-item
 															{...props}
 														>
-															<MessageSquareTextIcon />
-															<span class="min-w-0 truncate">{thread.title}</span>
+															<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
+															<span class="min-w-0 truncate"
+																>{formatThreadTitleForDisplay(thread.title)}</span
+															>
 														</a>
 													{/snippet}
 												</Sidebar.MenuButton>
@@ -549,7 +679,9 @@
 				<Collapsible.Root bind:open={openSections.Artifacts} class="border-0 shadow-none ring-0">
 					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
-							<ChevronRightIcon
+							<HugeiconsIcon
+								icon={ArrowRight01Icon}
+								strokeWidth={2}
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Artifacts</span>
@@ -597,12 +729,15 @@
 														>
 															{#snippet child({ props })}
 																<a
-																	href={resolve(
-																		`/workspace/artifacts/${encodeURIComponent(artifact._id)}`
-																	)}
+																	href={workspaceArtifactHref(artifact._id)}
+																	data-workspace-nav-item
 																	{...props}
 																>
-																	<FileTextIcon class="shrink-0" />
+																	<HugeiconsIcon
+																		icon={File01Icon}
+																		strokeWidth={2}
+																		class="shrink-0"
+																	/>
 																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
 																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
 																		{artifactTypeLabel(artifact.type)}
@@ -636,7 +771,8 @@
 				<div class="group-data-[collapsible=icon]:hidden">
 					{#if budget.data}
 						<a
-							href={resolve('/workspace/settings')}
+							href={workspaceSettingsHref()}
+							data-workspace-nav-item
 							class="mb-2 block rounded-md px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 							aria-label={usageTooltip}
 						>
@@ -680,8 +816,13 @@
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton size="sm" class={navPill} tooltipContent={usageTooltip}>
 								{#snippet child({ props })}
-									<a href={resolve('/workspace/settings')} aria-label={usageTooltip} {...props}>
-										<CircleDollarSignIcon />
+									<a
+									href={workspaceSettingsHref()}
+									data-workspace-nav-item
+									aria-label={usageTooltip}
+									{...props}
+								>
+										<HugeiconsIcon icon={DollarCircleIcon} strokeWidth={2} />
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>
@@ -698,8 +839,13 @@
 							class={cn(navPill, 'min-w-0')}
 						>
 							{#snippet child({ props })}
-								<a href={resolve('/workspace/settings')} aria-label="Settings" {...props}>
-									<SettingsIcon />
+								<a
+									href={workspaceSettingsHref()}
+									data-workspace-nav-item
+									aria-label="Settings"
+									{...props}
+								>
+									<HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
 									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
 										>Settings</span
 									>
@@ -716,7 +862,7 @@
 							aria-disabled={isSigningOut}
 							onclick={handleSignOut}
 						>
-							<LogOutIcon />
+							<HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
 							<span class="group-data-[collapsible=icon]:sr-only">
 								{isSigningOut ? 'Signing out…' : 'Sign out'}
 							</span>
@@ -724,21 +870,44 @@
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 			</Sidebar.Footer>
+			</nav>
 		</Sidebar.Root>
 
 		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
 			<header
-				class="flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
+				class="flex h-10 shrink-0 items-center gap-1.5 border-b border-border/50 bg-background px-2 py-1"
 			>
-				<Sidebar.Trigger class="-ms-1" />
+				<Sidebar.Trigger class="shrink-0" />
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					class="h-7 shrink-0 gap-1.5 px-2 text-[11px] text-muted-foreground"
+					aria-label="Open command center"
+					onclick={() => {
+						commandCenterOpen = true;
+					}}
+				>
+					<HugeiconsIcon icon={Search01Icon} strokeWidth={2} class="size-3.5 opacity-80" />
+					<span class="hidden min-[400px]:inline">Search</span>
+					<Kbd.KbdGroup class="hidden gap-0.5 opacity-80 min-[400px]:inline-flex">
+						<Kbd.Kbd>⌘</Kbd.Kbd>
+						<Kbd.Kbd>K</Kbd.Kbd>
+					</Kbd.KbdGroup>
+				</Button>
 				<div class="min-w-0 flex-1">
 					{#if headerTitle}
-						<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+						<p class="truncate text-xs font-semibold tracking-tight text-foreground">
+							{headerTitle}
+						</p>
 					{/if}
 					{#if headerDescription}
-						<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
+						<p class="truncate text-[11px] text-muted-foreground {headerTitle ? 'mt-0.5' : ''}">
+							{headerDescription}
+						</p>
 					{/if}
 				</div>
+
 				{#if workspaceArtifactChrome.value}
 					<div
 						class="flex max-w-[min(100%,20rem)] shrink-[2] flex-wrap items-center justify-end gap-1 sm:max-w-none"
@@ -752,7 +921,7 @@
 								aria-label="Back to thread artifacts"
 								onclick={() => workspaceArtifactChrome.value?.onBack?.()}
 							>
-								<ChevronLeftIcon class="size-4" />
+								<HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} class="size-4" />
 							</Button>
 						{/if}
 						<div class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5">
@@ -793,7 +962,7 @@
 						class="h-8 shrink-0 gap-1.5 px-2 text-xs font-medium"
 						onclick={openPromoteDialog}
 					>
-						<RocketIcon class="size-3.5 shrink-0" />
+						<HugeiconsIcon icon={Rocket01Icon} strokeWidth={2} class="size-3.5 shrink-0" />
 						<span class="hidden min-[420px]:inline">Create project from chat</span>
 						<span class="min-[420px]:hidden">Project</span>
 					</Button>
@@ -808,9 +977,9 @@
 						onclick={toggleThreadContext}
 					>
 						{#if contextPanelOpen}
-							<PanelRightCloseIcon class="size-3.5" />
+							<HugeiconsIcon icon={PanelRightCloseIcon} strokeWidth={2} class="size-3.5" />
 						{:else}
-							<PanelRightOpenIcon class="size-3.5" />
+							<HugeiconsIcon icon={PanelRightOpenIcon} strokeWidth={2} class="size-3.5" />
 						{/if}
 					</Button>
 				{/if}
@@ -830,6 +999,20 @@
 				{@render children()}
 			</main>
 		</Sidebar.Inset>
+
+		<WorkspaceCommandPalette
+			bind:open={commandCenterOpen}
+			projects={projects.data}
+			threads={threads.data}
+			artifacts={artifacts.data}
+			activeThreadId={activeThreadId}
+			contextPanelOpen={contextPanelOpen}
+			canPromoteThreadToProject={canPromoteThreadToProject}
+			onRequestPromote={() => {
+				promoteDialogOpen = true;
+			}}
+			onToggleThreadContext={toggleThreadContext}
+		/>
 
 		<Dialog.Root bind:open={promoteDialogOpen}>
 			<Dialog.Content class="sm:max-w-md">
@@ -891,6 +1074,5 @@
 				</form>
 			</Dialog.Content>
 		</Dialog.Root>
-
 	</Sidebar.Provider>
 {/if}

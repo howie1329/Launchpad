@@ -73,6 +73,8 @@ export default defineSchema({
 		title: v.string(),
 		scopeType: chatThreadScopeType,
 		projectId: v.optional(v.id('projects')),
+		/** Set when the LLM has written the sidebar title (one-time). */
+		titleGeneratedAt: v.optional(v.number()),
 		createdAt: v.number(),
 		updatedAt: v.number()
 	})
@@ -100,6 +102,7 @@ export default defineSchema({
 		title: v.string(),
 		contentMarkdown: v.string(),
 		contentFormat: artifactContentFormat,
+		revision: v.optional(v.number()),
 		metadata: v.optional(artifactMetadata),
 		projectId: v.optional(v.id('projects')),
 		sourceThreadId: v.optional(v.id('chatThreads')),
@@ -128,6 +131,16 @@ export default defineSchema({
 		proposedTitle: v.string(),
 		proposedContentMarkdown: v.string(),
 		summary: v.optional(v.string()),
+		baseArtifactRevision: v.optional(v.number()),
+		baseTitle: v.optional(v.string()),
+		baseContentMarkdown: v.optional(v.string()),
+		patch: v.optional(v.any()),
+		changeSummary: v.optional(v.string()),
+		hasTitleChange: v.optional(v.boolean()),
+		changedSectionCount: v.optional(v.number()),
+		additionCount: v.optional(v.number()),
+		deletionCount: v.optional(v.number()),
+		staleReason: v.optional(v.string()),
 		status: artifactDraftChangeStatus,
 		createdAt: v.number(),
 		updatedAt: v.number(),

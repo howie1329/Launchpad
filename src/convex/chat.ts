@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import { PLACEHOLDER_THREAD_TITLE } from '../lib/thread-title';
 import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
 import { logActivityEvent } from './activityHelpers'
 import { mutation, query } from './_generated/server';
@@ -21,7 +22,6 @@ type StoredUIMessage = {
 export const createThread = mutation({
 	args: {
 		projectId: v.optional(v.id('projects')),
-		title: v.optional(v.string()),
 		text: v.string(),
 		modelId: v.optional(v.string())
 	},
@@ -38,10 +38,9 @@ export const createThread = mutation({
 		}
 
 		const now = Date.now();
-		const title = createTitle(args.title?.trim() || text);
 		const threadId = await ctx.db.insert('chatThreads', {
 			ownerId,
-			title,
+			title: PLACEHOLDER_THREAD_TITLE,
 			scopeType: args.projectId ? 'project' : 'general',
 			...(args.projectId ? { projectId: args.projectId } : {}),
 			createdAt: now,
@@ -195,6 +194,41 @@ export const saveMessages = mutation({
 	}
 });
 
+export const setThreadGeneratedTitle = mutation({
+	args: {
+		threadId: v.id('chatThreads'),
+		title: v.string(),
+		titleGeneratedAt: v.number()
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireAuthUserId(ctx);
+		const thread = await getOwnedThread(ctx, args.threadId, ownerId);
+
+		if (thread.titleGeneratedAt !== undefined) {
+			return { updated: false as const };
+		}
+		if (thread.title !== PLACEHOLDER_THREAD_TITLE) {
+			return { updated: false as const };
+		}
+
+		const trimmed = args.title.trim();
+		if (!trimmed) {
+			throw new Error('Title is required');
+		}
+
+		const safeTitle = trimmed.length > 120 ? `${trimmed.slice(0, 117)}…` : trimmed;
+		const now = Date.now();
+
+		await ctx.db.patch(thread._id, {
+			title: safeTitle,
+			titleGeneratedAt: args.titleGeneratedAt,
+			updatedAt: now
+		});
+
+		return { updated: true as const };
+	}
+});
+
 async function getOwnedProject(
 	ctx: QueryCtx | MutationCtx,
 	projectId: Id<'projects'>,
@@ -219,12 +253,6 @@ async function getOwnedThread(
 	}
 
 	return thread;
-}
-
-function createTitle(text: string) {
-	const firstLine = text.trim().split('\n')[0]?.trim() ?? '';
-	if (!firstLine) return 'Untitled chat';
-	return firstLine.length > 80 ? `${firstLine.slice(0, 77)}...` : firstLine;
 }
 
 function assertUIMessage(value: unknown): StoredUIMessage {

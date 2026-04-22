@@ -29,9 +29,11 @@
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Suggestion, Suggestions } from '$lib/components/ai-elements/suggestion';
 	import { defaultIdeaAiModelId, ideaAiModels, type IdeaAiModelId } from '$lib/idea-ai-models';
-	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import type { Component } from 'svelte';
+	import { prefersReducedMotion } from '$lib/prefers-reduced-motion.svelte';
+	import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
+	import { backOut } from 'svelte/easing';
+	import { fly } from 'svelte/transition';
 
 	type ChatLandingSuggestion = {
 		label: string;
@@ -42,7 +44,7 @@
 		title: string;
 		description: string;
 		prompt: string;
-		icon: Component;
+		icon: IconSvgElement;
 	};
 
 	type SubmitPayload = {
@@ -112,12 +114,31 @@
 			submitError = 'Could not start this chat. Please try again.';
 		}
 	};
+
+	const heroIn = $derived({
+		y: 8,
+		easing: backOut,
+		delay: prefersReducedMotion.current ? 0 : 0,
+		duration: prefersReducedMotion.current ? 0 : 220
+	});
+	const promptIn = $derived({
+		y: 8,
+		easing: backOut,
+		delay: prefersReducedMotion.current ? 0 : 50,
+		duration: prefersReducedMotion.current ? 0 : 220
+	});
+	const suggestionsAndExamplesIn = $derived({
+		y: 8,
+		easing: backOut,
+		delay: prefersReducedMotion.current ? 0 : 100,
+		duration: prefersReducedMotion.current ? 0 : 220
+	});
 </script>
 
 <section class="flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
 	<div class="flex flex-1 flex-col justify-center px-4 pt-4 pb-6 sm:px-6 sm:pt-6 lg:px-8">
 		<div class="mx-auto flex w-full max-w-4xl flex-col gap-5">
-			<div class="text-center">
+			<div class="text-center" in:fly={heroIn}>
 				<p class="mb-1.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
 					{kicker}
 				</p>
@@ -127,6 +148,7 @@
 				</p>
 			</div>
 
+			<div class="w-full" in:fly={promptIn}>
 			<PromptInput
 				class="w-full overflow-hidden rounded-lg border-0 bg-card/80 shadow-none ring-1 ring-border/70 backdrop-blur-sm"
 				clearOnSubmit={false}
@@ -145,7 +167,7 @@
 								class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 							>
 								{selectedModel.label}
-								<ChevronDownIcon class="size-3" />
+								<HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} class="size-3" />
 							</ModelSelectorTrigger>
 							<ModelSelectorContent class="max-w-sm">
 								<ModelSelectorInput placeholder="Search models..." />
@@ -185,15 +207,17 @@
 						</Context>
 					</PromptInputTools>
 					<PromptInputSubmit class="size-8 shrink-0 rounded-md shadow-none" disabled={!canSubmit}>
-						<ArrowUpIcon class="size-4" />
+						<HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} class="size-4" />
 					</PromptInputSubmit>
 				</PromptInputToolbar>
 			</PromptInput>
 
 			{#if submitError}
-				<p class="w-full text-left text-xs text-destructive">{submitError}</p>
+				<p class="mt-2 w-full text-left text-xs text-destructive">{submitError}</p>
 			{/if}
+			</div>
 
+			<div class="w-full" in:fly={suggestionsAndExamplesIn}>
 			<Suggestions class="gap-1.5 py-0.5" scrollbarXClasses="hidden">
 				{#each suggestions as suggestion (suggestion.label)}
 					<Suggestion
@@ -206,30 +230,33 @@
 					</Suggestion>
 				{/each}
 			</Suggestions>
-		</div>
-	</div>
 
-	<div class="mx-auto w-full max-w-4xl shrink-0 scroll-mt-8 px-4 pt-8 pb-16 sm:px-6 lg:px-8">
-		<div class="mb-1.5 flex items-center justify-between gap-3">
-			<p class="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Examples</p>
-		</div>
+			<div class="w-full scroll-mt-8 pt-6 pb-10 sm:pt-8 sm:pb-16">
+				<div class="mb-1.5 flex items-center justify-between gap-3">
+					<p class="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">Examples</p>
+				</div>
 
-		<div class="grid gap-1 sm:grid-cols-3">
-			{#each examples as example (example.title)}
-				<button
-					type="button"
-					class="group flex min-h-[4.5rem] flex-col items-start rounded-md border border-transparent p-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-					onclick={() => fillComposer(example.prompt)}
-				>
-					<example.icon
-						class="mb-2 size-3 text-muted-foreground transition-colors group-hover:text-foreground"
-					/>
-					<span class="text-[11px] leading-snug font-medium tracking-tight">{example.title}</span>
-					<span class="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
-						{example.description}
-					</span>
-				</button>
-			{/each}
+				<div class="grid gap-1 sm:grid-cols-3">
+					{#each examples as example (example.title)}
+						<button
+							type="button"
+							class="group flex min-h-[4.5rem] flex-col items-start rounded-md border border-transparent p-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							onclick={() => fillComposer(example.prompt)}
+						>
+							<HugeiconsIcon
+								icon={example.icon}
+								strokeWidth={2}
+								class="mb-2 size-3 text-muted-foreground transition-colors group-hover:text-foreground"
+							/>
+							<span class="text-[11px] leading-snug font-medium tracking-tight">{example.title}</span>
+							<span class="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
+								{example.description}
+							</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+			</div>
 		</div>
 	</div>
 </section>

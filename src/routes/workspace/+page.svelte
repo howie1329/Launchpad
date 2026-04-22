@@ -5,14 +5,15 @@
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import { getSafePostAuthRedirect } from '$lib/safeRedirect';
 	import { createThreadMutation } from '$lib/chat';
+	import { prefersReducedMotion } from '$lib/prefers-reduced-motion.svelte';
 	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params';
 	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte';
 	import WorkspaceThread from '$lib/components/workspaces/WorkspaceThread.svelte';
 	import type { Id } from '../../convex/_generated/dataModel';
-	import BoxIcon from '@lucide/svelte/icons/box';
-	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
-	import TargetIcon from '@lucide/svelte/icons/target';
+	import { Package01Icon, Target01Icon, TaskDaily01Icon } from '@hugeicons/core-free-icons';
 	import { useSearchParams } from 'runed/kit';
+	import { backOut } from 'svelte/easing';
+	import { fade, fly } from 'svelte/transition';
 
 	const routeParams = useSearchParams(workspaceSearchParamsSchema);
 	const activeProjectId = $derived(routeParams.project.trim());
@@ -45,21 +46,21 @@
 			description: 'Find the project hiding inside a messy note',
 			prompt:
 				'I keep noticing a messy workflow that might be worth building around. Help me turn the rough thought into a clear project with a target user and first version.',
-			icon: BoxIcon
+			icon: Package01Icon
 		},
 		{
 			title: 'Validate the pain',
 			description: 'Decide if the project is worth promoting',
 			prompt:
 				'I have a possible project, but I am not sure if the pain is real. Help me find the riskiest assumption and the fastest validation path.',
-			icon: TargetIcon
+			icon: Target01Icon
 		},
 		{
 			title: 'Draft a project PRD',
 			description: 'Leave with scope you can build from',
 			prompt:
 				'This project feels promising. Help me shape it into a practical first-version PRD with clear must-haves and non-goals.',
-			icon: ClipboardListIcon
+			icon: TaskDaily01Icon
 		}
 	] as const;
 
@@ -83,6 +84,15 @@
 			)
 		);
 	};
+
+	const pageFlyIn = $derived({
+		y: 8,
+		duration: prefersReducedMotion.current ? 0 : 220,
+		easing: backOut
+	});
+	const pageFadeOut = $derived({
+		duration: prefersReducedMotion.current ? 0 : 130
+	});
 </script>
 
 <svelte:head>
@@ -91,14 +101,18 @@
 </svelte:head>
 
 {#if activeThreadId}
-	<WorkspaceThread />
+	<div class="h-full min-h-0 flex flex-1 flex-col" in:fly={pageFlyIn} out:fade={pageFadeOut}>
+		<WorkspaceThread />
+	</div>
 {:else}
-	<WorkspaceChatLanding
-		title="Turn a rough idea into a project."
-		description="Start with the messy version. Leave with a named project, useful context, and a tighter first build."
-		placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
-		{suggestions}
-		{examples}
-		onSubmit={startThread}
-	/>
+	<div class="h-full min-h-0 flex flex-1 flex-col" in:fly={pageFlyIn} out:fade={pageFadeOut}>
+		<WorkspaceChatLanding
+			title="Turn a rough idea into a project."
+			description="Start with the messy version. Leave with a named project, useful context, and a tighter first build."
+			placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
+			{suggestions}
+			{examples}
+			onSubmit={startThread}
+		/>
+	</div>
 {/if}

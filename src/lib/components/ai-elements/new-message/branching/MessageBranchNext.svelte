@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { Button, type ButtonProps } from "$lib/components/ui/button/index.js";
 	import { cn } from "$lib/utils";
-	import ChevronRight from "@lucide/svelte/icons/chevron-right";
+	import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 	import type { Snippet } from "svelte";
 	import { getMessageBranchContext } from "../context/message-context.svelte.js";
 
@@ -32,6 +33,6 @@
 	{#if children}
 		{@render children()}
 	{:else}
-		<ChevronRight class="size-3.5" />
+		<HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} class="size-3.5" />
 	{/if}
 </Button>

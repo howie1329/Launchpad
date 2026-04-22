@@ -1,12 +1,18 @@
-import { v } from 'convex/values'
-import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers'
-import { logActivityEvent } from './activityHelpers'
-import { mutation, query } from './_generated/server'
-import type { Doc, Id } from './_generated/dataModel'
-import type { MutationCtx, QueryCtx } from './_generated/server'
+import { v } from 'convex/values';
+import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
+import { logActivityEvent } from './activityHelpers';
+import { mutation, query } from './_generated/server';
+import type { Doc, Id } from './_generated/dataModel';
+import type { MutationCtx, QueryCtx } from './_generated/server';
+import {
+	createArtifactDraftReviewData,
+	deriveLegacyArtifactDraftReviewData,
+	getArtifactRevision,
+	type StoredArtifactPatch
+} from './artifactDiffs';
 
-const metadataValue = v.record(v.string(), v.any())
-const linkReasonValue = v.union(v.literal('referenced'), v.literal('imported'))
+const metadataValue = v.record(v.string(), v.any());
+const linkReasonValue = v.union(v.literal('referenced'), v.literal('imported'));
 
 export const createArtifact = mutation({
 	args: {
@@ -18,41 +24,42 @@ export const createArtifact = mutation({
 		sourceThreadId: v.optional(v.id('chatThreads'))
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
-		const type = args.type.trim()
-		const title = args.title.trim()
-		const contentMarkdown = args.contentMarkdown
+		const ownerId = await requireAuthUserId(ctx);
+		const type = args.type.trim();
+		const title = args.title.trim();
+		const contentMarkdown = args.contentMarkdown;
 
 		if (!type) {
-			throw new Error('Artifact type is required')
+			throw new Error('Artifact type is required');
 		}
 		if (!title) {
-			throw new Error('Artifact title is required')
+			throw new Error('Artifact title is required');
 		}
 		if (!contentMarkdown.trim()) {
-			throw new Error('Artifact content is required')
+			throw new Error('Artifact content is required');
 		}
 
 		const sourceThread = args.sourceThreadId
 			? await getOwnedThread(ctx, args.sourceThreadId, ownerId)
-			: null
-		const projectId = await resolveProjectId(ctx, ownerId, args.projectId, sourceThread)
-		const now = Date.now()
+			: null;
+		const projectId = await resolveProjectId(ctx, ownerId, args.projectId, sourceThread);
+		const now = Date.now();
 		const artifactId = await ctx.db.insert('artifacts', {
 			ownerId,
 			type,
 			title,
 			contentMarkdown,
 			contentFormat: 'markdown',
+			revision: 1,
 			...(args.metadata ? { metadata: args.metadata } : {}),
 			...(projectId ? { projectId } : {}),
 			...(args.sourceThreadId ? { sourceThreadId: args.sourceThreadId } : {}),
 			createdAt: now,
 			updatedAt: now
-		})
+		});
 
 		if (args.sourceThreadId) {
-			await upsertThreadArtifactLink(ctx, ownerId, args.sourceThreadId, artifactId, 'created', now)
+			await upsertThreadArtifactLink(ctx, ownerId, args.sourceThreadId, artifactId, 'created', now);
 		}
 
 		await logActivityEvent(ctx, {
@@ -65,86 +72,86 @@ export const createArtifact = mutation({
 				...(args.sourceThreadId ? { threadId: args.sourceThreadId } : {})
 			},
 			occurredAtMs: now
-		})
+		});
 
-		return { artifactId }
+		return { artifactId };
 	}
-})
+});
 
 export const listArtifacts = query({
 	args: {},
 	handler: async (ctx) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
-		if (!ownerId) return []
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return [];
 
 		return await ctx.db
 			.query('artifacts')
 			.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
 			.order('desc')
-			.take(200)
+			.take(200);
 	}
-})
+});
 
 export const listProjectArtifacts = query({
 	args: {
 		projectId: v.id('projects')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
-		if (!ownerId) return []
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return [];
 
-		await getOwnedProject(ctx, args.projectId, ownerId)
+		await getOwnedProject(ctx, args.projectId, ownerId);
 
 		return await ctx.db
 			.query('artifacts')
 			.withIndex('by_projectId_and_updatedAt', (q) => q.eq('projectId', args.projectId))
 			.order('desc')
-			.take(100)
+			.take(100);
 	}
-})
+});
 
 export const listThreadArtifacts = query({
 	args: {
 		threadId: v.id('chatThreads')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
-		if (!ownerId) return []
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return [];
 
-		await getOwnedThread(ctx, args.threadId, ownerId)
+		await getOwnedThread(ctx, args.threadId, ownerId);
 
 		const links = await ctx.db
 			.query('threadArtifactLinks')
 			.withIndex('by_threadId_and_updatedAt', (q) => q.eq('threadId', args.threadId))
 			.order('desc')
-			.take(100)
-		const rows = []
+			.take(100);
+		const rows = [];
 
 		for (const link of links) {
-			const artifact = await ctx.db.get(link.artifactId)
+			const artifact = await ctx.db.get(link.artifactId);
 			if (artifact && artifact.ownerId === ownerId) {
-				rows.push({ link, artifact })
+				rows.push({ link, artifact });
 			}
 		}
 
-		return rows
+		return rows;
 	}
-})
+});
 
 export const getArtifact = query({
 	args: {
 		artifactId: v.id('artifacts')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
-		if (!ownerId) return null
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return null;
 
-		const artifact = await ctx.db.get(args.artifactId)
-		if (!artifact || artifact.ownerId !== ownerId) return null
+		const artifact = await ctx.db.get(args.artifactId);
+		if (!artifact || artifact.ownerId !== ownerId) return null;
 
-		return artifact
+		return artifact;
 	}
-})
+});
 
 export const updateArtifact = mutation({
 	args: {
@@ -155,62 +162,68 @@ export const updateArtifact = mutation({
 		projectId: v.optional(v.union(v.id('projects'), v.null()))
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
-		const artifact = await getOwnedArtifact(ctx, args.artifactId, ownerId)
-		const now = Date.now()
-		const patch: Partial<Doc<'artifacts'>> = { updatedAt: now }
+		const ownerId = await requireAuthUserId(ctx);
+		const artifact = await getOwnedArtifact(ctx, args.artifactId, ownerId);
+		const now = Date.now();
+		const patch: Partial<Doc<'artifacts'>> = { updatedAt: now };
+		let shouldBumpRevision = false;
 
 		if (args.title !== undefined) {
-			const title = args.title.trim()
+			const title = args.title.trim();
 			if (!title) {
-				throw new Error('Artifact title is required')
+				throw new Error('Artifact title is required');
 			}
-			patch.title = title
+			patch.title = title;
+			shouldBumpRevision = true;
 		}
 		if (args.contentMarkdown !== undefined) {
 			if (!args.contentMarkdown.trim()) {
-				throw new Error('Artifact content is required')
+				throw new Error('Artifact content is required');
 			}
-			patch.contentMarkdown = args.contentMarkdown
+			patch.contentMarkdown = args.contentMarkdown;
+			shouldBumpRevision = true;
 		}
 		if (args.metadata !== undefined) {
-			patch.metadata = args.metadata ?? undefined
+			patch.metadata = args.metadata ?? undefined;
 		}
 		if (args.projectId !== undefined) {
 			if (args.projectId) {
-				await getOwnedProject(ctx, args.projectId, ownerId)
+				await getOwnedProject(ctx, args.projectId, ownerId);
 			}
-			patch.projectId = args.projectId ?? undefined
+			patch.projectId = args.projectId ?? undefined;
+		}
+		if (shouldBumpRevision) {
+			patch.revision = getArtifactRevision(artifact) + 1;
 		}
 
-		await ctx.db.patch(artifact._id, patch)
+		await ctx.db.patch(artifact._id, patch);
 
-		return { ok: true as const }
+		return { ok: true as const };
 	}
-})
+});
 
 export const deleteArtifact = mutation({
 	args: {
 		artifactId: v.id('artifacts')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
-		await getOwnedArtifact(ctx, args.artifactId, ownerId)
+		const ownerId = await requireAuthUserId(ctx);
+		await getOwnedArtifact(ctx, args.artifactId, ownerId);
 
 		const links = await ctx.db
 			.query('threadArtifactLinks')
 			.withIndex('by_artifactId_and_updatedAt', (q) => q.eq('artifactId', args.artifactId))
-			.collect()
+			.collect();
 		for (const link of links) {
-			await ctx.db.delete(link._id)
+			await ctx.db.delete(link._id);
 		}
 
 		const drafts = await ctx.db
 			.query('artifactDraftChanges')
 			.withIndex('by_artifactId_and_updatedAt', (q) => q.eq('artifactId', args.artifactId))
-			.collect()
+			.collect();
 		for (const draft of drafts) {
-			await ctx.db.delete(draft._id)
+			await ctx.db.delete(draft._id);
 		}
 
 		const memoryRow = await ctx.db
@@ -218,14 +231,14 @@ export const deleteArtifact = mutation({
 			.withIndex('by_sourceType_and_sourceId', (q) =>
 				q.eq('sourceType', 'artifact').eq('sourceId', args.artifactId)
 			)
-			.unique()
+			.unique();
 		if (memoryRow) {
-			await ctx.db.delete(memoryRow._id)
+			await ctx.db.delete(memoryRow._id);
 		}
 
-		await ctx.db.delete(args.artifactId)
+		await ctx.db.delete(args.artifactId);
 
-		const now = Date.now()
+		const now = Date.now();
 		await logActivityEvent(ctx, {
 			ownerId,
 			eventType: 'artifact_deleted',
@@ -233,11 +246,11 @@ export const deleteArtifact = mutation({
 				artifactId: args.artifactId
 			},
 			occurredAtMs: now
-		})
+		});
 
-		return { ok: true as const }
+		return { ok: true as const };
 	}
-})
+});
 
 export const linkArtifactToThread = mutation({
 	args: {
@@ -246,10 +259,10 @@ export const linkArtifactToThread = mutation({
 		reason: linkReasonValue
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
+		const ownerId = await requireAuthUserId(ctx);
 
-		await getOwnedThread(ctx, args.threadId, ownerId)
-		await getOwnedArtifact(ctx, args.artifactId, ownerId)
+		await getOwnedThread(ctx, args.threadId, ownerId);
+		await getOwnedArtifact(ctx, args.artifactId, ownerId);
 		await upsertThreadArtifactLink(
 			ctx,
 			ownerId,
@@ -257,11 +270,11 @@ export const linkArtifactToThread = mutation({
 			args.artifactId,
 			args.reason,
 			Date.now()
-		)
+		);
 
-		return { ok: true as const }
+		return { ok: true as const };
 	}
-})
+});
 
 export const createArtifactDraftChange = mutation({
 	args: {
@@ -272,23 +285,29 @@ export const createArtifactDraftChange = mutation({
 		summary: v.optional(v.string())
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
-		const proposedTitle = args.proposedTitle.trim()
-		const proposedContentMarkdown = args.proposedContentMarkdown
-		const summary = args.summary?.trim()
+		const ownerId = await requireAuthUserId(ctx);
+		const proposedTitle = args.proposedTitle.trim();
+		const proposedContentMarkdown = args.proposedContentMarkdown;
+		const summary = args.summary?.trim();
 
-		await getOwnedArtifact(ctx, args.artifactId, ownerId)
+		const artifact = await getOwnedArtifact(ctx, args.artifactId, ownerId);
 		if (args.threadId) {
-			await getOwnedThread(ctx, args.threadId, ownerId)
+			await getOwnedThread(ctx, args.threadId, ownerId);
 		}
 		if (!proposedTitle) {
-			throw new Error('Proposed title is required')
+			throw new Error('Proposed title is required');
 		}
 		if (!proposedContentMarkdown.trim()) {
-			throw new Error('Proposed content is required')
+			throw new Error('Proposed content is required');
 		}
 
-		const now = Date.now()
+		const now = Date.now();
+		const reviewData = createArtifactDraftReviewData({
+			artifact,
+			proposedTitle,
+			proposedContentMarkdown,
+			summary
+		});
 		const draftChangeId = await ctx.db.insert('artifactDraftChanges', {
 			ownerId,
 			artifactId: args.artifactId,
@@ -296,10 +315,19 @@ export const createArtifactDraftChange = mutation({
 			proposedTitle,
 			proposedContentMarkdown,
 			...(summary ? { summary } : {}),
+			baseArtifactRevision: reviewData.baseArtifactRevision,
+			baseTitle: reviewData.baseTitle,
+			baseContentMarkdown: reviewData.baseContentMarkdown,
+			patch: reviewData.patch,
+			changeSummary: reviewData.changeSummary,
+			hasTitleChange: reviewData.hasTitleChange,
+			changedSectionCount: reviewData.changedSectionCount,
+			additionCount: reviewData.additionCount,
+			deletionCount: reviewData.deletionCount,
 			status: 'pending',
 			createdAt: now,
 			updatedAt: now
-		})
+		});
 
 		await logActivityEvent(ctx, {
 			ownerId,
@@ -310,93 +338,189 @@ export const createArtifactDraftChange = mutation({
 				...(args.threadId ? { threadId: args.threadId } : {})
 			},
 			occurredAtMs: now
-		})
+		});
 
-		return { draftChangeId }
+		return { draftChangeId };
 	}
-})
+});
 
 export const listArtifactDraftChanges = query({
 	args: {
 		artifactId: v.id('artifacts')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
-		if (!ownerId) return []
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return [];
 
-		await getOwnedArtifact(ctx, args.artifactId, ownerId)
+		await getOwnedArtifact(ctx, args.artifactId, ownerId);
 
-		return await ctx.db
+		const drafts = await ctx.db
 			.query('artifactDraftChanges')
 			.withIndex('by_artifactId_and_updatedAt', (q) => q.eq('artifactId', args.artifactId))
 			.order('desc')
-			.take(50)
+			.take(50);
+
+		const artifact = await ctx.db.get(args.artifactId);
+		if (!artifact) return [];
+
+		return drafts.map((draftChange) => normalizeDraftChangeForArtifact(artifact, draftChange));
 	}
-})
+});
+
+export const hydrateArtifactDraftChangeReviewData = mutation({
+	args: {
+		draftChangeId: v.id('artifactDraftChanges')
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireAuthUserId(ctx);
+		const draftChange = await getOwnedDraftChange(ctx, args.draftChangeId, ownerId);
+
+		if (draftChange.status !== 'pending') {
+			return { ok: true as const, hydrated: false as const };
+		}
+
+		if (
+			draftChange.baseArtifactRevision !== undefined &&
+			draftChange.baseTitle !== undefined &&
+			draftChange.baseContentMarkdown !== undefined &&
+			draftChange.patch !== undefined
+		) {
+			return { ok: true as const, hydrated: false as const };
+		}
+
+		const artifact = await getOwnedArtifact(ctx, draftChange.artifactId, ownerId);
+		const legacyReviewData = deriveLegacyArtifactDraftReviewData({ artifact, draftChange });
+		const now = Date.now();
+
+		if (!legacyReviewData.ok) {
+			await ctx.db.patch(draftChange._id, {
+				staleReason: legacyReviewData.staleReason,
+				updatedAt: now
+			});
+			return { ok: true as const, hydrated: false as const, stale: true as const };
+		}
+
+		await ctx.db.patch(draftChange._id, {
+			baseArtifactRevision: legacyReviewData.reviewData.baseArtifactRevision,
+			baseTitle: legacyReviewData.reviewData.baseTitle,
+			baseContentMarkdown: legacyReviewData.reviewData.baseContentMarkdown,
+			patch: legacyReviewData.reviewData.patch,
+			changeSummary: legacyReviewData.reviewData.changeSummary,
+			hasTitleChange: legacyReviewData.reviewData.hasTitleChange,
+			changedSectionCount: legacyReviewData.reviewData.changedSectionCount,
+			additionCount: legacyReviewData.reviewData.additionCount,
+			deletionCount: legacyReviewData.reviewData.deletionCount,
+			staleReason: undefined,
+			updatedAt: now
+		});
+
+		return { ok: true as const, hydrated: true as const };
+	}
+});
 
 export const listThreadDraftChanges = query({
 	args: {
 		threadId: v.id('chatThreads')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
-		if (!ownerId) return []
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return [];
 
-		await getOwnedThread(ctx, args.threadId, ownerId)
+		await getOwnedThread(ctx, args.threadId, ownerId);
 
 		const links = await ctx.db
 			.query('threadArtifactLinks')
 			.withIndex('by_threadId_and_updatedAt', (q) => q.eq('threadId', args.threadId))
 			.order('desc')
-			.take(100)
-		const threadArtifactIds = new Set(links.map((link) => link.artifactId))
+			.take(100);
+		const threadArtifactIds = new Set(links.map((link) => link.artifactId));
 		const draftChanges = await ctx.db
 			.query('artifactDraftChanges')
 			.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
 			.order('desc')
-			.take(100)
-		const rows = []
+			.take(100);
+		const rows = [];
 
 		for (const draftChange of draftChanges) {
-			if (draftChange.status !== 'pending') continue
-			if (draftChange.threadId !== args.threadId) continue
-			if (!threadArtifactIds.has(draftChange.artifactId)) continue
+			if (draftChange.status !== 'pending') continue;
+			if (draftChange.threadId !== args.threadId) continue;
+			if (!threadArtifactIds.has(draftChange.artifactId)) continue;
 
-			const artifact = await ctx.db.get(draftChange.artifactId)
+			const artifact = await ctx.db.get(draftChange.artifactId);
 			if (artifact && artifact.ownerId === ownerId) {
-				rows.push({ draftChange, artifact })
+				rows.push({
+					draftChange: normalizeDraftChangeForArtifact(artifact, draftChange),
+					artifact
+				});
 			}
 		}
 
-		return rows
+		return rows;
 	}
-})
+});
 
 export const applyArtifactDraftChange = mutation({
 	args: {
 		draftChangeId: v.id('artifactDraftChanges')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
-		const draftChange = await getOwnedDraftChange(ctx, args.draftChangeId, ownerId)
+		const ownerId = await requireAuthUserId(ctx);
+		const draftChange = await getOwnedDraftChange(ctx, args.draftChangeId, ownerId);
 
 		if (draftChange.status !== 'pending') {
-			throw new Error('Draft change is not pending')
+			throw new Error('Draft change is not pending');
 		}
 
-		const artifact = await getOwnedArtifact(ctx, draftChange.artifactId, ownerId)
-		const now = Date.now()
+		const artifact = await getOwnedArtifact(ctx, draftChange.artifactId, ownerId);
+		const now = Date.now();
+		const currentRevision = getArtifactRevision(artifact);
+
+		if (draftChange.baseArtifactRevision === undefined) {
+			const legacyReviewData = deriveLegacyArtifactDraftReviewData({ artifact, draftChange });
+			if (!legacyReviewData.ok) {
+				await ctx.db.patch(draftChange._id, {
+					staleReason: legacyReviewData.staleReason,
+					updatedAt: now
+				});
+				throw new Error(legacyReviewData.staleReason);
+			}
+
+			await ctx.db.patch(draftChange._id, {
+				baseArtifactRevision: legacyReviewData.reviewData.baseArtifactRevision,
+				baseTitle: legacyReviewData.reviewData.baseTitle,
+				baseContentMarkdown: legacyReviewData.reviewData.baseContentMarkdown,
+				patch: legacyReviewData.reviewData.patch,
+				changeSummary: legacyReviewData.reviewData.changeSummary,
+				hasTitleChange: legacyReviewData.reviewData.hasTitleChange,
+				changedSectionCount: legacyReviewData.reviewData.changedSectionCount,
+				additionCount: legacyReviewData.reviewData.additionCount,
+				deletionCount: legacyReviewData.reviewData.deletionCount,
+				staleReason: undefined,
+				updatedAt: now
+			});
+			draftChange.baseArtifactRevision = legacyReviewData.reviewData.baseArtifactRevision;
+		}
+
+		if (draftChange.baseArtifactRevision !== currentRevision) {
+			await ctx.db.patch(draftChange._id, {
+				staleReason: 'This draft is stale because the artifact changed after it was created.',
+				updatedAt: now
+			});
+			throw new Error('Draft change is stale');
+		}
 
 		await ctx.db.patch(artifact._id, {
 			title: draftChange.proposedTitle,
 			contentMarkdown: draftChange.proposedContentMarkdown,
+			revision: currentRevision + 1,
 			updatedAt: now
-		})
+		});
 		await ctx.db.patch(draftChange._id, {
 			status: 'applied',
 			appliedAt: now,
+			staleReason: undefined,
 			updatedAt: now
-		})
+		});
 
 		await logActivityEvent(ctx, {
 			ownerId,
@@ -407,31 +531,31 @@ export const applyArtifactDraftChange = mutation({
 				...(draftChange.threadId ? { threadId: draftChange.threadId } : {})
 			},
 			occurredAtMs: now
-		})
+		});
 
-		return { ok: true as const }
+		return { ok: true as const };
 	}
-})
+});
 
 export const discardArtifactDraftChange = mutation({
 	args: {
 		draftChangeId: v.id('artifactDraftChanges')
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
-		const draftChange = await getOwnedDraftChange(ctx, args.draftChangeId, ownerId)
+		const ownerId = await requireAuthUserId(ctx);
+		const draftChange = await getOwnedDraftChange(ctx, args.draftChangeId, ownerId);
 
 		if (draftChange.status !== 'pending') {
-			throw new Error('Draft change is not pending')
+			throw new Error('Draft change is not pending');
 		}
 
-		const now = Date.now()
+		const now = Date.now();
 
 		await ctx.db.patch(draftChange._id, {
 			status: 'discarded',
 			discardedAt: now,
 			updatedAt: now
-		})
+		});
 
 		await logActivityEvent(ctx, {
 			ownerId,
@@ -442,11 +566,11 @@ export const discardArtifactDraftChange = mutation({
 				...(draftChange.threadId ? { threadId: draftChange.threadId } : {})
 			},
 			occurredAtMs: now
-		})
+		});
 
-		return { ok: true as const }
+		return { ok: true as const };
 	}
-})
+});
 
 async function resolveProjectId(
 	ctx: QueryCtx | MutationCtx,
@@ -455,14 +579,14 @@ async function resolveProjectId(
 	sourceThread: Doc<'chatThreads'> | null
 ) {
 	if (projectId) {
-		await getOwnedProject(ctx, projectId, ownerId)
+		await getOwnedProject(ctx, projectId, ownerId);
 	}
 
 	if (sourceThread?.projectId && projectId && sourceThread.projectId !== projectId) {
-		throw new Error('Artifact project must match source thread project')
+		throw new Error('Artifact project must match source thread project');
 	}
 
-	return projectId ?? sourceThread?.projectId
+	return projectId ?? sourceThread?.projectId;
 }
 
 async function upsertThreadArtifactLink(
@@ -478,14 +602,14 @@ async function upsertThreadArtifactLink(
 		.withIndex('by_threadId_and_artifactId', (q) =>
 			q.eq('threadId', threadId).eq('artifactId', artifactId)
 		)
-		.unique()
+		.unique();
 
 	if (existing) {
 		await ctx.db.patch(existing._id, {
 			reason,
 			updatedAt: now
-		})
-		return existing._id
+		});
+		return existing._id;
 	}
 
 	return await ctx.db.insert('threadArtifactLinks', {
@@ -495,7 +619,7 @@ async function upsertThreadArtifactLink(
 		reason,
 		createdAt: now,
 		updatedAt: now
-	})
+	});
 }
 
 async function getOwnedProject(
@@ -503,12 +627,12 @@ async function getOwnedProject(
 	projectId: Id<'projects'>,
 	ownerId: Id<'users'>
 ) {
-	const project = await ctx.db.get(projectId)
+	const project = await ctx.db.get(projectId);
 	if (!project || project.ownerId !== ownerId) {
-		throw new Error('Project not found')
+		throw new Error('Project not found');
 	}
 
-	return project
+	return project;
 }
 
 async function getOwnedThread(
@@ -516,12 +640,12 @@ async function getOwnedThread(
 	threadId: Id<'chatThreads'>,
 	ownerId: Id<'users'>
 ) {
-	const thread = await ctx.db.get(threadId)
+	const thread = await ctx.db.get(threadId);
 	if (!thread || thread.ownerId !== ownerId) {
-		throw new Error('Thread not found')
+		throw new Error('Thread not found');
 	}
 
-	return thread
+	return thread;
 }
 
 async function getOwnedArtifact(
@@ -529,12 +653,12 @@ async function getOwnedArtifact(
 	artifactId: Id<'artifacts'>,
 	ownerId: Id<'users'>
 ) {
-	const artifact = await ctx.db.get(artifactId)
+	const artifact = await ctx.db.get(artifactId);
 	if (!artifact || artifact.ownerId !== ownerId) {
-		throw new Error('Artifact not found')
+		throw new Error('Artifact not found');
 	}
 
-	return artifact
+	return artifact;
 }
 
 async function getOwnedDraftChange(
@@ -542,10 +666,52 @@ async function getOwnedDraftChange(
 	draftChangeId: Id<'artifactDraftChanges'>,
 	ownerId: Id<'users'>
 ) {
-	const draftChange = await ctx.db.get(draftChangeId)
+	const draftChange = await ctx.db.get(draftChangeId);
 	if (!draftChange || draftChange.ownerId !== ownerId) {
-		throw new Error('Draft change not found')
+		throw new Error('Draft change not found');
 	}
 
-	return draftChange
+	return draftChange;
+}
+
+function normalizeDraftChangeForArtifact(
+	artifact: Doc<'artifacts'>,
+	draftChange: Doc<'artifactDraftChanges'>
+) {
+	const patch = draftChange.patch as StoredArtifactPatch | undefined;
+	const hasReviewData =
+		draftChange.baseArtifactRevision !== undefined &&
+		draftChange.baseTitle !== undefined &&
+		draftChange.baseContentMarkdown !== undefined &&
+		patch !== undefined;
+
+	if (!hasReviewData) {
+		const derived = deriveLegacyArtifactDraftReviewData({ artifact, draftChange });
+		if (!derived.ok) {
+			return {
+				...draftChange,
+				isStale: true,
+				needsHydration: true,
+				staleReason: draftChange.staleReason ?? derived.staleReason
+			};
+		}
+
+		return {
+			...draftChange,
+			...derived.reviewData,
+			isStale: false,
+			needsHydration: true
+		};
+	}
+
+	const isStale = getArtifactRevision(artifact) !== draftChange.baseArtifactRevision;
+
+	return {
+		...draftChange,
+		isStale,
+		needsHydration: false,
+		staleReason: isStale
+			? (draftChange.staleReason ?? 'This draft is stale because the artifact changed.')
+			: draftChange.staleReason
+	};
 }

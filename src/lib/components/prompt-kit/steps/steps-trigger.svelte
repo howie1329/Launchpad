@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { CollapsibleTrigger } from "$lib/components/ui/collapsible";
 	import { cn } from "$lib/utils";
-	import ChevronDown from "@lucide/svelte/icons/chevron-down";
+	import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 
 	import type { Snippet } from "svelte";
 
@@ -31,7 +32,9 @@
 					{@render leftIcon()}
 				</span>
 				{#if swapIconOnHover}
-					<ChevronDown
+					<HugeiconsIcon
+						icon={ArrowDown01Icon}
+						strokeWidth={2}
 						class="absolute size-4 opacity-0 transition-opacity group-hover:opacity-100 group-data-[state=open]:rotate-180"
 					/>
 				{/if}
@@ -42,6 +45,10 @@
 		{/if}
 	</div>
 	{#if !leftIcon}
-		<ChevronDown class="size-4 transition-transform group-data-[state=open]:rotate-180" />
+		<HugeiconsIcon
+			icon={ArrowDown01Icon}
+			strokeWidth={2}
+			class="size-4 transition-transform group-data-[state=open]:rotate-180"
+		/>
 	{/if}
 </CollapsibleTrigger>
