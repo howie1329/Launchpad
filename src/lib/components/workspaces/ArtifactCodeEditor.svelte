@@ -1,9 +1,54 @@
 <script lang="ts">
-	import { Compartment, EditorState, Transaction } from '@codemirror/state'
-	import { EditorView, type ViewUpdate } from '@codemirror/view'
+	import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
+	import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 	import { markdown } from '@codemirror/lang-markdown'
-	import { basicSetup } from 'codemirror'
+	import { bracketMatching, defaultHighlightStyle, foldKeymap, indentOnInput, syntaxHighlighting } from '@codemirror/language'
+	import { lintKeymap } from '@codemirror/lint'
+	import { Compartment, EditorState, Transaction } from '@codemirror/state'
+	import {
+		EditorView,
+		crosshairCursor,
+		drawSelection,
+		dropCursor,
+		highlightActiveLine,
+		highlightSpecialChars,
+		keymap,
+		rectangularSelection,
+		type ViewUpdate
+	} from '@codemirror/view'
+	import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 	import { onDestroy, onMount } from 'svelte'
+
+	/**
+	 * Same role as `basicSetup` from the `codemirror` package, but without
+	 * line numbers, the active-line gutter, or the fold gutter (the left
+	 * column with line numbers and chevrons).
+	 */
+	const artifactEditorSetup = /* @__PURE__ */ (() => [
+		highlightSpecialChars(),
+		history(),
+		drawSelection(),
+		dropCursor(),
+		EditorState.allowMultipleSelections.of(true),
+		indentOnInput(),
+		syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+		bracketMatching(),
+		closeBrackets(),
+		autocompletion(),
+		rectangularSelection(),
+		crosshairCursor(),
+		highlightActiveLine(),
+		highlightSelectionMatches(),
+		keymap.of([
+			...closeBracketsKeymap,
+			...defaultKeymap,
+			...searchKeymap,
+			...historyKeymap,
+			...foldKeymap,
+			...completionKeymap,
+			...lintKeymap
+		])
+	])()
 
 	let {
 		value,
@@ -33,15 +78,6 @@
 		'.cm-scroller': {
 			overflow: 'auto',
 			fontFamily: 'var(--font-mono), ui-monospace, monospace'
-		},
-		'.cm-gutters': {
-			backgroundColor: 'var(--muted)',
-			borderRight: '1px solid var(--border)',
-			color: 'var(--muted-foreground)'
-		},
-		'.cm-lineNumbers .cm-gutterElement': {
-			padding: '0 0.375rem 0 0.5rem',
-			minWidth: '2.25rem'
 		},
 		'.cm-content': {
 			padding: '0.75rem 0.875rem'
@@ -73,7 +109,7 @@
 			state: EditorState.create({
 				doc: value,
 				extensions: [
-					basicSetup,
+					artifactEditorSetup,
 					markdown(),
 					EditorView.lineWrapping,
 					editorTheme,
