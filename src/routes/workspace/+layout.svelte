@@ -11,7 +11,7 @@
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display';
 	import { listThreadsQuery } from '$lib/chat';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
-	import { LaunchpadMark } from '$lib/components/brand';
+	import { LaunchpadMarkOutline } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -127,6 +127,40 @@
 				: activeProjectId
 					? 'Start a new chat in this project.'
 					: ''
+	);
+
+	/** Outline Launchpad mark + contextual copy; a11y name comes from the link. */
+	const SIDEBAR_HOME_LABEL_MAX = 24;
+	const ellipsizeSidebarLabel = (text: string, max: number) => {
+		const t = text.trim();
+		if (t.length <= max) return t;
+		if (max <= 1) return '…';
+		return `${t.slice(0, max - 1)}…`;
+	};
+
+	const sidebarHomeTitleFull = $derived.by(() => {
+		if (isSettingsActive) return 'Settings';
+		const threadTitle = selectedThread?.title?.trim();
+		if (activeThreadId) {
+			if (threadTitle) return threadTitle;
+			return 'Chat';
+		}
+		if (activeArtifactId) {
+			const at = selectedArtifact?.title?.trim();
+			return at || 'Artifact';
+		}
+		if (activeProjectId) {
+			const pn = selectedProject?.name?.trim();
+			return pn || 'Project';
+		}
+		return 'Launchpad';
+	});
+
+	const sidebarHomeDisplayLabel = $derived(
+		ellipsizeSidebarLabel(sidebarHomeTitleFull, SIDEBAR_HOME_LABEL_MAX)
+	);
+	const sidebarHomeLinkAria = $derived(
+		`Go to workspace home — ${sidebarHomeTitleFull}`
 	);
 
 	const projectThreads = (projectId: string) =>
@@ -305,14 +339,19 @@
 					<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 							{#snippet child({ props })}
-								<a href={resolve('/workspace')} aria-label="Workspace home" {...props}>
+								<a
+									href={resolve('/workspace')}
+									aria-label={sidebarHomeLinkAria}
+									title={sidebarHomeTitleFull}
+									{...props}
+								>
 									<div
 										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
 									>
-										<LaunchpadMark class="size-3.5" />
+										<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
 									</div>
 									<span class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
-										>Workspace</span
+										>{sidebarHomeDisplayLabel}</span
 									>
 								</a>
 							{/snippet}
