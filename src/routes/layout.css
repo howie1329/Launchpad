@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
 @import '@fontsource-variable/inter';
+@import '@fontsource/geist-sans';
 
 @custom-variant dark (&:is(.dark *));
 @plugin '@tailwindcss/forms';
@@ -77,6 +78,7 @@
 }
 
 @theme inline {
+	--font-geist-sans: 'Geist Sans', sans-serif;
 	--font-sans: 'Inter Variable', sans-serif;
 	--font-mono:
 		ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
@@ -129,6 +131,6 @@
 		@apply bg-background text-foreground;
 	}
 	html {
-		@apply font-sans;
+		@apply font-geist-sans;
 	}
 }

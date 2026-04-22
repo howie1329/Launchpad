@@ -64,6 +64,7 @@
 		"@codemirror/state": "^6.5.2",
 		"@codemirror/view": "^6.38.6",
 		"@convex-dev/auth": "^0.0.91",
+		"@fontsource/geist-sans": "^5.2.5",
 		"@pierre/diffs": "^1.1.16",
 		"@shikijs/themes": "^4.0.2",
 		"@tavily/ai-sdk": "^0.4.1",
