@@ -11,6 +11,7 @@ export type SavedChatThread = {
 	title: string;
 	scopeType: ChatScopeType;
 	projectId?: Id<'projects'>;
+	titleGeneratedAt?: number;
 	createdAt: number;
 	updatedAt: number;
 };
@@ -32,7 +33,6 @@ export type SavedChatMessage = {
 
 export type CreateThreadArgs = {
 	projectId?: Id<'projects'>;
-	title?: string;
 	text: string;
 	modelId?: string;
 };
@@ -80,3 +80,19 @@ export const saveMessagesMutation = makeFunctionReference<
 	SaveMessagesArgs,
 	SaveMessagesResult
 >('chat:saveMessages');
+
+export type SetThreadGeneratedTitleArgs = {
+	threadId: Id<'chatThreads'>;
+	title: string;
+	titleGeneratedAt: number;
+};
+
+export type SetThreadGeneratedTitleResult = {
+	updated: boolean;
+};
+
+export const setThreadGeneratedTitleMutation = makeFunctionReference<
+	'mutation',
+	SetThreadGeneratedTitleArgs,
+	SetThreadGeneratedTitleResult
+>('chat:setThreadGeneratedTitle');

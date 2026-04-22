@@ -10,6 +10,7 @@
 	} from '$lib/artifacts';
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display';
 	import { listThreadsQuery } from '$lib/chat';
+	import { formatThreadTitleForDisplay, PLACEHOLDER_THREAD_TITLE } from '$lib/thread-title';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
 	import { LaunchpadMarkOutline } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
@@ -111,10 +112,11 @@
 	const headerTitle = $derived(
 		isSettingsActive
 			? 'Settings'
-			: (selectedThread?.title ??
-					selectedArtifact?.title ??
-					selectedProject?.name ??
-					(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
+			: selectedThread
+				? formatThreadTitleForDisplay(selectedThread.title)
+				: (selectedArtifact?.title ??
+						selectedProject?.name ??
+						(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
 	);
 	const headerDescription = $derived(
 		isSettingsActive
@@ -137,10 +139,8 @@
 
 	const sidebarHomeTitleFull = $derived.by(() => {
 		if (isSettingsActive) return 'Settings';
-		const threadTitle = selectedThread?.title?.trim();
 		if (activeThreadId) {
-			if (threadTitle) return threadTitle;
-			return 'Chat';
+			return formatThreadTitleForDisplay(selectedThread?.title ?? '');
 		}
 		if (activeArtifactId) {
 			const at = selectedArtifact?.title?.trim();
@@ -190,7 +190,11 @@
 
 	const openPromoteDialog = () => {
 		if (!selectedThread || selectedThread.projectId) return;
-		promoteName = selectedThread.title?.trim() || 'New project';
+		const rawTitle = selectedThread.title?.trim() ?? '';
+		promoteName =
+			!rawTitle || rawTitle === PLACEHOLDER_THREAD_TITLE
+				? 'New project'
+				: formatThreadTitleForDisplay(selectedThread.title ?? '');
 		promoteSummary = '';
 		promoteError = '';
 		promoteDialogOpen = true;
@@ -506,7 +510,9 @@
 																					)}
 																					{...props}
 																				>
-																					<span class="min-w-0 truncate">{thread.title}</span>
+																					<span class="min-w-0 truncate"
+																						>{formatThreadTitleForDisplay(thread.title)}</span
+																					>
 																				</a>
 																			{/snippet}
 																		</Sidebar.MenuSubButton>
@@ -576,7 +582,9 @@
 															{...props}
 														>
 															<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
-															<span class="min-w-0 truncate">{thread.title}</span>
+															<span class="min-w-0 truncate"
+																>{formatThreadTitleForDisplay(thread.title)}</span
+															>
 														</a>
 													{/snippet}
 												</Sidebar.MenuButton>

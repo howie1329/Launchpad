@@ -493,6 +493,7 @@
 			onFinish: ({ messages, isError }) => {
 				if (isError) return;
 				void persistMessages(threadId, messages);
+				void requestThreadTitleGeneration(threadId);
 			}
 		});
 	}
@@ -545,6 +546,25 @@
 	function authHeaders(): Record<string, string> {
 		if (!auth.token) return {};
 		return { Authorization: `Bearer ${auth.token}` };
+	}
+
+	async function requestThreadTitleGeneration(threadId: string) {
+		if (!auth.token) return;
+		try {
+			const response = await fetch('/api/workspace/thread/generate-title', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					...authHeaders()
+				},
+				body: JSON.stringify({ threadId })
+			});
+			if (response.ok) {
+				void invalidateAll();
+			}
+		} catch {
+			// Non-blocking; sidebar keeps placeholder until next visit or retry.
+		}
 	}
 
 	function messageText(message: UIMessage) {

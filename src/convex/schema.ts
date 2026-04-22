@@ -73,6 +73,8 @@ export default defineSchema({
 		title: v.string(),
 		scopeType: chatThreadScopeType,
 		projectId: v.optional(v.id('projects')),
+		/** Set when the LLM has written the sidebar title (one-time). */
+		titleGeneratedAt: v.optional(v.number()),
 		createdAt: v.number(),
 		updatedAt: v.number()
 	})
