@@ -1,7 +1,8 @@
 <script lang="ts">
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
 	import Button from "../controls/Button.svelte";
-	import PlusIcon from "@lucide/svelte/icons/plus";
+	import { Add01Icon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 
 	interface Props {
 		class?: string;
@@ -16,7 +17,7 @@
 		{#if children}
 			{@render children()}
 		{:else}
-			<PlusIcon class="size-4" />
+			<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-4" />
 		{/if}
 	</Button>
 </DropdownMenu.Trigger>

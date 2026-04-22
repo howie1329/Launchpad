@@ -29,9 +29,8 @@
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Suggestion, Suggestions } from '$lib/components/ai-elements/suggestion';
 	import { defaultIdeaAiModelId, ideaAiModels, type IdeaAiModelId } from '$lib/idea-ai-models';
-	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import type { Component } from 'svelte';
+	import { ArrowDown01Icon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
 
 	type ChatLandingSuggestion = {
 		label: string;
@@ -42,7 +41,7 @@
 		title: string;
 		description: string;
 		prompt: string;
-		icon: Component;
+		icon: IconSvgElement;
 	};
 
 	type SubmitPayload = {
@@ -145,7 +144,7 @@
 								class="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 							>
 								{selectedModel.label}
-								<ChevronDownIcon class="size-3" />
+								<HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} class="size-3" />
 							</ModelSelectorTrigger>
 							<ModelSelectorContent class="max-w-sm">
 								<ModelSelectorInput placeholder="Search models..." />
@@ -185,7 +184,7 @@
 						</Context>
 					</PromptInputTools>
 					<PromptInputSubmit class="size-8 shrink-0 rounded-md shadow-none" disabled={!canSubmit}>
-						<ArrowUpIcon class="size-4" />
+						<HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} class="size-4" />
 					</PromptInputSubmit>
 				</PromptInputToolbar>
 			</PromptInput>
@@ -221,7 +220,9 @@
 					class="group flex min-h-[4.5rem] flex-col items-start rounded-md border border-transparent p-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 					onclick={() => fillComposer(example.prompt)}
 				>
-					<example.icon
+					<HugeiconsIcon
+						icon={example.icon}
+						strokeWidth={2}
 						class="mb-2 size-3 text-muted-foreground transition-colors group-hover:text-foreground"
 					/>
 					<span class="text-[11px] leading-snug font-medium tracking-tight">{example.title}</span>

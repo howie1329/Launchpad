@@ -47,10 +47,10 @@ All colors are consumed via semantic tokens defined in `src/routes/layout.css`. 
 
 ### Families
 
-| Role                  | Token / utility | Notes                                                                 |
-| --------------------- | --------------- | --------------------------------------------------------------------- |
+| Role                  | Token / utility             | Notes                                                                     |
+| --------------------- | --------------------------- | ------------------------------------------------------------------------- |
 | Interface text        | `--font-sans` / `font-sans` | Set in `layout.css` `@theme inline`. Default for `html` in `@layer base`. |
-| Code, IDs, timestamps | `font-mono`     | Define `--font-mono` in `@theme inline` when you need a dedicated stack. |
+| Code, IDs, timestamps | `font-mono`                 | Define `--font-mono` in `@theme inline` when you need a dedicated stack.  |
 
 Avoid hardcoded family names in components; keep stacks centralized in `layout.css`.
 
@@ -58,7 +58,7 @@ Avoid hardcoded family names in components; keep stacks centralized in `layout.c
 
 | Role              | Size                    | Weight  |
 | ----------------- | ----------------------- | ------- |
-| Page heading      | `text-xl` (20px)        | 600     |
+| Page heading      | `text-xl` (18px)        | 600     |
 | Section heading   | `text-base` (16px)      | 600     |
 | Body / row label  | `text-xs` (12px)        | 400–500 |
 | Meta / secondary  | `text-[11px]`           | 400     |
@@ -144,12 +144,12 @@ Use [shadcn-svelte Sidebar](https://www.shadcn-svelte.com/docs/components/sideba
 
 ### Page content patterns
 
-| Pattern            | Structure                                                     | Used for                         |
-| ------------------ | ------------------------------------------------------------- | -------------------------------- |
-| **List workspace** | Toolbar strip + scrollable list                               | Indexes, feeds, collections    |
-| **Detail view**    | Breadcrumb header + content + optional right properties panel | Single-entity views              |
-| **Editor**         | List rail (left) + editor pane (center)                       | Split views, threads, documents  |
-| **Settings**       | Sidebar nav (left) + form content (right)                     | Settings and configuration       |
+| Pattern            | Structure                                                     | Used for                        |
+| ------------------ | ------------------------------------------------------------- | ------------------------------- |
+| **List workspace** | Toolbar strip + scrollable list                               | Indexes, feeds, collections     |
+| **Detail view**    | Breadcrumb header + content + optional right properties panel | Single-entity views             |
+| **Editor**         | List rail (left) + editor pane (center)                       | Split views, threads, documents |
+| **Settings**       | Sidebar nav (left) + form content (right)                     | Settings and configuration      |
 
 ### Toolbar strip
 

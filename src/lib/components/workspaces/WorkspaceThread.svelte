@@ -72,11 +72,14 @@
 		assistantSegmentsHaveContent,
 		buildAssistantSegments
 	} from '$lib/idea-chat-assistant-parts';
-	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
-	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
-	import XIcon from '@lucide/svelte/icons/x';
+	import {
+		ArrowDown01Icon,
+		ArrowUp01Icon,
+		Cancel01Icon,
+		GlobeIcon,
+		Loading03Icon
+	} from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Chat } from '@ai-sdk/svelte';
 	import { DefaultChatTransport, type UIMessage } from 'ai';
 	import { useQuery } from 'convex-svelte';
@@ -672,7 +675,11 @@
 									<MessageContent
 										class="flex w-full min-w-0 flex-row items-center gap-2 text-muted-foreground"
 									>
-										<LoaderCircleIcon class="size-3.5 motion-safe:animate-spin" />
+										<HugeiconsIcon
+											icon={Loading03Icon}
+											strokeWidth={2}
+											class="size-3.5 motion-safe:animate-spin"
+										/>
 										Thinking...
 									</MessageContent>
 								</Message>
@@ -969,7 +976,7 @@
 											aria-label="Remove artifact reference"
 											onclick={() => removeMentionChip(chip.id)}
 										>
-											<XIcon class="size-3" />
+											<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} class="size-3" />
 										</button>
 									</span>
 								{/each}
@@ -1005,7 +1012,7 @@
 										focusComposer();
 									}}
 								>
-									<GlobeIcon class="size-3" aria-hidden="true" />
+									<HugeiconsIcon icon={GlobeIcon} strokeWidth={2} class="size-3" aria-hidden="true" />
 									Search web
 								</button>
 								<ModelSelector bind:open={modelSelectorOpen}>
@@ -1013,7 +1020,7 @@
 										class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 									>
 										{selectedModel.label}
-										<ChevronDownIcon class="size-3" />
+										<HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} class="size-3" />
 									</ModelSelectorTrigger>
 									<ModelSelectorContent class="max-w-sm">
 										<ModelSelectorInput placeholder="Search models..." />
@@ -1051,9 +1058,9 @@
 							</PromptInputTools>
 							<PromptInputSubmit class="size-8 shrink-0" disabled={!canSubmit}>
 								{#if isChatBusy}
-									<LoaderCircleIcon class="size-4 animate-spin" />
+									<HugeiconsIcon icon={Loading03Icon} strokeWidth={2} class="size-4 animate-spin" />
 								{:else}
-									<ArrowUpIcon class="size-4" />
+									<HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} class="size-4" />
 								{/if}
 							</PromptInputSubmit>
 						</PromptInputToolbar>

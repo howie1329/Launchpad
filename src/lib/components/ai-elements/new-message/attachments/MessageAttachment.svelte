@@ -2,8 +2,8 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 	import { cn } from "$lib/utils";
-	import Paperclip from "@lucide/svelte/icons/paperclip";
-	import X from "@lucide/svelte/icons/x";
+	import { Attachment01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 	import type { HTMLAttributes } from "svelte/elements";
 	import type { MessageAttachmentData } from "../context/message-context.svelte.js";
 	import MessageAttachmentPreview from "./MessageAttachmentPreview.svelte";
@@ -37,7 +37,7 @@
 				type="button"
 				variant="ghost"
 			>
-				<X />
+				<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} class="size-3" />
 				<span class="sr-only">Remove</span>
 			</Button>
 		{/if}
@@ -50,7 +50,7 @@
 							{...props}
 							class="bg-muted text-muted-foreground flex size-full shrink-0 items-center justify-center rounded-lg"
 						>
-							<Paperclip class="size-4" />
+							<HugeiconsIcon icon={Attachment01Icon} strokeWidth={2} class="size-4" />
 						</div>
 					{/snippet}
 				</Tooltip.Trigger>
@@ -67,7 +67,7 @@
 				type="button"
 				variant="ghost"
 			>
-				<X />
+				<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} class="size-3" />
 				<span class="sr-only">Remove</span>
 			</Button>
 		{/if}

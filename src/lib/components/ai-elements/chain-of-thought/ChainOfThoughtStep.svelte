@@ -1,13 +1,13 @@
 <script lang="ts">
+	import { RecordIcon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/svelte";
 	import { cn } from "$lib/utils";
-	import { type Icon as IconType } from "@lucide/svelte";
-	import DotIcon from "@lucide/svelte/icons/dot";
 	import { getChainOfThoughtContext } from "./chain-of-thought-context.svelte.js";
 	import type { Snippet } from "svelte";
 	import type { HTMLAttributes } from "svelte/elements";
 
 	interface ChainOfThoughtStepProps extends HTMLAttributes<HTMLDivElement> {
-		icon?: typeof IconType;
+		icon?: IconSvgElement;
 		label: string;
 		description?: string;
 		status?: "complete" | "active" | "pending";
@@ -17,7 +17,7 @@
 	}
 
 	let {
-		icon: Icon = DotIcon,
+		icon = RecordIcon,
 		label,
 		description,
 		status = "complete",
@@ -72,7 +72,7 @@
 	{...restProps}
 >
 	<div class="relative mt-0.5">
-		<Icon class="size-4" />
+		<HugeiconsIcon {icon} strokeWidth={2} class="size-4" />
 		<div class="bg-border absolute top-7 bottom-0 left-1/2 -mx-px w-px"></div>
 	</div>
 	<div class="flex-1 space-y-2">

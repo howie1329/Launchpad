@@ -7,13 +7,13 @@
 		TooltipTrigger,
 	} from "$lib/components/ui/tooltip/index.js";
 	import { cn } from "$lib/utils";
-	import { type Icon as IconType } from "@lucide/svelte";
+	import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/svelte";
 
 	interface Props extends ButtonProps {
 		class?: string;
 		tooltip?: string;
 		label?: string;
-		icon?: typeof IconType;
+		icon?: IconSvgElement;
 		size?: ButtonProps["size"];
 		variant?: ButtonProps["variant"];
 	}
@@ -21,7 +21,7 @@
 	let {
 		tooltip,
 		label,
-		icon: Icon,
+		icon,
 		children,
 		class: className,
 		size = "sm",
@@ -40,8 +40,8 @@
 		{variant}
 		{...restProps}
 	>
-		{#if Icon}
-			<Icon class="size-4" />
+		{#if icon}
+			<HugeiconsIcon {icon} strokeWidth={2} class="size-4" />
 		{:else if children}
 			{@render children()}
 		{/if}

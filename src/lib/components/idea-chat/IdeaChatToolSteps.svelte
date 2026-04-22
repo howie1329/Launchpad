@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { Steps, StepsContent, StepsItem, StepsTrigger } from '$lib/components/prompt-kit/steps';
 	import type { ToolStepView } from '$lib/idea-chat-assistant-parts';
-	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
-	import BanIcon from '@lucide/svelte/icons/ban';
-	import CheckIcon from '@lucide/svelte/icons/check';
-	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import {
+		AlertCircleIcon,
+		Loading03Icon,
+		ShieldBanIcon,
+		Tick02Icon
+	} from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
 	let { tools }: { tools: ToolStepView[] } = $props();
 
 	let open = $state(false);
@@ -17,16 +20,16 @@
 		tools.length === 1 ? (tools[0]?.title ?? 'Tool activity') : `Tool activity (${tools.length})`
 	);
 
-	function statusIcon(phase: ToolStepView['phase']): typeof CheckIcon {
+	function statusIcon(phase: ToolStepView['phase']): IconSvgElement {
 		switch (phase) {
 			case 'done':
-				return CheckIcon;
+				return Tick02Icon;
 			case 'error':
 				return AlertCircleIcon;
 			case 'denied':
-				return BanIcon;
+				return ShieldBanIcon;
 			default:
-				return LoaderCircleIcon;
+				return Loading03Icon;
 		}
 	}
 </script>
@@ -34,13 +37,33 @@
 {#snippet triggerLeftIcon()}
 	<span class="relative inline-flex size-4 items-center justify-center text-muted-foreground">
 		{#if anyRunning}
-			<LoaderCircleIcon class="size-4 motion-safe:animate-spin" aria-hidden="true" />
+			<HugeiconsIcon
+				icon={Loading03Icon}
+				strokeWidth={2}
+				class="size-4 motion-safe:animate-spin"
+				aria-hidden="true"
+			/>
 		{:else if anyError}
-			<AlertCircleIcon class="size-4 text-destructive" aria-hidden="true" />
+			<HugeiconsIcon
+				icon={AlertCircleIcon}
+				strokeWidth={2}
+				class="size-4 text-destructive"
+				aria-hidden="true"
+			/>
 		{:else if anyDenied}
-			<BanIcon class="size-4 text-muted-foreground" aria-hidden="true" />
+			<HugeiconsIcon
+				icon={ShieldBanIcon}
+				strokeWidth={2}
+				class="size-4 text-muted-foreground"
+				aria-hidden="true"
+			/>
 		{:else}
-			<CheckIcon class="size-4 text-muted-foreground" aria-hidden="true" />
+			<HugeiconsIcon
+				icon={Tick02Icon}
+				strokeWidth={2}
+				class="size-4 text-muted-foreground"
+				aria-hidden="true"
+			/>
 		{/if}
 	</span>
 {/snippet}
@@ -55,10 +78,12 @@
 		</StepsTrigger>
 		<StepsContent class="px-0 pt-0.5 pb-1">
 			{#each tools as tool (tool.id)}
-				{@const Icon = statusIcon(tool.phase)}
+				{@const stepIcon = statusIcon(tool.phase)}
 				<StepsItem class="space-y-1">
 					<div class="flex items-start gap-2">
-						<Icon
+						<HugeiconsIcon
+							icon={stepIcon}
+							strokeWidth={2}
 							class="mt-0.5 size-3.5 shrink-0 {tool.phase === 'running'
 								? 'text-muted-foreground motion-safe:animate-spin'
 								: tool.phase === 'done'
