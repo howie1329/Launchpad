@@ -21,10 +21,7 @@
 	import { cn } from '$lib/utils';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
-	import {
-		createProjectFromThreadMutation,
-		listProjectsQuery
-	} from '$lib/projects';
+	import { createProjectFromThreadMutation, listProjectsQuery } from '$lib/projects';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
 	import {
 		ArrowLeft01Icon,
@@ -159,9 +156,7 @@
 	const sidebarHomeDisplayLabel = $derived(
 		ellipsizeSidebarLabel(sidebarHomeTitleFull, SIDEBAR_HOME_LABEL_MAX)
 	);
-	const sidebarHomeLinkAria = $derived(
-		`Go to workspace home — ${sidebarHomeTitleFull}`
-	);
+	const sidebarHomeLinkAria = $derived(`Go to workspace home — ${sidebarHomeTitleFull}`);
 
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
@@ -652,7 +647,11 @@
 																	)}
 																	{...props}
 																>
-																	<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="shrink-0" />
+																	<HugeiconsIcon
+																		icon={File01Icon}
+																		strokeWidth={2}
+																		class="shrink-0"
+																	/>
 																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
 																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
 																		{artifactTypeLabel(artifact.type)}
@@ -778,17 +777,22 @@
 
 		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
 			<header
-				class="flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-background px-4"
+				class="flex h-10 shrink-0 items-center gap-1.5 border-b border-border/50 bg-background px-2 py-1"
 			>
-				<Sidebar.Trigger class="-ms-1" />
+				<Sidebar.Trigger class="shrink-0" />
 				<div class="min-w-0 flex-1">
 					{#if headerTitle}
-						<p class="truncate text-lg font-semibold tracking-tight">{headerTitle}</p>
+						<p class="truncate text-xs font-semibold tracking-tight text-foreground">
+							{headerTitle}
+						</p>
 					{/if}
 					{#if headerDescription}
-						<p class="truncate text-[11px] text-muted-foreground">{headerDescription}</p>
+						<p class="truncate text-[11px] text-muted-foreground {headerTitle ? 'mt-0.5' : ''}">
+							{headerDescription}
+						</p>
 					{/if}
 				</div>
+
 				{#if workspaceArtifactChrome.value}
 					<div
 						class="flex max-w-[min(100%,20rem)] shrink-[2] flex-wrap items-center justify-end gap-1 sm:max-w-none"
@@ -941,6 +945,5 @@
 				</form>
 			</Dialog.Content>
 		</Dialog.Root>
-
 	</Sidebar.Provider>
 {/if}
