@@ -65,14 +65,20 @@
 
 	function nav(path: string) {
 		return async () => {
-			await goto(path);
-			close();
+			try {
+				await goto(path);
+			} finally {
+				close();
+			}
 		};
 	}
 
 	async function runAction(fn: () => void | Promise<void>) {
-		await fn();
-		close();
+		try {
+			await fn();
+		} finally {
+			close();
+		}
 	}
 
 	const projectsCap = 50;
