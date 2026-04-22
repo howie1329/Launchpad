@@ -2,6 +2,15 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
+	import WorkspaceCommandPalette from '$lib/components/workspaces/WorkspaceCommandPalette.svelte';
+	import {
+		workspaceArtifactHref,
+		workspaceProjectHref,
+		workspaceRootHref,
+		workspaceSettingsHref,
+		workspaceThreadHref,
+		workspaceThreadViewHref
+	} from '$lib/workspace-nav';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import {
 		linkArtifactToThreadMutation,
@@ -21,6 +30,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { cn } from '$lib/utils';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import * as Kbd from '$lib/components/ui/kbd';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { createProjectFromThreadMutation, listProjectsQuery } from '$lib/projects';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
@@ -36,6 +46,7 @@
 		PanelRightCloseIcon,
 		PanelRightOpenIcon,
 		Rocket01Icon,
+		Search01Icon,
 		Settings01Icon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
@@ -60,6 +71,7 @@
 		Artifacts: true
 	});
 	let openProjectIds = $state<Record<string, boolean>>({});
+	let commandCenterOpen = $state(false);
 
 	const pathname = $derived($page.url.pathname);
 	const isSettingsActive = $derived(pathname === '/workspace/settings');
@@ -232,9 +244,10 @@
 			promoteSummary = '';
 			workspaceNotice = 'Project created. This chat and its artifacts now live in the project.';
 			await goto(
-				resolve(
-					`/workspace?project=${encodeURIComponent(result.projectId)}&thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
-				)
+				workspaceThreadHref({
+					_id: activeThreadId as Id<'chatThreads'>,
+					projectId: result.projectId
+				})
 			);
 		} catch (error) {
 			console.error(error);
@@ -269,31 +282,86 @@
 	};
 
 	const toggleThreadContext = async () => {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
-
-		if (contextPanelOpen) {
-			await goto(
-				resolve(
-					`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}` as `/workspace?${string}`
-				),
-				{
-					noScroll: true,
-					keepFocus: true
-				}
-			);
-			return;
-		}
-
+		if (!activeThreadId) return;
 		await goto(
-			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
-			),
+			workspaceThreadViewHref({
+				threadId: activeThreadId,
+				projectId: activeProjectId || null,
+				withContext: !contextPanelOpen
+			}),
 			{
 				noScroll: true,
 				keepFocus: true
 			}
 		);
 	};
+
+	function isWorkspaceTypableTarget(target: EventTarget | null) {
+		return (
+			target instanceof HTMLInputElement ||
+			target instanceof HTMLTextAreaElement ||
+			target instanceof HTMLSelectElement ||
+			(target instanceof HTMLElement && target.isContentEditable)
+		);
+	}
+
+	function handleWorkspaceKeydown(e: KeyboardEvent) {
+		if (auth.isLoading || !auth.isAuthenticated) return;
+		if (e.defaultPrevented) return;
+		const mod = e.metaKey || e.ctrlKey;
+		if (mod && (e.key === 'k' || e.key === 'K') && !e.shiftKey) {
+			e.preventDefault();
+			if (e.repeat) return;
+			commandCenterOpen = !commandCenterOpen;
+			return;
+		}
+		if (mod && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+			if (e.repeat || commandCenterOpen) return;
+			if (isWorkspaceTypableTarget(e.target)) return;
+			e.preventDefault();
+			document
+				.querySelector<HTMLElement>('#workspace-sidebar-nav [data-workspace-nav-item]')
+				?.focus();
+		}
+		trySidebarRovingKeydown(e);
+	}
+
+	function trySidebarRovingKeydown(e: KeyboardEvent) {
+		if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') {
+			return;
+		}
+		if (isWorkspaceTypableTarget(e.target)) return;
+
+		const nav = document.getElementById('workspace-sidebar-nav');
+		if (!nav) return;
+		if (!(e.target instanceof Node) || !nav.contains(e.target)) return;
+
+		const items = [
+			...nav.querySelectorAll<HTMLElement>('[data-workspace-nav-item]')
+		];
+		if (items.length === 0) return;
+		const active = document.activeElement;
+		if (!active || !nav.contains(active)) return;
+
+		const isNavItem = active.hasAttribute('data-workspace-nav-item');
+		const idx = isNavItem ? items.indexOf(active as HTMLElement) : -1;
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			if (idx < 0) items[0]?.focus();
+			else items[Math.min(idx + 1, items.length - 1)]?.focus();
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			if (idx < 0) items[items.length - 1]?.focus();
+			else items[Math.max(idx - 1, 0)]?.focus();
+		} else if (e.key === 'Home' && !e.metaKey && !e.ctrlKey) {
+			e.preventDefault();
+			items[0]?.focus();
+		} else if (e.key === 'End' && !e.metaKey && !e.ctrlKey) {
+			e.preventDefault();
+			items[items.length - 1]?.focus();
+		}
+	}
 
 	const handleSignOut = async () => {
 		if (isSigningOut) return;
@@ -319,6 +387,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={handleWorkspaceKeydown} />
+
 {#if auth.isLoading || !auth.isAuthenticated}
 	<main class="flex min-h-svh items-center justify-center bg-background px-5 text-foreground">
 		<div class="text-center">
@@ -332,14 +402,16 @@
 		class="h-svh overflow-hidden"
 		style="--sidebar-width: 15rem;"
 	>
-		<Sidebar.Root collapsible="icon" class="overflow-hidden">
+		<Sidebar.Root class="overflow-hidden" collapsible="icon">
+			<nav id="workspace-sidebar-nav" class="flex min-h-0 flex-1 flex-col" aria-label="Workspace">
 			<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
 				<Sidebar.Menu class="flex flex-row items-center gap-1">
 					<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 							{#snippet child({ props })}
 								<a
-									href={resolve('/workspace')}
+									href={workspaceRootHref()}
+									data-workspace-nav-item
 									aria-label={sidebarHomeLinkAria}
 									title={sidebarHomeTitleFull}
 									{...props}
@@ -390,7 +462,12 @@
 								tooltipContent="New chat"
 							>
 								{#snippet child({ props })}
-									<a href={resolve('/workspace')} aria-label="New chat" {...props}>
+									<a
+										href={workspaceRootHref()}
+										data-workspace-nav-item
+										aria-label="New chat"
+										{...props}
+									>
 										<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 										<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
 											>New chat</span
@@ -460,9 +537,8 @@
 													<Sidebar.MenuAction aria-label={`New chat in ${project.name}`}>
 														{#snippet child({ props })}
 															<a
-																href={resolve(
-																	`/workspace?project=${encodeURIComponent(project._id)}`
-																)}
+																href={workspaceProjectHref(project._id)}
+																data-workspace-nav-item
 																{...props}
 															>
 																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
@@ -485,9 +561,8 @@
 																	<Sidebar.MenuSubButton class={subNavPill}>
 																		{#snippet child({ props })}
 																			<a
-																				href={resolve(
-																					`/workspace?project=${encodeURIComponent(project._id)}`
-																				)}
+																				href={workspaceProjectHref(project._id)}
+																				data-workspace-nav-item
 																				{...props}
 																			>
 																				<span class="text-sidebar-foreground/60">Start chat</span>
@@ -505,11 +580,10 @@
 																		>
 																			{#snippet child({ props })}
 																				<a
-																					href={resolve(
-																						`/workspace?project=${encodeURIComponent(project._id)}&thread=${encodeURIComponent(thread._id)}`
-																					)}
-																					{...props}
-																				>
+																						href={workspaceThreadHref(thread)}
+																						data-workspace-nav-item
+																						{...props}
+																					>
 																					<span class="min-w-0 truncate"
 																						>{formatThreadTitleForDisplay(thread.title)}</span
 																					>
@@ -560,7 +634,11 @@
 												</p>
 												<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 													{#snippet child({ props })}
-														<a href={resolve('/workspace')} {...props}>
+														<a
+															href={workspaceRootHref()}
+															data-workspace-nav-item
+															{...props}
+														>
 															<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 															<span class="min-w-0 truncate">Start first chat</span>
 														</a>
@@ -578,7 +656,8 @@
 												>
 													{#snippet child({ props })}
 														<a
-															href={resolve(`/workspace?thread=${encodeURIComponent(thread._id)}`)}
+															href={workspaceThreadHref(thread)}
+															data-workspace-nav-item
 															{...props}
 														>
 															<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
@@ -650,9 +729,8 @@
 														>
 															{#snippet child({ props })}
 																<a
-																	href={resolve(
-																		`/workspace/artifacts/${encodeURIComponent(artifact._id)}`
-																	)}
+																	href={workspaceArtifactHref(artifact._id)}
+																	data-workspace-nav-item
 																	{...props}
 																>
 																	<HugeiconsIcon
@@ -693,7 +771,8 @@
 				<div class="group-data-[collapsible=icon]:hidden">
 					{#if budget.data}
 						<a
-							href={resolve('/workspace/settings')}
+							href={workspaceSettingsHref()}
+							data-workspace-nav-item
 							class="mb-2 block rounded-md px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 							aria-label={usageTooltip}
 						>
@@ -737,7 +816,12 @@
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton size="sm" class={navPill} tooltipContent={usageTooltip}>
 								{#snippet child({ props })}
-									<a href={resolve('/workspace/settings')} aria-label={usageTooltip} {...props}>
+									<a
+									href={workspaceSettingsHref()}
+									data-workspace-nav-item
+									aria-label={usageTooltip}
+									{...props}
+								>
 										<HugeiconsIcon icon={DollarCircleIcon} strokeWidth={2} />
 									</a>
 								{/snippet}
@@ -755,7 +839,12 @@
 							class={cn(navPill, 'min-w-0')}
 						>
 							{#snippet child({ props })}
-								<a href={resolve('/workspace/settings')} aria-label="Settings" {...props}>
+								<a
+									href={workspaceSettingsHref()}
+									data-workspace-nav-item
+									aria-label="Settings"
+									{...props}
+								>
 									<HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
 									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
 										>Settings</span
@@ -781,6 +870,7 @@
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
 			</Sidebar.Footer>
+			</nav>
 		</Sidebar.Root>
 
 		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
@@ -788,6 +878,23 @@
 				class="flex h-10 shrink-0 items-center gap-1.5 border-b border-border/50 bg-background px-2 py-1"
 			>
 				<Sidebar.Trigger class="shrink-0" />
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					class="h-7 shrink-0 gap-1.5 px-2 text-[11px] text-muted-foreground"
+					aria-label="Open command center"
+					onclick={() => {
+						commandCenterOpen = true;
+					}}
+				>
+					<HugeiconsIcon icon={Search01Icon} strokeWidth={2} class="size-3.5 opacity-80" />
+					<span class="hidden min-[400px]:inline">Search</span>
+					<Kbd.KbdGroup class="hidden gap-0.5 opacity-80 min-[400px]:inline-flex">
+						<Kbd.Kbd>⌘</Kbd.Kbd>
+						<Kbd.Kbd>K</Kbd.Kbd>
+					</Kbd.KbdGroup>
+				</Button>
 				<div class="min-w-0 flex-1">
 					{#if headerTitle}
 						<p class="truncate text-xs font-semibold tracking-tight text-foreground">
@@ -892,6 +999,20 @@
 				{@render children()}
 			</main>
 		</Sidebar.Inset>
+
+		<WorkspaceCommandPalette
+			bind:open={commandCenterOpen}
+			projects={projects.data}
+			threads={threads.data}
+			artifacts={artifacts.data}
+			activeThreadId={activeThreadId}
+			contextPanelOpen={contextPanelOpen}
+			canPromoteThreadToProject={canPromoteThreadToProject}
+			onRequestPromote={() => {
+				promoteDialogOpen = true;
+			}}
+			onToggleThreadContext={toggleThreadContext}
+		/>
 
 		<Dialog.Root bind:open={promoteDialogOpen}>
 			<Dialog.Content class="sm:max-w-md">
