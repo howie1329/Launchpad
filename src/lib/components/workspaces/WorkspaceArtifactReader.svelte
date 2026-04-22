@@ -49,6 +49,7 @@
 	let editorValue = $state('');
 	let hydratedArtifactId = $state<Id<'artifacts'> | null>(null);
 	let hydratingDraftChangeId = $state('');
+	let initialSelectionApplied = $state(false);
 	let saveError = $state('');
 	let isSaving = $state(false);
 	let surfaceMode = $state<SurfaceMode>('read');
@@ -92,6 +93,7 @@
 			editorValue = artifact.contentMarkdown;
 			contentDirty = false;
 			saveError = '';
+			initialSelectionApplied = false;
 			surfaceMode = 'read';
 			readMode = 'editor';
 			diffLayout = 'unified';
@@ -111,6 +113,7 @@
 	$effect(() => {
 		const list = pendingDraftChanges;
 		if (list.length === 0) {
+			initialSelectionApplied = false;
 			selectedDraftChangeId = null;
 			if (surfaceMode === 'compare') {
 				surfaceMode = 'read';
@@ -118,11 +121,13 @@
 			return;
 		}
 		if (
+			!initialSelectionApplied &&
 			initialSelectedDraftChangeId &&
 			list.some((d) => d._id === initialSelectedDraftChangeId) &&
 			selectedDraftChangeId !== initialSelectedDraftChangeId
 		) {
 			selectedDraftChangeId = initialSelectedDraftChangeId;
+			initialSelectionApplied = true;
 			surfaceMode = 'compare';
 			return;
 		}
