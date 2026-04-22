@@ -82,9 +82,12 @@
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Chat } from '@ai-sdk/svelte';
 	import { DefaultChatTransport, type UIMessage } from 'ai';
+	import { prefersReducedMotion } from '$lib/prefers-reduced-motion.svelte';
 	import { useQuery } from 'convex-svelte';
 	import { tick } from 'svelte';
 	import type { Id } from '../../../convex/_generated/dataModel';
+	import { backOut } from 'svelte/easing';
+	import { fade, fly } from 'svelte/transition';
 
 	let composerText = $state('');
 	let textareaRef = $state<HTMLTextAreaElement | null>(null);
@@ -585,12 +588,31 @@
 		if (chat?.status !== 'submitted' && chat?.status !== 'streaming') return false;
 		return !assistantSegmentsHaveContent(buildAssistantSegments(message));
 	}
+
+	const threadStateFade = $derived({
+		duration: prefersReducedMotion.current ? 0 : 160
+	});
+	const threadStateFadeOut = $derived({
+		duration: prefersReducedMotion.current ? 0 : 120
+	});
+	const threadReadyIn = $derived({
+		y: 8,
+		duration: prefersReducedMotion.current ? 0 : 220,
+		easing: backOut
+	});
+	const threadReadyOut = $derived({
+		duration: prefersReducedMotion.current ? 0 : 130
+	});
 </script>
 
 <section class="flex h-full min-h-0 flex-col bg-background text-foreground">
 	<div class="flex min-h-0 flex-1 flex-col">
 		{#if threadMessages.error}
-			<div class="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-8">
+			<div
+				class="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-8"
+				in:fade|local={threadStateFade}
+				out:fade|local={threadStateFadeOut}
+			>
 				<div class="max-w-sm text-center">
 					<p class="text-sm font-semibold tracking-tight">Could not load this thread</p>
 					<p class="mt-2 text-xs leading-5 text-muted-foreground">
@@ -619,7 +641,11 @@
 				</div>
 			</div>
 		{:else if threadMessages.isLoading || threadMessages.data === undefined || !chat}
-			<div class="flex flex-1 items-center justify-center px-4">
+			<div
+				class="flex flex-1 items-center justify-center px-4"
+				in:fade|local={threadStateFade}
+				out:fade|local={threadStateFadeOut}
+			>
 				<div class="text-center">
 					<p class="text-sm font-semibold tracking-tight">Loading thread.</p>
 					<p class="mt-2 text-xs leading-5 text-muted-foreground">
@@ -1055,7 +1081,11 @@
 				</div>
 			{/snippet}
 
-			<div class="flex min-h-0 flex-1 flex-col">
+			<div
+				class="flex min-h-0 flex-1 flex-col"
+				in:fly|local={threadReadyIn}
+				out:fade|local={threadReadyOut}
+			>
 				{#if !contextPanelOpen || !mediaMinLg}
 					{#if !contextPanelOpen}
 						<div class="flex min-h-0 min-w-0 flex-1 flex-col">

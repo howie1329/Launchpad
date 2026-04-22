@@ -5,12 +5,15 @@
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import { getSafePostAuthRedirect } from '$lib/safeRedirect';
 	import { createThreadMutation } from '$lib/chat';
+	import { prefersReducedMotion } from '$lib/prefers-reduced-motion.svelte';
 	import { workspaceSearchParamsSchema } from '$lib/workspace-search-params';
 	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte';
 	import WorkspaceThread from '$lib/components/workspaces/WorkspaceThread.svelte';
 	import type { Id } from '../../convex/_generated/dataModel';
 	import { Package01Icon, Target01Icon, TaskDaily01Icon } from '@hugeicons/core-free-icons';
 	import { useSearchParams } from 'runed/kit';
+	import { backOut } from 'svelte/easing';
+	import { fade, fly } from 'svelte/transition';
 
 	const routeParams = useSearchParams(workspaceSearchParamsSchema);
 	const activeProjectId = $derived(routeParams.project.trim());
@@ -81,6 +84,15 @@
 			)
 		);
 	};
+
+	const pageFlyIn = $derived({
+		y: 8,
+		duration: prefersReducedMotion.current ? 0 : 220,
+		easing: backOut
+	});
+	const pageFadeOut = $derived({
+		duration: prefersReducedMotion.current ? 0 : 130
+	});
 </script>
 
 <svelte:head>
@@ -89,14 +101,18 @@
 </svelte:head>
 
 {#if activeThreadId}
-	<WorkspaceThread />
+	<div class="h-full min-h-0 flex flex-1 flex-col" in:fly={pageFlyIn} out:fade={pageFadeOut}>
+		<WorkspaceThread />
+	</div>
 {:else}
-	<WorkspaceChatLanding
-		title="Turn a rough idea into a project."
-		description="Start with the messy version. Leave with a named project, useful context, and a tighter first build."
-		placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
-		{suggestions}
-		{examples}
-		onSubmit={startThread}
-	/>
+	<div class="h-full min-h-0 flex flex-1 flex-col" in:fly={pageFlyIn} out:fade={pageFadeOut}>
+		<WorkspaceChatLanding
+			title="Turn a rough idea into a project."
+			description="Start with the messy version. Leave with a named project, useful context, and a tighter first build."
+			placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
+			{suggestions}
+			{examples}
+			onSubmit={startThread}
+		/>
+	</div>
 {/if}
