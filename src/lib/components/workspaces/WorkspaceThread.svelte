@@ -852,7 +852,7 @@
 			{/snippet}
 
 			{#snippet threadComposer()}
-				<div class="shrink-0 border-t border-border/40 bg-background px-4 py-4 sm:px-6">
+				<div class="shrink-0 bg-background px-4 py-4 sm:px-6">
 					<div class="relative mx-auto w-full max-w-3xl space-y-2">
 						{#if chatError || saveError}
 							<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
