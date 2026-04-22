@@ -5,8 +5,8 @@
 	import { getAttachmentsContext } from "../context/attachments.svelte.js";
 	import type { PromptInputAttachment } from "../context/types.js";
 	import AttachmentImagePreview from "./AttachmentImagePreview.svelte";
-	import PaperclipIcon from "@lucide/svelte/icons/paperclip";
-	import XIcon from "@lucide/svelte/icons/x";
+	import { Attachment01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 
 	interface Props {
 		data: PromptInputAttachment;
@@ -35,7 +35,7 @@
 		<div
 			class="text-muted-foreground flex size-full max-w-full cursor-pointer items-center justify-start gap-2 overflow-hidden px-2"
 		>
-			<PaperclipIcon class="size-4 shrink-0" />
+			<HugeiconsIcon icon={Attachment01Icon} strokeWidth={2} class="size-4 shrink-0" />
 			<Tooltip.Root delayDuration={400}>
 				<Tooltip.Trigger class="min-w-0 flex-1">
 					<h4 class="w-full truncate text-left text-sm font-medium">
@@ -72,7 +72,7 @@
 					type="button"
 					variant="secondary"
 				>
-					<XIcon class="size-3" />
+					<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} class="size-3" />
 				</Button>
 			{/snippet}
 		</Tooltip.Trigger>

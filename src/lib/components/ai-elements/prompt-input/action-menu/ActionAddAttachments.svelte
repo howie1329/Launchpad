@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { getAttachmentsContext } from "../context/attachments.svelte.js";
 	import ActionMenuItem from "./ActionMenuItem.svelte";
-	import ImageIcon from "@lucide/svelte/icons/image";
+	import { Image01Icon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 	import { cn } from "$lib/utils.js";
 
 	interface Props {
@@ -22,6 +23,6 @@
 </script>
 
 <ActionMenuItem class={cn("gap-2", className)} onSelect={handleSelect} {...props}>
-	<ImageIcon class="size-4" />
+	<HugeiconsIcon icon={Image01Icon} strokeWidth={2} class="size-4" />
 	{label}
 </ActionMenuItem>

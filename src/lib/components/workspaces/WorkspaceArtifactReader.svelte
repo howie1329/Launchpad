@@ -15,7 +15,8 @@
 	import ArtifactReviewSurface from '$lib/components/workspaces/ArtifactReviewSurface.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
-	import SaveIcon from '@lucide/svelte/icons/save';
+	import { SaveIcon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { useQuery } from 'convex-svelte';
 	import type { Id } from '../../../convex/_generated/dataModel';
 
@@ -422,7 +423,7 @@
 						disabled={!canSave}
 						onclick={saveChanges}
 					>
-						<SaveIcon class="size-3.5" />
+						<HugeiconsIcon icon={SaveIcon} strokeWidth={2} class="size-3.5" />
 						{isSaving ? 'Saving...' : 'Save'}
 					</Button>
 				</div>

@@ -7,7 +7,8 @@
 
 <script lang="ts">
 	import { Button } from "$lib/components/ui/button";
-	import ArrowDown from "@lucide/svelte/icons/arrow-down";
+	import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 	import { getStickToBottomContext } from "./stick-to-bottom-context.svelte.js";
 	import { fly } from "svelte/transition";
 	import { backOut } from "svelte/easing";
@@ -53,7 +54,7 @@
 			variant="outline"
 			{...restProps}
 		>
-			<ArrowDown class="size-4" />
+			<HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} class="size-4" />
 		</Button>
 	</div>
 {/if}

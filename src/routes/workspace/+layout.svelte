@@ -26,18 +26,21 @@
 		listProjectsQuery
 	} from '$lib/projects';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import CircleDollarSignIcon from '@lucide/svelte/icons/circle-dollar-sign';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import FolderIcon from '@lucide/svelte/icons/folder';
-	import LogOutIcon from '@lucide/svelte/icons/log-out';
-	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
-	import MessageSquareTextIcon from '@lucide/svelte/icons/message-square-text';
-	import PanelRightCloseIcon from '@lucide/svelte/icons/panel-right-close';
-	import PanelRightOpenIcon from '@lucide/svelte/icons/panel-right-open';
-	import RocketIcon from '@lucide/svelte/icons/rocket';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import {
+		ArrowLeft01Icon,
+		ArrowRight01Icon,
+		Chat01Icon,
+		ChatAdd01Icon,
+		DollarCircleIcon,
+		File01Icon,
+		Folder01Icon,
+		Logout01Icon,
+		PanelRightCloseIcon,
+		PanelRightOpenIcon,
+		Rocket01Icon,
+		Settings01Icon
+	} from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { useQuery } from 'convex-svelte';
 	import type { Id } from '../../convex/_generated/dataModel';
 
@@ -350,7 +353,7 @@
 							>
 								{#snippet child({ props })}
 									<a href={resolve('/workspace')} aria-label="New chat" {...props}>
-										<MessageSquarePlusIcon />
+										<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 										<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
 											>New chat</span
 										>
@@ -364,7 +367,9 @@
 				<Collapsible.Root bind:open={openSections.Projects} class="border-0 shadow-none ring-0">
 					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
-							<ChevronRightIcon
+							<HugeiconsIcon
+								icon={ArrowRight01Icon}
+								strokeWidth={2}
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Projects</span>
@@ -403,11 +408,13 @@
 																class={cn(navPill, 'min-w-0 pr-8')}
 																{...props}
 															>
-																<ChevronRightIcon
+																<HugeiconsIcon
+																	icon={ArrowRight01Icon}
+																	strokeWidth={2}
 																	class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
 																	data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
 																/>
-																<FolderIcon />
+																<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
 																<span class="min-w-0 truncate">{project.name}</span>
 															</Sidebar.MenuButton>
 														{/snippet}
@@ -420,7 +427,7 @@
 																)}
 																{...props}
 															>
-																<MessageSquarePlusIcon />
+																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 															</a>
 														{/snippet}
 													</Sidebar.MenuAction>
@@ -487,7 +494,9 @@
 				<Collapsible.Root bind:open={openSections.Chats} class="border-0 shadow-none ring-0">
 					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
-							<ChevronRightIcon
+							<HugeiconsIcon
+								icon={ArrowRight01Icon}
+								strokeWidth={2}
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Inbox</span>
@@ -512,7 +521,7 @@
 												<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 													{#snippet child({ props })}
 														<a href={resolve('/workspace')} {...props}>
-															<MessageSquarePlusIcon />
+															<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 															<span class="min-w-0 truncate">Start first chat</span>
 														</a>
 													{/snippet}
@@ -532,7 +541,7 @@
 															href={resolve(`/workspace?thread=${encodeURIComponent(thread._id)}`)}
 															{...props}
 														>
-															<MessageSquareTextIcon />
+															<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
 															<span class="min-w-0 truncate">{thread.title}</span>
 														</a>
 													{/snippet}
@@ -549,7 +558,9 @@
 				<Collapsible.Root bind:open={openSections.Artifacts} class="border-0 shadow-none ring-0">
 					<Sidebar.Group class="border-0 shadow-none ring-0">
 						<Collapsible.Trigger class={sectionTrigger}>
-							<ChevronRightIcon
+							<HugeiconsIcon
+								icon={ArrowRight01Icon}
+								strokeWidth={2}
 								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 							/>
 							<span class="min-w-0 truncate">Artifacts</span>
@@ -602,7 +613,7 @@
 																	)}
 																	{...props}
 																>
-																	<FileTextIcon class="shrink-0" />
+																	<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="shrink-0" />
 																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
 																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
 																		{artifactTypeLabel(artifact.type)}
@@ -681,7 +692,7 @@
 							<Sidebar.MenuButton size="sm" class={navPill} tooltipContent={usageTooltip}>
 								{#snippet child({ props })}
 									<a href={resolve('/workspace/settings')} aria-label={usageTooltip} {...props}>
-										<CircleDollarSignIcon />
+										<HugeiconsIcon icon={DollarCircleIcon} strokeWidth={2} />
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>
@@ -699,7 +710,7 @@
 						>
 							{#snippet child({ props })}
 								<a href={resolve('/workspace/settings')} aria-label="Settings" {...props}>
-									<SettingsIcon />
+									<HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
 									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
 										>Settings</span
 									>
@@ -716,7 +727,7 @@
 							aria-disabled={isSigningOut}
 							onclick={handleSignOut}
 						>
-							<LogOutIcon />
+							<HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
 							<span class="group-data-[collapsible=icon]:sr-only">
 								{isSigningOut ? 'Signing out…' : 'Sign out'}
 							</span>
@@ -752,7 +763,7 @@
 								aria-label="Back to thread artifacts"
 								onclick={() => workspaceArtifactChrome.value?.onBack?.()}
 							>
-								<ChevronLeftIcon class="size-4" />
+								<HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} class="size-4" />
 							</Button>
 						{/if}
 						<div class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5">
@@ -793,7 +804,7 @@
 						class="h-8 shrink-0 gap-1.5 px-2 text-xs font-medium"
 						onclick={openPromoteDialog}
 					>
-						<RocketIcon class="size-3.5 shrink-0" />
+						<HugeiconsIcon icon={Rocket01Icon} strokeWidth={2} class="size-3.5 shrink-0" />
 						<span class="hidden min-[420px]:inline">Create project from chat</span>
 						<span class="min-[420px]:hidden">Project</span>
 					</Button>
@@ -808,9 +819,9 @@
 						onclick={toggleThreadContext}
 					>
 						{#if contextPanelOpen}
-							<PanelRightCloseIcon class="size-3.5" />
+							<HugeiconsIcon icon={PanelRightCloseIcon} strokeWidth={2} class="size-3.5" />
 						{:else}
-							<PanelRightOpenIcon class="size-3.5" />
+							<HugeiconsIcon icon={PanelRightOpenIcon} strokeWidth={2} class="size-3.5" />
 						{/if}
 					</Button>
 				{/if}

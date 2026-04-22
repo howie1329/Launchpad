@@ -3,10 +3,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { setMode, userPrefersMode } from 'mode-watcher';
-	import CheckIcon from '@lucide/svelte/icons/check';
-	import MonitorIcon from '@lucide/svelte/icons/monitor';
-	import MoonIcon from '@lucide/svelte/icons/moon';
-	import SunIcon from '@lucide/svelte/icons/sun';
+	import { ComputerIcon, Moon01Icon, Sun01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
 
 	type Variant = 'default' | 'icon' | 'sidebar' | 'sidebar-label';
 
@@ -17,8 +15,8 @@
 
 	const preference = $derived(userPrefersMode.current);
 
-	const TriggerIcon = $derived(
-		preference === 'system' ? MonitorIcon : preference === 'dark' ? MoonIcon : SunIcon
+	const triggerIcon = $derived<IconSvgElement>(
+		preference === 'system' ? ComputerIcon : preference === 'dark' ? Moon01Icon : Sun01Icon
 	);
 
 	function select(next: 'light' | 'dark' | 'system') {
@@ -32,24 +30,24 @@
 	>
 	<DropdownMenu.Separator />
 	<DropdownMenu.Item class="gap-2" onclick={() => select('light')}>
-		<SunIcon class="size-3.5" />
+		<HugeiconsIcon icon={Sun01Icon} strokeWidth={2} class="size-3.5" />
 		<span class="flex-1">Light</span>
 		{#if preference === 'light'}
-			<CheckIcon class="size-3.5" />
+			<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} class="size-3.5" />
 		{/if}
 	</DropdownMenu.Item>
 	<DropdownMenu.Item class="gap-2" onclick={() => select('dark')}>
-		<MoonIcon class="size-3.5" />
+		<HugeiconsIcon icon={Moon01Icon} strokeWidth={2} class="size-3.5" />
 		<span class="flex-1">Dark</span>
 		{#if preference === 'dark'}
-			<CheckIcon class="size-3.5" />
+			<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} class="size-3.5" />
 		{/if}
 	</DropdownMenu.Item>
 	<DropdownMenu.Item class="gap-2" onclick={() => select('system')}>
-		<MonitorIcon class="size-3.5" />
+		<HugeiconsIcon icon={ComputerIcon} strokeWidth={2} class="size-3.5" />
 		<span class="flex-1">System</span>
 		{#if preference === 'system'}
-			<CheckIcon class="size-3.5" />
+			<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} class="size-3.5" />
 		{/if}
 	</DropdownMenu.Item>
 {/snippet}
@@ -67,7 +65,11 @@
 							? 'justify-center px-0 md:size-8 md:p-0'
 							: 'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3'}
 					>
-						<TriggerIcon class={variant === 'sidebar' ? 'size-4' : 'size-3'} />
+						<HugeiconsIcon
+							icon={triggerIcon}
+							strokeWidth={2}
+							class={variant === 'sidebar' ? 'size-4' : 'size-3'}
+						/>
 						<span
 							class={variant === 'sidebar'
 								? 'sr-only'
@@ -95,7 +97,7 @@
 						class="size-8 text-muted-foreground hover:text-foreground"
 						aria-label="Color theme"
 					>
-						<TriggerIcon class="size-4" />
+						<HugeiconsIcon icon={triggerIcon} strokeWidth={2} class="size-4" />
 					</Button>
 				{:else}
 					<Button
@@ -105,7 +107,7 @@
 						class="gap-1.5 text-muted-foreground hover:text-foreground"
 						aria-label="Color theme"
 					>
-						<TriggerIcon class="size-3.5" />
+						<HugeiconsIcon icon={triggerIcon} strokeWidth={2} class="size-3.5" />
 						<span class="text-xs">Theme</span>
 					</Button>
 				{/if}

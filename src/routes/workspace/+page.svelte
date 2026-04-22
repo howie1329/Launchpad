@@ -9,9 +9,7 @@
 	import WorkspaceChatLanding from '$lib/components/workspaces/WorkspaceChatLanding.svelte';
 	import WorkspaceThread from '$lib/components/workspaces/WorkspaceThread.svelte';
 	import type { Id } from '../../convex/_generated/dataModel';
-	import BoxIcon from '@lucide/svelte/icons/box';
-	import ClipboardListIcon from '@lucide/svelte/icons/clipboard-list';
-	import TargetIcon from '@lucide/svelte/icons/target';
+	import { Package01Icon, Target01Icon, TaskDaily01Icon } from '@hugeicons/core-free-icons';
 	import { useSearchParams } from 'runed/kit';
 
 	const routeParams = useSearchParams(workspaceSearchParamsSchema);
@@ -45,21 +43,21 @@
 			description: 'Find the project hiding inside a messy note',
 			prompt:
 				'I keep noticing a messy workflow that might be worth building around. Help me turn the rough thought into a clear project with a target user and first version.',
-			icon: BoxIcon
+			icon: Package01Icon
 		},
 		{
 			title: 'Validate the pain',
 			description: 'Decide if the project is worth promoting',
 			prompt:
 				'I have a possible project, but I am not sure if the pain is real. Help me find the riskiest assumption and the fastest validation path.',
-			icon: TargetIcon
+			icon: Target01Icon
 		},
 		{
 			title: 'Draft a project PRD',
 			description: 'Leave with scope you can build from',
 			prompt:
 				'This project feels promising. Help me shape it into a practical first-version PRD with clear must-haves and non-goals.',
-			icon: ClipboardListIcon
+			icon: TaskDaily01Icon
 		}
 	] as const;
 

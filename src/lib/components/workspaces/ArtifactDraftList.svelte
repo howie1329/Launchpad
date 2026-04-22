@@ -3,7 +3,8 @@
 	import { draftStatItems, draftSummaryText } from '$lib/artifact-review';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
-	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import { File01Icon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import type { ArtifactDraftChange } from '$lib/artifacts';
 	import type { Id } from '../../../convex/_generated/dataModel';
 
@@ -54,7 +55,7 @@
 					<div
 						class="mt-0.5 flex size-7 shrink-0 items-center justify-center text-muted-foreground"
 					>
-						<FileTextIcon class="size-3" />
+						<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3" />
 					</div>
 					<div class="min-w-0 flex-1">
 						<div class="flex items-center justify-between gap-2">

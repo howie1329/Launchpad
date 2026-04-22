@@ -4,8 +4,8 @@
 	import ArtifactDiffRendererDiffs from '$lib/components/workspaces/ArtifactDiffRendererDiffs.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
-	import Columns2Icon from '@lucide/svelte/icons/columns-2';
-	import Rows3Icon from '@lucide/svelte/icons/rows-3';
+	import { LayoutTwoColumnIcon, LayoutTwoRowIcon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import type { Id } from '../../../convex/_generated/dataModel';
 
 	let {
@@ -66,7 +66,7 @@
 					class="h-7 gap-1 rounded-sm px-2 text-xs font-medium"
 					onclick={onSetUnified}
 				>
-					<Rows3Icon class="size-3" />
+					<HugeiconsIcon icon={LayoutTwoRowIcon} strokeWidth={2} class="size-3" />
 					Unified
 				</Button>
 				<Button
@@ -76,7 +76,7 @@
 					class="h-7 gap-1 rounded-sm px-2 text-xs font-medium"
 					onclick={onSetSplit}
 				>
-					<Columns2Icon class="size-3" />
+					<HugeiconsIcon icon={LayoutTwoColumnIcon} strokeWidth={2} class="size-3" />
 					Split
 				</Button>
 			</div>

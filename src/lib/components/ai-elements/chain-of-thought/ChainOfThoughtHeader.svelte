@@ -2,8 +2,8 @@
 	import { cn } from "$lib/utils";
 	import { getChainOfThoughtContext } from "./chain-of-thought-context.svelte.js";
 	import { CollapsibleTrigger } from "$lib/components/ui/collapsible/index.js";
-	import BrainIcon from "@lucide/svelte/icons/brain";
-	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import { ArrowDown01Icon, BrainIcon } from "@hugeicons/core-free-icons";
+	import { HugeiconsIcon } from "@hugeicons/svelte";
 	import type { Snippet } from "svelte";
 
 	interface ChainOfThoughtHeaderProps {
@@ -22,7 +22,7 @@
 		className
 	)}
 >
-	<BrainIcon class="size-4" />
+	<HugeiconsIcon icon={BrainIcon} strokeWidth={2} class="size-4" />
 	<span class="flex-1 text-left">
 		{#if children}
 			{@render children()}
@@ -30,7 +30,9 @@
 			Chain of Thought
 		{/if}
 	</span>
-	<ChevronDownIcon
+	<HugeiconsIcon
+		icon={ArrowDown01Icon}
+		strokeWidth={2}
 		class={cn("size-4 transition-transform", context.isOpen ? "rotate-180" : "rotate-0")}
 	/>
 </CollapsibleTrigger>
