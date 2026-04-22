@@ -7,10 +7,13 @@
 		class: className,
 		children,
 		heading,
+		headingClass,
 		value,
 		...restProps
 	}: CommandPrimitive.GroupProps & {
 		heading?: string;
+		/** Merged with default group heading styles (e.g. nav-style section labels in the command palette). */
+		headingClass?: string;
 	} = $props();
 </script>
 
@@ -23,7 +26,10 @@
 >
 	{#if heading}
 		<CommandPrimitive.GroupHeading
-			class="text-muted-foreground px-2 py-1.5 text-xs font-medium"
+			class={cn(
+				"px-2 py-1.5 text-xs font-medium text-muted-foreground",
+				headingClass
+			)}
 		>
 			{heading}
 		</CommandPrimitive.GroupHeading>
