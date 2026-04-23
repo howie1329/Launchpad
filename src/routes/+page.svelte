@@ -45,7 +45,7 @@
 			</a>
 			<div class="flex min-w-0 items-center gap-1">
 				<ThemeMenu variant="icon" />
-				<AuthControls />
+				<AuthControls signedInMode="goToWorkspace" signedInCta="Go to Launchpad" />
 			</div>
 		</div>
 	</header>

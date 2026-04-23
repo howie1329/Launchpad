@@ -1,10 +1,16 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
-	import { auth, getConvexClient } from '$lib/auth.svelte';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import {
+		deleteAccountMutation,
+		resetAccountMutation
+	} from '$lib/account-management';
+	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import { listMyActivityEventsQuery } from '$lib/activity';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
@@ -29,6 +35,52 @@
 	let saveError = $state('');
 	let isSaving = $state(false);
 	let didAutofillTimeZone = $state(false);
+
+	let resetDialogOpen = $state(false);
+	let deleteDialogOpen = $state(false);
+	let isResetting = $state(false);
+	let isDeleting = $state(false);
+	let resetError = $state('');
+	let deleteError = $state('');
+
+	const confirmReset = async () => {
+		if (isResetting) return;
+		resetError = '';
+		isResetting = true;
+		try {
+			await getConvexClient().mutation(resetAccountMutation, {});
+			resetDialogOpen = false;
+			void invalidateAll();
+		} catch (error) {
+			console.error(error);
+			resetError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not reset account. Please try again.';
+		} finally {
+			isResetting = false;
+		}
+	};
+
+	const confirmDelete = async () => {
+		if (isDeleting) return;
+		deleteError = '';
+		isDeleting = true;
+		try {
+			await getConvexClient().mutation(deleteAccountMutation, {});
+			deleteDialogOpen = false;
+			await signOut();
+			goto(resolve('/'));
+		} catch (error) {
+			console.error(error);
+			deleteError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not delete account. Please try again.';
+		} finally {
+			isDeleting = false;
+		}
+	};
 
 	$effect(() => {
 		if (!settings.data) return;
@@ -319,4 +371,91 @@
 			{/if}
 		</div>
 	</section>
+
+	<Separator class="my-2" />
+
+	<section class="space-y-4">
+		<div class="space-y-1">
+			<h2 class="text-sm font-semibold tracking-tight text-destructive">Danger zone</h2>
+			<p class="text-xs leading-5 text-muted-foreground">
+				Permanent actions. Reset removes all your workspace data but keeps this login. Deleting
+				removes your data and this account, then signs you out.
+			</p>
+		</div>
+		<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				class="border-destructive/50 text-destructive hover:bg-destructive/10"
+				onclick={() => {
+					resetError = '';
+					resetDialogOpen = true;
+				}}
+			>
+				Reset account
+			</Button>
+			<Button
+				type="button"
+				variant="destructive"
+				size="sm"
+				onclick={() => {
+					deleteError = '';
+					deleteDialogOpen = true;
+				}}
+			>
+				Delete account
+			</Button>
+		</div>
+	</section>
 </section>
+
+<Dialog.Root bind:open={resetDialogOpen}>
+	<Dialog.Content class="sm:max-w-md" showCloseButton={!isResetting}>
+		<Dialog.Header>
+			<Dialog.Title>Reset account</Dialog.Title>
+			<Dialog.Description>
+				This permanently deletes your projects, chats, messages, artifacts, and settings. Your
+				account and login will stay. This cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if resetError}
+			<p class="text-xs text-destructive">{resetError}</p>
+		{/if}
+		<Dialog.Footer>
+			<Button type="button" variant="secondary" size="sm" disabled={isResetting} onclick={() => (resetDialogOpen = false)}
+				>Cancel</Button
+			>
+			<Button type="button" variant="destructive" size="sm" disabled={isResetting} onclick={confirmReset}>
+				{isResetting ? 'Resetting…' : 'Confirm reset'}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root bind:open={deleteDialogOpen}>
+	<Dialog.Content class="sm:max-w-md" showCloseButton={!isDeleting}>
+		<Dialog.Header>
+			<Dialog.Title>Delete account</Dialog.Title>
+			<Dialog.Description>
+				This permanently deletes your workspace and your account, then signs you out. This cannot
+				be undone. You can register again with the same email.
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if deleteError}
+			<p class="text-xs text-destructive">{deleteError}</p>
+		{/if}
+		<Dialog.Footer>
+			<Button
+				type="button"
+				variant="secondary"
+				size="sm"
+				disabled={isDeleting}
+				onclick={() => (deleteDialogOpen = false)}>Cancel</Button
+			>
+			<Button type="button" variant="destructive" size="sm" disabled={isDeleting} onclick={confirmDelete}>
+				{isDeleting ? 'Deleting…' : 'Confirm delete'}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

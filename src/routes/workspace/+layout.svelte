@@ -24,6 +24,7 @@
 	import { LaunchpadMarkOutline } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -33,20 +34,20 @@
 	import * as Kbd from '$lib/components/ui/kbd';
 	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
 	import { createProjectFromThreadMutation, listProjectsQuery } from '$lib/projects';
+	import { deleteProjectMutation, deleteThreadMutation } from '$lib/account-management';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
 	import {
 		ArrowLeft01Icon,
 		ArrowRight01Icon,
-		Chat01Icon,
 		ChatAdd01Icon,
 		DollarCircleIcon,
-		File01Icon,
 		Folder01Icon,
 		Logout01Icon,
 		PanelRightCloseIcon,
 		PanelRightOpenIcon,
 		Rocket01Icon,
 		Search01Icon,
+		MoreHorizontalCircle01Icon,
 		Settings01Icon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
@@ -72,6 +73,14 @@
 	});
 	let openProjectIds = $state<Record<string, boolean>>({});
 	let commandCenterOpen = $state(false);
+	let projectDeleteDialogOpen = $state(false);
+	let projectToDelete: { id: Id<'projects'>; name: string } | null = $state(null);
+	let threadDeleteDialogOpen = $state(false);
+	let threadToDelete: { id: Id<'chatThreads'>; title: string; projectId: Id<'projects'> | null } | null =
+		$state(null);
+	let isDeletingProject = $state(false);
+	let isDeletingThread = $state(false);
+	let deleteNavError = $state('');
 
 	const pathname = $derived($page.url.pathname);
 	const isSettingsActive = $derived(pathname === '/workspace/settings');
@@ -376,6 +385,80 @@
 		}
 	};
 
+	const openDeleteProjectDialog = (id: Id<'projects'>, name: string) => {
+		deleteNavError = '';
+		projectToDelete = { id, name };
+		projectDeleteDialogOpen = true;
+	};
+
+	const confirmDeleteProject = async () => {
+		if (isDeletingProject || !projectToDelete) return;
+		isDeletingProject = true;
+		deleteNavError = '';
+		const { id, name: deletedName } = projectToDelete;
+		try {
+			await getConvexClient().mutation(deleteProjectMutation, { projectId: id });
+			projectDeleteDialogOpen = false;
+			projectToDelete = null;
+			void invalidateAll();
+			if (activeProjectId === id) {
+				await goto(resolve('/workspace'));
+			}
+			workspaceNotice = `Deleted project “${deletedName}”.`;
+		} catch (error) {
+			console.error(error);
+			deleteNavError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not delete this project. Please try again.';
+		} finally {
+			isDeletingProject = false;
+		}
+	};
+
+	const openDeleteThreadDialog = (
+		id: Id<'chatThreads'>,
+		title: string,
+		projectId: Id<'projects'> | null
+	) => {
+		deleteNavError = '';
+		threadToDelete = { id, title, projectId };
+		threadDeleteDialogOpen = true;
+	};
+
+	const confirmDeleteThread = async () => {
+		if (isDeletingThread || !threadToDelete) return;
+		isDeletingThread = true;
+		deleteNavError = '';
+		const { id, title, projectId: tidProject } = threadToDelete;
+		try {
+			await getConvexClient().mutation(deleteThreadMutation, { threadId: id });
+			threadDeleteDialogOpen = false;
+			threadToDelete = null;
+			void invalidateAll();
+			if (activeThreadId === id) {
+				if (tidProject) {
+					await goto(
+						resolve(
+							`/workspace?project=${encodeURIComponent(String(tidProject))}` as '/workspace?${string}'
+						)
+					);
+				} else {
+					await goto(resolve('/workspace'));
+				}
+			}
+			workspaceNotice = `Deleted chat “${formatThreadTitleForDisplay(title)}”.`;
+		} catch (error) {
+			console.error(error);
+			deleteNavError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not delete this chat. Please try again.';
+		} finally {
+			isDeletingThread = false;
+		}
+	};
+
 	$effect(() => {
 		if (!auth.isLoading && !auth.isAuthenticated) {
 			const u = $page.url;
@@ -510,43 +593,71 @@
 										</Sidebar.MenuItem>
 									{:else}
 										{#each projects.data as project (project._id)}
-											<Sidebar.MenuItem>
+											<Sidebar.MenuItem class="mb-0.5 min-w-0 last:mb-0">
 												<Collapsible.Root
 													open={isProjectOpen(project._id)}
 													onOpenChange={(open) => setProjectOpen(project._id, open)}
 												>
-													<Collapsible.Trigger>
-														{#snippet child({ props })}
-															<Sidebar.MenuButton
-																size="sm"
-																isActive={activeProjectId === project._id && !activeThreadId}
-																class={cn(navPill, 'min-w-0 pr-8')}
-																{...props}
-															>
-																<HugeiconsIcon
-																	icon={ArrowRight01Icon}
-																	strokeWidth={2}
-																	class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
-																	data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
-																/>
-																<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
-																<span class="min-w-0 truncate">{project.name}</span>
-															</Sidebar.MenuButton>
-														{/snippet}
-													</Collapsible.Trigger>
-													<Sidebar.MenuAction aria-label={`New chat in ${project.name}`}>
-														{#snippet child({ props })}
+													<div class="flex w-full min-w-0 items-center gap-0.5">
+														<Collapsible.Trigger class="min-w-0 min-h-0 flex-1">
+															{#snippet child({ props })}
+																<Sidebar.MenuButton
+																	size="sm"
+																	isActive={activeProjectId === project._id && !activeThreadId}
+																	class={cn(navPill, 'min-w-0 w-full')}
+																	{...props}
+																>
+																	<HugeiconsIcon
+																		icon={ArrowRight01Icon}
+																		strokeWidth={2}
+																		class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
+																		data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
+																	/>
+																	<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
+																	<span class="min-w-0 truncate" title={project.name}
+																		>{project.name}</span
+																	>
+																</Sidebar.MenuButton>
+															{/snippet}
+														</Collapsible.Trigger>
+														<div
+															class="flex shrink-0 items-center gap-0.5 group-data-[collapsible=icon]:hidden"
+														>
+															<DropdownMenu.Root>
+																<DropdownMenu.Trigger
+																	type="button"
+																	class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																	onclick={(e) => e.stopPropagation()}
+																	onpointerdown={(e) => e.stopPropagation()}
+																	aria-label={`Project actions: ${project.name}`}
+																>
+																	<HugeiconsIcon
+																		icon={MoreHorizontalCircle01Icon}
+																		strokeWidth={2}
+																	/>
+																</DropdownMenu.Trigger>
+																<DropdownMenu.Content class="min-w-40" align="end">
+																	<DropdownMenu.Item
+																		variant="destructive"
+																		onclick={() =>
+																			openDeleteProjectDialog(project._id, project.name)}
+																	>
+																		Delete project
+																	</DropdownMenu.Item>
+																</DropdownMenu.Content>
+															</DropdownMenu.Root>
 															<a
 																href={workspaceProjectHref(project._id)}
 																data-workspace-nav-item
-																{...props}
+																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																aria-label={`New chat in ${project.name}`}
 															>
 																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 															</a>
-														{/snippet}
-													</Sidebar.MenuAction>
+														</div>
+													</div>
 													<Collapsible.Content
-														class="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+														class="overflow-hidden pt-0.5 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 													>
 														<Sidebar.MenuSub>
 															{@const threadsForProject = projectThreads(project._id)}
@@ -572,24 +683,58 @@
 																</Sidebar.MenuSubItem>
 															{:else}
 																{#each threadsForProject as thread (thread._id)}
-																	<Sidebar.MenuSubItem>
-																		<Sidebar.MenuSubButton
-																			size="sm"
-																			isActive={activeThreadId === thread._id}
-																			class={cn(subNavPill, 'min-w-0')}
+																	<Sidebar.MenuSubItem class="min-w-0">
+																		<div
+																			class="group/subthread flex w-full min-w-0 items-center gap-0.5"
 																		>
-																			{#snippet child({ props })}
-																				<a
+																			<Sidebar.MenuSubButton
+																				size="sm"
+																				isActive={activeThreadId === thread._id}
+																				class={cn(subNavPill, 'min-w-0 min-h-0 flex-1')}
+																			>
+																				{#snippet child({ props })}
+																					<a
 																						href={workspaceThreadHref(thread)}
 																						data-workspace-nav-item
+																						title={formatThreadTitleForDisplay(thread.title)}
 																						{...props}
 																					>
-																					<span class="min-w-0 truncate"
-																						>{formatThreadTitleForDisplay(thread.title)}</span
+																						<span class="min-w-0 truncate"
+																							>{formatThreadTitleForDisplay(
+																								thread.title
+																							)}</span
+																						>
+																					</a>
+																				{/snippet}
+																			</Sidebar.MenuSubButton>
+																			<DropdownMenu.Root>
+																				<DropdownMenu.Trigger
+																					type="button"
+																					class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground group-focus-within/subthread:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																					onclick={(e) => e.stopPropagation()}
+																					onpointerdown={(e) => e.stopPropagation()}
+																					aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
+																				>
+																					<HugeiconsIcon
+																						icon={MoreHorizontalCircle01Icon}
+																						strokeWidth={2}
+																					/>
+																				</DropdownMenu.Trigger>
+																				<DropdownMenu.Content class="min-w-40" align="end">
+																					<DropdownMenu.Item
+																						variant="destructive"
+																						onclick={() =>
+																							openDeleteThreadDialog(
+																								thread._id,
+																								thread.title,
+																								project._id
+																							)}
 																					>
-																				</a>
-																			{/snippet}
-																		</Sidebar.MenuSubButton>
+																						Delete thread
+																					</DropdownMenu.Item>
+																				</DropdownMenu.Content>
+																			</DropdownMenu.Root>
+																		</div>
 																	</Sidebar.MenuSubItem>
 																{/each}
 															{/if}
@@ -648,25 +793,52 @@
 										</Sidebar.MenuItem>
 									{:else}
 										{#each generalThreads as thread (thread._id)}
-											<Sidebar.MenuItem>
-												<Sidebar.MenuButton
-													size="sm"
-													isActive={activeThreadId === thread._id}
-													class={cn(navPill, 'min-w-0')}
+											<Sidebar.MenuItem class="min-w-0">
+												<div
+													class="group/inbox-thread flex w-full min-w-0 items-center gap-0.5"
 												>
-													{#snippet child({ props })}
-														<a
-															href={workspaceThreadHref(thread)}
-															data-workspace-nav-item
-															{...props}
-														>
-															<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
-															<span class="min-w-0 truncate"
-																>{formatThreadTitleForDisplay(thread.title)}</span
+													<Sidebar.MenuButton
+														size="sm"
+														isActive={activeThreadId === thread._id}
+														class={cn(navPill, 'min-w-0 min-h-0 flex-1')}
+													>
+														{#snippet child({ props })}
+															<a
+																href={workspaceThreadHref(thread)}
+																data-workspace-nav-item
+																title={formatThreadTitleForDisplay(thread.title)}
+																{...props}
 															>
-														</a>
-													{/snippet}
-												</Sidebar.MenuButton>
+																<span class="min-w-0 truncate"
+																	>{formatThreadTitleForDisplay(thread.title)}</span
+																>
+															</a>
+														{/snippet}
+													</Sidebar.MenuButton>
+													<DropdownMenu.Root>
+														<DropdownMenu.Trigger
+															type="button"
+															class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground group-focus-within/inbox-thread:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+															onclick={(e) => e.stopPropagation()}
+															onpointerdown={(e) => e.stopPropagation()}
+															aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
+														>
+															<HugeiconsIcon
+																icon={MoreHorizontalCircle01Icon}
+																strokeWidth={2}
+															/>
+														</DropdownMenu.Trigger>
+														<DropdownMenu.Content class="min-w-40" align="end">
+															<DropdownMenu.Item
+																variant="destructive"
+																onclick={() =>
+																	openDeleteThreadDialog(thread._id, thread.title, null)}
+															>
+																Delete thread
+															</DropdownMenu.Item>
+														</DropdownMenu.Content>
+													</DropdownMenu.Root>
+												</div>
 											</Sidebar.MenuItem>
 										{/each}
 									{/if}
@@ -733,11 +905,6 @@
 																	data-workspace-nav-item
 																	{...props}
 																>
-																	<HugeiconsIcon
-																		icon={File01Icon}
-																		strokeWidth={2}
-																		class="shrink-0"
-																	/>
 																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
 																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
 																		{artifactTypeLabel(artifact.type)}
@@ -1013,6 +1180,82 @@
 			}}
 			onToggleThreadContext={toggleThreadContext}
 		/>
+
+		<Dialog.Root bind:open={projectDeleteDialogOpen}>
+			<Dialog.Content class="sm:max-w-md" showCloseButton={!isDeletingProject}>
+				<Dialog.Header>
+					<Dialog.Title>Delete project</Dialog.Title>
+					<Dialog.Description>
+						{#if projectToDelete}
+							This removes “{projectToDelete.name}” and all of its chats and saved artifacts. This
+							cannot be undone.
+						{/if}
+					</Dialog.Description>
+				</Dialog.Header>
+				{#if deleteNavError}
+					<p class="text-xs text-destructive">{deleteNavError}</p>
+				{/if}
+				<Dialog.Footer>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={isDeletingProject}
+						onclick={() => {
+							projectDeleteDialogOpen = false;
+							projectToDelete = null;
+						}}
+					>
+						Cancel
+					</Button>
+					<Button
+						type="button"
+						variant="destructive"
+						disabled={isDeletingProject || !projectToDelete}
+						onclick={confirmDeleteProject}
+					>
+						{isDeletingProject ? 'Deleting…' : 'Delete project'}
+					</Button>
+				</Dialog.Footer>
+			</Dialog.Content>
+		</Dialog.Root>
+
+		<Dialog.Root bind:open={threadDeleteDialogOpen}>
+			<Dialog.Content class="sm:max-w-md" showCloseButton={!isDeletingThread}>
+				<Dialog.Header>
+					<Dialog.Title>Delete thread</Dialog.Title>
+					<Dialog.Description>
+						{#if threadToDelete}
+							This removes “{formatThreadTitleForDisplay(threadToDelete.title)}” and its messages
+							and saved artifacts. This cannot be undone.
+						{/if}
+					</Dialog.Description>
+				</Dialog.Header>
+				{#if deleteNavError}
+					<p class="text-xs text-destructive">{deleteNavError}</p>
+				{/if}
+				<Dialog.Footer>
+					<Button
+						type="button"
+						variant="secondary"
+						disabled={isDeletingThread}
+						onclick={() => {
+							threadDeleteDialogOpen = false;
+							threadToDelete = null;
+						}}
+					>
+						Cancel
+					</Button>
+					<Button
+						type="button"
+						variant="destructive"
+						disabled={isDeletingThread || !threadToDelete}
+						onclick={confirmDeleteThread}
+					>
+						{isDeletingThread ? 'Deleting…' : 'Delete thread'}
+					</Button>
+				</Dialog.Footer>
+			</Dialog.Content>
+		</Dialog.Root>
 
 		<Dialog.Root bind:open={promoteDialogOpen}>
 			<Dialog.Content class="sm:max-w-md">
