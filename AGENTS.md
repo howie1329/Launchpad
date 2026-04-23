@@ -42,3 +42,9 @@ Convex agent skills for common tasks can be installed by running `npx convex ai-
 **Ownership:** For app data keyed by user (`ownerId` on projects, threads, messages, artifacts, etc.), use `getAuthUserId` from `@convex-dev/auth/server` via [`src/convex/authHelpers.ts`](src/convex/authHelpers.ts). Do not use `getUserIdentity().tokenIdentifier` for ownership — it includes the session id and changes on new sessions.
 
 <!-- convex-ai-end -->
+
+## Documentation
+
+- Keep `docs/` organized by intent with subfolders: `features/`, `architecture/`, `research/`, `history/`, and `operations/`
+- Add new documentation to the most specific existing folder instead of root-level `docs/`
+- Update `docs/index.md` whenever docs are added, removed, or moved so links stay current
