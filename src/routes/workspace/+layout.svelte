@@ -595,66 +595,71 @@
 										</Sidebar.MenuItem>
 									{:else}
 										{#each projects.data as project (project._id)}
-											<Sidebar.MenuItem>
+											<Sidebar.MenuItem class="mb-0.5 min-w-0 last:mb-0">
 												<Collapsible.Root
 													open={isProjectOpen(project._id)}
 													onOpenChange={(open) => setProjectOpen(project._id, open)}
 												>
-													<Collapsible.Trigger>
-														{#snippet child({ props })}
-															<Sidebar.MenuButton
-																size="sm"
-																isActive={activeProjectId === project._id && !activeThreadId}
-																class={cn(navPill, 'min-w-0 pr-14')}
-																{...props}
-															>
-																<HugeiconsIcon
-																	icon={ArrowRight01Icon}
-																	strokeWidth={2}
-																	class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
-																	data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
-																/>
-																<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
-																<span class="min-w-0 truncate">{project.name}</span>
-															</Sidebar.MenuButton>
-														{/snippet}
-													</Collapsible.Trigger>
-													<div
-														class="absolute right-5 top-1/2 z-10 -translate-y-1/2 group-data-[collapsible=icon]:hidden"
-													>
-														<DropdownMenu.Root>
-															<DropdownMenu.Trigger
-																type="button"
-																class="inline-flex size-5 items-center justify-center rounded-sm text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
-																onclick={(e) => e.stopPropagation()}
-																onpointerdown={(e) => e.stopPropagation()}
-																aria-label={`Project actions: ${project.name}`}
-															>
-																<HugeiconsIcon icon={MoreHorizontalCircle01Icon} strokeWidth={2} />
-															</DropdownMenu.Trigger>
-															<DropdownMenu.Content class="min-w-40" align="end">
-																<DropdownMenu.Item
-																	variant="destructive"
-																	onclick={() => openDeleteProjectDialog(project._id, project.name)}
+													<div class="flex w-full min-w-0 items-center gap-0.5">
+														<Collapsible.Trigger class="min-w-0 min-h-0 flex-1">
+															{#snippet child({ props })}
+																<Sidebar.MenuButton
+																	size="sm"
+																	isActive={activeProjectId === project._id && !activeThreadId}
+																	class={cn(navPill, 'min-w-0 w-full')}
+																	{...props}
 																>
-																	Delete project
-																</DropdownMenu.Item>
-															</DropdownMenu.Content>
-														</DropdownMenu.Root>
-													</div>
-													<Sidebar.MenuAction aria-label={`New chat in ${project.name}`}>
-														{#snippet child({ props })}
+																	<HugeiconsIcon
+																		icon={ArrowRight01Icon}
+																		strokeWidth={2}
+																		class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
+																		data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
+																	/>
+																	<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
+																	<span class="min-w-0 truncate" title={project.name}
+																		>{project.name}</span
+																	>
+																</Sidebar.MenuButton>
+															{/snippet}
+														</Collapsible.Trigger>
+														<div
+															class="flex shrink-0 items-center gap-0.5 group-data-[collapsible=icon]:hidden"
+														>
+															<DropdownMenu.Root>
+																<DropdownMenu.Trigger
+																	type="button"
+																	class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																	onclick={(e) => e.stopPropagation()}
+																	onpointerdown={(e) => e.stopPropagation()}
+																	aria-label={`Project actions: ${project.name}`}
+																>
+																	<HugeiconsIcon
+																		icon={MoreHorizontalCircle01Icon}
+																		strokeWidth={2}
+																	/>
+																</DropdownMenu.Trigger>
+																<DropdownMenu.Content class="min-w-40" align="end">
+																	<DropdownMenu.Item
+																		variant="destructive"
+																		onclick={() =>
+																			openDeleteProjectDialog(project._id, project.name)}
+																	>
+																		Delete project
+																	</DropdownMenu.Item>
+																</DropdownMenu.Content>
+															</DropdownMenu.Root>
 															<a
 																href={workspaceProjectHref(project._id)}
 																data-workspace-nav-item
-																{...props}
+																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																aria-label={`New chat in ${project.name}`}
 															>
 																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 															</a>
-														{/snippet}
-													</Sidebar.MenuAction>
+														</div>
+													</div>
 													<Collapsible.Content
-														class="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+														class="overflow-hidden pt-0.5 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 													>
 														<Sidebar.MenuSub>
 															{@const threadsForProject = projectThreads(project._id)}
@@ -680,31 +685,34 @@
 																</Sidebar.MenuSubItem>
 															{:else}
 																{#each threadsForProject as thread (thread._id)}
-																	<Sidebar.MenuSubItem class="group/menu-sub-item relative">
-																		<Sidebar.MenuSubButton
-																			size="sm"
-																			isActive={activeThreadId === thread._id}
-																			class={cn(subNavPill, 'min-w-0 pr-6')}
-																		>
-																			{#snippet child({ props })}
-																				<a
-																					href={workspaceThreadHref(thread)}
-																					data-workspace-nav-item
-																					{...props}
-																				>
-																					<span class="min-w-0 truncate"
-																						>{formatThreadTitleForDisplay(thread.title)}</span
-																					>
-																				</a>
-																			{/snippet}
-																		</Sidebar.MenuSubButton>
+																	<Sidebar.MenuSubItem class="min-w-0">
 																		<div
-																			class="absolute right-0.5 top-1/2 z-10 -translate-y-1/2"
+																			class="group/subthread flex w-full min-w-0 items-center gap-0.5"
 																		>
+																			<Sidebar.MenuSubButton
+																				size="sm"
+																				isActive={activeThreadId === thread._id}
+																				class={cn(subNavPill, 'min-w-0 min-h-0 flex-1')}
+																			>
+																				{#snippet child({ props })}
+																					<a
+																						href={workspaceThreadHref(thread)}
+																						data-workspace-nav-item
+																						title={formatThreadTitleForDisplay(thread.title)}
+																						{...props}
+																					>
+																						<span class="min-w-0 truncate"
+																							>{formatThreadTitleForDisplay(
+																								thread.title
+																							)}</span
+																						>
+																					</a>
+																				{/snippet}
+																			</Sidebar.MenuSubButton>
 																			<DropdownMenu.Root>
 																				<DropdownMenu.Trigger
 																					type="button"
-																					class="inline-flex size-5 items-center justify-center rounded-sm text-sidebar-foreground ring-sidebar-ring opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/menu-sub-item:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																					class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground group-focus-within/subthread:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
 																					onclick={(e) => e.stopPropagation()}
 																					onpointerdown={(e) => e.stopPropagation()}
 																					aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -787,30 +795,33 @@
 										</Sidebar.MenuItem>
 									{:else}
 										{#each generalThreads as thread (thread._id)}
-											<Sidebar.MenuItem class="group/inbox-thread relative">
-												<Sidebar.MenuButton
-													size="sm"
-													isActive={activeThreadId === thread._id}
-													class={cn(navPill, 'min-w-0 pr-6')}
+											<Sidebar.MenuItem class="min-w-0">
+												<div
+													class="group/inbox-thread flex w-full min-w-0 items-center gap-0.5"
 												>
-													{#snippet child({ props })}
-														<a
-															href={workspaceThreadHref(thread)}
-															data-workspace-nav-item
-															{...props}
-														>
-															<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
-															<span class="min-w-0 truncate"
-																>{formatThreadTitleForDisplay(thread.title)}</span
+													<Sidebar.MenuButton
+														size="sm"
+														isActive={activeThreadId === thread._id}
+														class={cn(navPill, 'min-w-0 min-h-0 flex-1')}
+													>
+														{#snippet child({ props })}
+															<a
+																href={workspaceThreadHref(thread)}
+																data-workspace-nav-item
+																title={formatThreadTitleForDisplay(thread.title)}
+																{...props}
 															>
-														</a>
-													{/snippet}
-												</Sidebar.MenuButton>
-												<div class="absolute right-0.5 top-1/2 z-10 -translate-y-1/2">
+																<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
+																<span class="min-w-0 truncate"
+																	>{formatThreadTitleForDisplay(thread.title)}</span
+																>
+															</a>
+														{/snippet}
+													</Sidebar.MenuButton>
 													<DropdownMenu.Root>
 														<DropdownMenu.Trigger
 															type="button"
-															class="inline-flex size-5 items-center justify-center rounded-sm text-sidebar-foreground ring-sidebar-ring opacity-0 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/inbox-thread:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+															class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground group-focus-within/inbox-thread:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
 															onclick={(e) => e.stopPropagation()}
 															onpointerdown={(e) => e.stopPropagation()}
 															aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
