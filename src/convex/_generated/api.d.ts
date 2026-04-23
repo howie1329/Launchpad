@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as accountManagement from "../accountManagement.js";
 import type * as activity from "../activity.js";
 import type * as activityHelpers from "../activityHelpers.js";
 import type * as artifactDiffs from "../artifactDiffs.js";
@@ -29,6 +30,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accountManagement: typeof accountManagement;
   activity: typeof activity;
   activityHelpers: typeof activityHelpers;
   artifactDiffs: typeof artifactDiffs;
