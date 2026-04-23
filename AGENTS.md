@@ -1,50 +1,60 @@
-# Launchpad — Guidelines
+# Launchpad
 
 ## Guidelines
 
-Act like a high-performing senior engineer. Be concise, direct, decisive, and execution-focused.
-Solve problems with simple, maintainable, production-friendly solutions.
-Prefer low-complexity code that is easy to read, debug, and modify.
-Prefer the smallest path.
-Do not overengineer. Do not introduce heavy abstractions,
-extra layers, or fallbacks,
-or large dependencies for small features. Choose the smallest solution that solves the problem well.
-Keep implementations clean, APIs small, behavior explicit, and naming clear. Avoid cleverness unless it clearly improves the outcome.
-Write code that another strong engineer can quickly understand, safely extend, and confidently ship.
+- Act like a high-performing senior engineer. Be concise, direct, decisive, and execution-focused.
+- Solve problems with simple, maintainable, production-friendly solutions.
+- Prefer low-complexity code that is easy to read, debug, and modify.
+- Prefer the smallest path.
+- Do not overengineer. Do not introduce heavy abstractions,extra layers, or fallbacks, or large dependencies for small features. Choose the smallest solution that solves the problem well.
+- Keep implementations clean, APIs small, behavior explicit, and naming clear. Avoid cleverness unless it clearly improves the outcome.
+- Write code that another strong engineer can quickly understand, safely extend, and confidently ship.
+- Always assume there are no current users and the database is empty.
 
-## Core Principles
+## DO NOT
 
-1. **Simple first.** Solve the actual problem. Don't over-engineer. Avoid speculative edge cases, extra abstractions, and defensive code for situations that don't exist yet. Keep the code simple and focused on the problem at hand and easy to understand and follow and maintain.
-2. **Use shadcn first.** Before writing custom UI, check `@/components/ui` in the app you're working in. Use existing components. Add new shadcn components via `npx shadcn-svelte@latest add <component>` if needed—don't hand-roll equivalents.
-3. **Match the codebase.** Search for how similar things are done before adding new patterns, utilities, or structure. Reuse existing conventions instead of inventing new ones.
-4. Build just enough to accomplish the goal or plan.
-5. Write code as if there is no user base yet.
+- DO NOT add edge-case logic for scenarios that aren't in the current requirements
 
 ## Maintainability
 
 Long term maintainability is a core priority. If you add new functionality, first check if there is shared logic that can be extracted to a separate module. Duplicate logic across multiple files is a code smell and should be avoided. Don't be afraid to change existing code. Don't take shortcuts by just adding local logic to solve a problem.
 
-## Do Not
+## Developer Commands
 
-- Add edge-case logic for scenarios that aren't in the current requirements
-- Build custom UI when a shadcn component exists or can be added
-- Introduce new abstractions, helpers, or patterns without checking if something equivalent already exists
-- Add semicolons (codebase omits them)
+| Command           | Description                            |
+| ----------------- | -------------------------------------- |
+| `npm run dev`     | Frontend only (fails if Convex needed) |
+| `npm run dev:all` | Frontend + Convex backend              |
+| `npm run check`   | TypeScript + svelte-check              |
+| `npm run lint`    | Prettier + ESLint                      |
+| `npm run format`  | Prettier write                         |
+| `npm run build`   | Production build                       |
+| `npm run preview` | Preview build                          |
 
-<!-- convex-ai-start -->
+## Environment
 
-This project uses [Convex](https://convex.dev) as its backend.
+Required env vars:
 
-When working on Convex code, **always read `src/convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
+- `PUBLIC_CONVEX_URL` - Convex deployment URL
+- `AI_GATEWAY_API_KEY` - Vercel AI Gateway key
+- `TAVILY_API_KEY` - Optional web search
 
-Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
+## Stack
 
-**Ownership:** For app data keyed by user (`ownerId` on projects, threads, messages, artifacts, etc.), use `getAuthUserId` from `@convex-dev/auth/server` via [`src/convex/authHelpers.ts`](src/convex/authHelpers.ts). Do not use `getUserIdentity().tokenIdentifier` for ownership — it includes the session id and changes on new sessions.
+- SvelteKit + Svelte 5 (runes mode enforced)
+- shadcn-svelte for UI components
+- Tailwind CSS v4
+- Convex + `@convex-dev/auth`
+- Vercel AI SDK
 
-<!-- convex-ai-end -->
+## Convex Rules
 
-## Documentation
+**Always read** `src/convex/_generated/ai/guidelines.md` first for Convex API patterns.
 
-- Keep `docs/` organized by intent with subfolders: `features/`, `architecture/`, `research/`, `history/`, and `operations/`
-- Add new documentation to the most specific existing folder instead of root-level `docs/`
-- Update `docs/index.md` whenever docs are added, removed, or moved so links stay current
+### Ownership
+
+For app data keyed by user (`ownerId` on projects, threads, messages, artifacts), use `getAuthUserId` from `@convex-dev/auth/server` via `src/convex/authHelpers.ts`. Do not use `getUserIdentity().tokenIdentifier` — it includes session id and changes on new sessions.
+
+---
+
+For full product docs, routes, and architecture: see `docs/index.md`.
