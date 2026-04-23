@@ -39,10 +39,8 @@
 	import {
 		ArrowLeft01Icon,
 		ArrowRight01Icon,
-		Chat01Icon,
 		ChatAdd01Icon,
 		DollarCircleIcon,
-		File01Icon,
 		Folder01Icon,
 		Logout01Icon,
 		PanelRightCloseIcon,
@@ -811,7 +809,6 @@
 																title={formatThreadTitleForDisplay(thread.title)}
 																{...props}
 															>
-																<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} />
 																<span class="min-w-0 truncate"
 																	>{formatThreadTitleForDisplay(thread.title)}</span
 																>
@@ -908,11 +905,6 @@
 																	data-workspace-nav-item
 																	{...props}
 																>
-																	<HugeiconsIcon
-																		icon={File01Icon}
-																		strokeWidth={2}
-																		class="shrink-0"
-																	/>
 																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
 																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
 																		{artifactTypeLabel(artifact.type)}
