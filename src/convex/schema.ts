@@ -1,6 +1,7 @@
 import { authTables } from '@convex-dev/auth/server';
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { workspaceTabEntry } from './workspaceTabValidators';
 
 const chatThreadScopeType = v.union(v.literal('general'), v.literal('project'));
 const chatMessageRole = v.union(v.literal('system'), v.literal('user'), v.literal('assistant'));
@@ -20,6 +21,13 @@ const memorySyncStatus = v.union(v.literal('synced'), v.literal('blocked'), v.li
 
 export default defineSchema({
 	...authTables,
+	workspaceTabStrip: defineTable({
+		ownerId: v.string(),
+		tabs: v.array(workspaceTabEntry),
+		activeTabId: v.string(),
+		createdAt: v.number(),
+		updatedAt: v.number()
+	}).index('by_ownerId', ['ownerId']),
 	userSettings: defineTable({
 		ownerId: v.string(),
 		timeZone: v.string(),

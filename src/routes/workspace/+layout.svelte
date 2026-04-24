@@ -1,8 +1,18 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { afterNavigate, goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
+	import { get } from 'svelte/store';
 	import WorkspaceCommandPalette from '$lib/components/workspaces/WorkspaceCommandPalette.svelte';
+	import WorkspaceTabPicker from '$lib/components/workspaces/WorkspaceTabPicker.svelte';
+	import WorkspaceTabStrip from '$lib/components/workspaces/WorkspaceTabStrip.svelte';
+	import { hrefForWorkspaceTarget, urlToWorkspaceTarget } from '$lib/workspace-tab-target';
+	import {
+		addOrActivateWorkspaceTabMutation,
+		getWorkspaceTabStripQuery,
+		removeWorkspaceTabMutation
+	} from '$lib/workspaceTabs';
+	import type { WorkspaceTabTarget } from '$lib/workspaceTabs';
 	import {
 		workspaceArtifactHref,
 		workspaceProjectHref,
@@ -73,11 +83,15 @@
 	});
 	let openProjectIds = $state<Record<string, boolean>>({});
 	let commandCenterOpen = $state(false);
+	let tabPickerOpen = $state(false);
 	let projectDeleteDialogOpen = $state(false);
 	let projectToDelete: { id: Id<'projects'>; name: string } | null = $state(null);
 	let threadDeleteDialogOpen = $state(false);
-	let threadToDelete: { id: Id<'chatThreads'>; title: string; projectId: Id<'projects'> | null } | null =
-		$state(null);
+	let threadToDelete: {
+		id: Id<'chatThreads'>;
+		title: string;
+		projectId: Id<'projects'> | null;
+	} | null = $state(null);
 	let isDeletingProject = $state(false);
 	let isDeletingThread = $state(false);
 	let deleteNavError = $state('');
@@ -96,6 +110,7 @@
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const tabStrip = useQuery(getWorkspaceTabStripQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const threadArtifacts = useQuery(listThreadArtifactsQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
@@ -130,24 +145,42 @@
 		threads.data?.filter((thread) => thread.scopeType === 'general') ?? []
 	);
 	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact));
-	const headerTitle = $derived(
-		isSettingsActive
-			? 'Settings'
-			: selectedThread
-				? formatThreadTitleForDisplay(selectedThread.title)
-				: (selectedArtifact?.title ??
-						selectedProject?.name ??
-						(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
-	);
-	const headerDescription = $derived(
-		isSettingsActive
-			? 'Manage workspace preferences.'
-			: activeThreadId || activeArtifactId
-				? ''
-				: activeProjectId
-					? 'Start a new chat in this project.'
-					: ''
-	);
+	const activeWorkspaceTarget = $derived.by(() => {
+		const t = urlToWorkspaceTarget($page.url);
+		return t ?? { kind: 'home' as const };
+	});
+
+	function syncWorkspaceTabsFromUrl() {
+		if (!auth.isAuthenticated) return;
+		const url = get(page).url;
+		if (!url.pathname.startsWith('/workspace')) return;
+		const t = urlToWorkspaceTarget(url);
+		if (!t) return;
+		void getConvexClient()
+			.mutation(addOrActivateWorkspaceTabMutation, { target: t })
+			.catch((e) => console.error(e));
+	}
+
+	afterNavigate(syncWorkspaceTabsFromUrl);
+
+	const selectWorkspaceTab = async (target: WorkspaceTabTarget) => {
+		const href = resolve(hrefForWorkspaceTarget(target) as '/workspace');
+		const u = get(page).url;
+		const next = new URL(href, u.origin);
+		if (u.pathname === next.pathname && u.search === next.search) return;
+		await goto(href, { noScroll: true, keepFocus: true });
+	};
+
+	const closeWorkspaceTab = async (tabId: string) => {
+		const result = await getConvexClient().mutation(removeWorkspaceTabMutation, { tabId });
+		if (!result.removed) return;
+		if (result.activeTarget) {
+			await goto(resolve(hrefForWorkspaceTarget(result.activeTarget) as '/workspace'), {
+				noScroll: true,
+				keepFocus: true
+			});
+		}
+	};
 
 	/** Outline Launchpad mark + contextual copy; a11y name comes from the link. */
 	const SIDEBAR_HOME_LABEL_MAX = 24;
@@ -190,13 +223,11 @@
 
 	/** Design-system-aligned nav rows: dense, 12px icons */
 	const navPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
-	const navPillPrimary =
-		'bg-primary text-primary-foreground shadow-none hover:bg-primary/90 hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground';
+		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
 	const sectionTrigger =
-		'group/section flex h-7 w-full items-center gap-1 rounded-md px-2 text-left text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
+		'group/section flex h-7 w-full items-center gap-1 rounded-full px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
 	const subNavPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
 
 	const usageBarPct = $derived(
 		budget.data && budget.data.capUsd > 0
@@ -345,9 +376,7 @@
 		if (!nav) return;
 		if (!(e.target instanceof Node) || !nav.contains(e.target)) return;
 
-		const items = [
-			...nav.querySelectorAll<HTMLElement>('[data-workspace-nav-item]')
-		];
+		const items = [...nav.querySelectorAll<HTMLElement>('[data-workspace-nav-item]')];
 		if (items.length === 0) return;
 		const active = document.activeElement;
 		if (!active || !nav.contains(active)) return;
@@ -487,556 +516,577 @@
 	>
 		<Sidebar.Root class="overflow-hidden" collapsible="icon">
 			<nav id="workspace-sidebar-nav" class="flex min-h-0 flex-1 flex-col" aria-label="Workspace">
-			<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
-				<Sidebar.Menu class="flex flex-row items-center gap-1">
-					<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
-						<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
-							{#snippet child({ props })}
-								<a
-									href={workspaceRootHref()}
-									data-workspace-nav-item
-									aria-label={sidebarHomeLinkAria}
-									title={sidebarHomeTitleFull}
-									{...props}
-								>
-									<div
-										class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
-									>
-										<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
-									</div>
-									<span class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
-										>{sidebarHomeDisplayLabel}</span
-									>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.Header>
-
-			<Sidebar.Content>
-				{#if workspaceListError}
-					<div
-						class="border-b border-destructive/25 bg-destructive/10 px-3 py-2.5 text-[11px] text-destructive"
-						role="status"
-					>
-						<p class="font-medium">Could not load part of the workspace</p>
-						<p class="mt-1 leading-snug opacity-90">{workspaceListError.message}</p>
-						<Button
-							type="button"
-							variant="secondary"
-							size="sm"
-							class="mt-2 h-7 text-xs"
-							onclick={() => {
-								void invalidateAll();
-							}}
-						>
-							Try again
-						</Button>
-					</div>
-				{/if}
-				<Sidebar.Group class="border-0 shadow-none ring-0">
-					<Sidebar.Menu>
-						<Sidebar.MenuItem>
-							<Sidebar.MenuButton
-								size="sm"
-								isActive={isNewChatActive}
-								class={cn(navPill, navPillPrimary)}
-								tooltipContent="New chat"
-							>
+				<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
+					<Sidebar.Menu class="flex flex-row items-center gap-1">
+						<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
+							<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 								{#snippet child({ props })}
 									<a
 										href={workspaceRootHref()}
 										data-workspace-nav-item
-										aria-label="New chat"
+										aria-label={sidebarHomeLinkAria}
+										title={sidebarHomeTitleFull}
 										{...props}
 									>
-										<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
-										<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
-											>New chat</span
+										<div
+											class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
+										>
+											<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
+										</div>
+										<span
+											class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
+											>{sidebarHomeDisplayLabel}</span
 										>
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>
 						</Sidebar.MenuItem>
 					</Sidebar.Menu>
-				</Sidebar.Group>
+				</Sidebar.Header>
 
-				<Collapsible.Root bind:open={openSections.Projects} class="border-0 shadow-none ring-0">
-					<Sidebar.Group class="border-0 shadow-none ring-0">
-						<Collapsible.Trigger class={sectionTrigger}>
-							<HugeiconsIcon
-								icon={ArrowRight01Icon}
-								strokeWidth={2}
-								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-							/>
-							<span class="min-w-0 truncate">Projects</span>
-						</Collapsible.Trigger>
-						<Collapsible.Content
-							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+				<Sidebar.Content>
+					{#if workspaceListError}
+						<div
+							class="border-b border-destructive/25 bg-destructive/10 px-3 py-2.5 text-[11px] text-destructive"
+							role="status"
 						>
-							<Sidebar.GroupContent>
-								<Sidebar.Menu>
-									{#if projects.data === undefined}
-										<Sidebar.MenuItem>
-											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
-												<span class="min-w-0 truncate">Loading projects…</span>
-											</Sidebar.MenuButton>
-										</Sidebar.MenuItem>
-									{:else if projects.data.length === 0}
-										<Sidebar.MenuItem>
-											<div class="space-y-2 px-2 py-1.5">
-												<p class="text-[11px] leading-snug text-sidebar-foreground/60">
-													Promote a useful chat when the idea is ready for focused work.
-												</p>
-											</div>
-										</Sidebar.MenuItem>
-									{:else}
-										{#each projects.data as project (project._id)}
-											<Sidebar.MenuItem class="mb-0.5 min-w-0 last:mb-0">
-												<Collapsible.Root
-													open={isProjectOpen(project._id)}
-													onOpenChange={(open) => setProjectOpen(project._id, open)}
-												>
-													<div class="flex w-full min-w-0 items-center gap-0.5">
-														<Collapsible.Trigger class="min-w-0 min-h-0 flex-1">
-															{#snippet child({ props })}
-																<Sidebar.MenuButton
-																	size="sm"
-																	isActive={activeProjectId === project._id && !activeThreadId}
-																	class={cn(navPill, 'min-w-0 w-full')}
-																	{...props}
-																>
-																	<HugeiconsIcon
-																		icon={ArrowRight01Icon}
-																		strokeWidth={2}
-																		class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
-																		data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
-																	/>
-																	<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
-																	<span class="min-w-0 truncate" title={project.name}
-																		>{project.name}</span
-																	>
-																</Sidebar.MenuButton>
-															{/snippet}
-														</Collapsible.Trigger>
-														<div
-															class="flex shrink-0 items-center gap-0.5 group-data-[collapsible=icon]:hidden"
-														>
-															<DropdownMenu.Root>
-																<DropdownMenu.Trigger
-																	type="button"
-																	class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
-																	onclick={(e) => e.stopPropagation()}
-																	onpointerdown={(e) => e.stopPropagation()}
-																	aria-label={`Project actions: ${project.name}`}
-																>
-																	<HugeiconsIcon
-																		icon={MoreHorizontalCircle01Icon}
-																		strokeWidth={2}
-																	/>
-																</DropdownMenu.Trigger>
-																<DropdownMenu.Content class="min-w-40" align="end">
-																	<DropdownMenu.Item
-																		variant="destructive"
-																		onclick={() =>
-																			openDeleteProjectDialog(project._id, project.name)}
-																	>
-																		Delete project
-																	</DropdownMenu.Item>
-																</DropdownMenu.Content>
-															</DropdownMenu.Root>
-															<a
-																href={workspaceProjectHref(project._id)}
-																data-workspace-nav-item
-																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
-																aria-label={`New chat in ${project.name}`}
-															>
-																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
-															</a>
-														</div>
-													</div>
-													<Collapsible.Content
-														class="overflow-hidden pt-0.5 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
-													>
-														<Sidebar.MenuSub>
-															{@const threadsForProject = projectThreads(project._id)}
-															{#if threads.data === undefined}
-																<Sidebar.MenuSubItem>
-																	<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
-																		<span>Loading chats…</span>
-																	</Sidebar.MenuSubButton>
-																</Sidebar.MenuSubItem>
-															{:else if threadsForProject.length === 0}
-																<Sidebar.MenuSubItem>
-																	<Sidebar.MenuSubButton class={subNavPill}>
-																		{#snippet child({ props })}
-																			<a
-																				href={workspaceProjectHref(project._id)}
-																				data-workspace-nav-item
-																				{...props}
-																			>
-																				<span class="text-sidebar-foreground/60">Start chat</span>
-																			</a>
-																		{/snippet}
-																	</Sidebar.MenuSubButton>
-																</Sidebar.MenuSubItem>
-															{:else}
-																{#each threadsForProject as thread (thread._id)}
-																	<Sidebar.MenuSubItem class="min-w-0">
-																		<div
-																			class="group/subthread flex w-full min-w-0 items-center gap-0.5"
-																		>
-																			<Sidebar.MenuSubButton
-																				size="sm"
-																				isActive={activeThreadId === thread._id}
-																				class={cn(subNavPill, 'min-w-0 min-h-0 flex-1')}
-																			>
-																				{#snippet child({ props })}
-																					<a
-																						href={workspaceThreadHref(thread)}
-																						data-workspace-nav-item
-																						title={formatThreadTitleForDisplay(thread.title)}
-																						{...props}
-																					>
-																						<span class="min-w-0 truncate"
-																							>{formatThreadTitleForDisplay(
-																								thread.title
-																							)}</span
-																						>
-																					</a>
-																				{/snippet}
-																			</Sidebar.MenuSubButton>
-																			<DropdownMenu.Root>
-																				<DropdownMenu.Trigger
-																					type="button"
-																					class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground group-focus-within/subthread:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
-																					onclick={(e) => e.stopPropagation()}
-																					onpointerdown={(e) => e.stopPropagation()}
-																					aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
-																				>
-																					<HugeiconsIcon
-																						icon={MoreHorizontalCircle01Icon}
-																						strokeWidth={2}
-																					/>
-																				</DropdownMenu.Trigger>
-																				<DropdownMenu.Content class="min-w-40" align="end">
-																					<DropdownMenu.Item
-																						variant="destructive"
-																						onclick={() =>
-																							openDeleteThreadDialog(
-																								thread._id,
-																								thread.title,
-																								project._id
-																							)}
-																					>
-																						Delete thread
-																					</DropdownMenu.Item>
-																				</DropdownMenu.Content>
-																			</DropdownMenu.Root>
-																		</div>
-																	</Sidebar.MenuSubItem>
-																{/each}
-															{/if}
-														</Sidebar.MenuSub>
-													</Collapsible.Content>
-												</Collapsible.Root>
-											</Sidebar.MenuItem>
-										{/each}
-									{/if}
-								</Sidebar.Menu>
-							</Sidebar.GroupContent>
-						</Collapsible.Content>
-					</Sidebar.Group>
-				</Collapsible.Root>
-
-				<Collapsible.Root bind:open={openSections.Chats} class="border-0 shadow-none ring-0">
-					<Sidebar.Group class="border-0 shadow-none ring-0">
-						<Collapsible.Trigger class={sectionTrigger}>
-							<HugeiconsIcon
-								icon={ArrowRight01Icon}
-								strokeWidth={2}
-								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-							/>
-							<span class="min-w-0 truncate">Inbox</span>
-						</Collapsible.Trigger>
-						<Collapsible.Content
-							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
-						>
-							<Sidebar.GroupContent>
-								<Sidebar.Menu>
-									{#if threads.data === undefined}
-										<Sidebar.MenuItem>
-											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
-												<span class="min-w-0 truncate">Loading chats…</span>
-											</Sidebar.MenuButton>
-										</Sidebar.MenuItem>
-									{:else if generalThreads.length === 0}
-										<Sidebar.MenuItem>
-											<div class="space-y-2 px-2 py-1.5">
-												<p class="text-[11px] leading-snug text-sidebar-foreground/60">
-													Start with a messy note. Launchpad will help turn it into a project.
-												</p>
-												<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
-													{#snippet child({ props })}
-														<a
-															href={workspaceRootHref()}
-															data-workspace-nav-item
-															{...props}
-														>
-															<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
-															<span class="min-w-0 truncate">Start first chat</span>
-														</a>
-													{/snippet}
-												</Sidebar.MenuButton>
-											</div>
-										</Sidebar.MenuItem>
-									{:else}
-										{#each generalThreads as thread (thread._id)}
-											<Sidebar.MenuItem class="min-w-0">
-												<div
-													class="group/inbox-thread flex w-full min-w-0 items-center gap-0.5"
-												>
-													<Sidebar.MenuButton
-														size="sm"
-														isActive={activeThreadId === thread._id}
-														class={cn(navPill, 'min-w-0 min-h-0 flex-1')}
-													>
-														{#snippet child({ props })}
-															<a
-																href={workspaceThreadHref(thread)}
-																data-workspace-nav-item
-																title={formatThreadTitleForDisplay(thread.title)}
-																{...props}
-															>
-																<span class="min-w-0 truncate"
-																	>{formatThreadTitleForDisplay(thread.title)}</span
-																>
-															</a>
-														{/snippet}
-													</Sidebar.MenuButton>
-													<DropdownMenu.Root>
-														<DropdownMenu.Trigger
-															type="button"
-															class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground group-focus-within/inbox-thread:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
-															onclick={(e) => e.stopPropagation()}
-															onpointerdown={(e) => e.stopPropagation()}
-															aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
-														>
-															<HugeiconsIcon
-																icon={MoreHorizontalCircle01Icon}
-																strokeWidth={2}
-															/>
-														</DropdownMenu.Trigger>
-														<DropdownMenu.Content class="min-w-40" align="end">
-															<DropdownMenu.Item
-																variant="destructive"
-																onclick={() =>
-																	openDeleteThreadDialog(thread._id, thread.title, null)}
-															>
-																Delete thread
-															</DropdownMenu.Item>
-														</DropdownMenu.Content>
-													</DropdownMenu.Root>
-												</div>
-											</Sidebar.MenuItem>
-										{/each}
-									{/if}
-								</Sidebar.Menu>
-							</Sidebar.GroupContent>
-						</Collapsible.Content>
-					</Sidebar.Group>
-				</Collapsible.Root>
-
-				<Collapsible.Root bind:open={openSections.Artifacts} class="border-0 shadow-none ring-0">
-					<Sidebar.Group class="border-0 shadow-none ring-0">
-						<Collapsible.Trigger class={sectionTrigger}>
-							<HugeiconsIcon
-								icon={ArrowRight01Icon}
-								strokeWidth={2}
-								class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-							/>
-							<span class="min-w-0 truncate">Artifacts</span>
-						</Collapsible.Trigger>
-						<Collapsible.Content
-							class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
-						>
-							<Sidebar.GroupContent>
-								<Sidebar.Menu>
-									{#if artifacts.data === undefined}
-										<Sidebar.MenuItem>
-											<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
-												<span class="min-w-0 truncate">Loading artifacts…</span>
-											</Sidebar.MenuButton>
-										</Sidebar.MenuItem>
-									{:else if artifacts.data.length === 0}
-										<Sidebar.MenuItem>
-											<p class="px-2 py-1.5 text-[11px] leading-snug text-sidebar-foreground/60">
-												Artifacts appear when a chat saves an idea, PRD, or draftable document.
-											</p>
-										</Sidebar.MenuItem>
-									{:else}
-										{#each artifactGroups as group (group.key)}
-											{#if group.artifacts.length > 0}
-												<li class="list-none px-2 pt-2 pb-0.5 first:pt-0" role="presentation">
-													<p
-														class="text-[11px] font-medium tracking-wide text-sidebar-foreground/55 uppercase"
-													>
-														{group.label}
-													</p>
-												</li>
-												{#each group.artifacts as artifact (artifact._id)}
-													{@const canUseArtifactInThread =
-														Boolean(activeThreadId) &&
-														(activeProjectId
-															? artifact.projectId === activeProjectId
-															: !artifact.projectId) &&
-														!activeThreadArtifactIds.has(artifact._id)}
-													<Sidebar.MenuItem>
-														<Sidebar.MenuButton
-															size="sm"
-															isActive={activeArtifactId === artifact._id && !activeThreadId}
-															class={cn(navPill, 'min-w-0 gap-2')}
-															tooltipContent={artifact.title}
-														>
-															{#snippet child({ props })}
-																<a
-																	href={workspaceArtifactHref(artifact._id)}
-																	data-workspace-nav-item
-																	{...props}
-																>
-																	<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
-																	<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
-																		{artifactTypeLabel(artifact.type)}
-																	</span>
-																</a>
-															{/snippet}
-														</Sidebar.MenuButton>
-														{#if canUseArtifactInThread}
-															<Sidebar.MenuAction
-																showOnHover
-																aria-label="Use artifact in this chat"
-																aria-disabled={Boolean(importingArtifactId)}
-																onclick={() => useArtifactInThread(artifact._id)}
-															>
-																{importingArtifactId === artifact._id ? '…' : '+'}
-															</Sidebar.MenuAction>
-														{/if}
-													</Sidebar.MenuItem>
-												{/each}
-											{/if}
-										{/each}
-									{/if}
-								</Sidebar.Menu>
-							</Sidebar.GroupContent>
-						</Collapsible.Content>
-					</Sidebar.Group>
-				</Collapsible.Root>
-			</Sidebar.Content>
-
-			<Sidebar.Footer class="border-t border-sidebar-border/60 p-2">
-				<div class="group-data-[collapsible=icon]:hidden">
-					{#if budget.data}
-						<a
-							href={workspaceSettingsHref()}
-							data-workspace-nav-item
-							class="mb-2 block rounded-md px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-							aria-label={usageTooltip}
-						>
-							<div
-								class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/70"
-							>
-								<span class="font-medium tracking-wide uppercase">AI today</span>
-								<span class="text-sidebar-foreground tabular-nums">
-									{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
-								</span>
-							</div>
-							<div class="h-1 w-full overflow-hidden rounded-full bg-muted">
-								<div
-									class="h-full rounded-full bg-primary transition-[width]"
-									style="width: {usageBarPct}%"
-								></div>
-							</div>
-						</a>
-					{:else if budget.error}
-						<div class="mb-2 space-y-1.5 px-1.5">
-							<p class="text-[10px] leading-snug text-destructive">Could not load usage.</p>
+							<p class="font-medium">Could not load part of the workspace</p>
+							<p class="mt-1 leading-snug opacity-90">{workspaceListError.message}</p>
 							<Button
 								type="button"
 								variant="secondary"
 								size="sm"
-								class="h-7 w-full text-[10px]"
+								class="mt-2 h-7 text-xs"
 								onclick={() => {
 									void invalidateAll();
 								}}
 							>
-								Retry
+								Try again
 							</Button>
 						</div>
-					{:else}
-						<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/50">Loading usage…</p>
 					{/if}
-				</div>
+					<Sidebar.Group class="border-0 shadow-none ring-0">
+						<Sidebar.Menu>
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton
+									size="sm"
+									isActive={isNewChatActive}
+									class={cn(navPill, 'min-w-0')}
+									tooltipContent="New chat"
+								>
+									{#snippet child({ props })}
+										<a
+											href={workspaceRootHref()}
+											data-workspace-nav-item
+											aria-label="New chat"
+											{...props}
+										>
+											<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
+											<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
+												>New chat</span
+											>
+										</a>
+									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+						</Sidebar.Menu>
+					</Sidebar.Group>
 
-				<div class="mb-1 hidden justify-center group-data-[collapsible=icon]:flex">
-					<Sidebar.Menu>
+					<Collapsible.Root bind:open={openSections.Projects} class="border-0 shadow-none ring-0">
+						<Sidebar.Group class="border-0 shadow-none ring-0">
+							<Collapsible.Trigger class={sectionTrigger}>
+								<HugeiconsIcon
+									icon={ArrowRight01Icon}
+									strokeWidth={2}
+									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								/>
+								<span class="min-w-0 truncate">Projects</span>
+							</Collapsible.Trigger>
+							<Collapsible.Content
+								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+							>
+								<Sidebar.GroupContent>
+									<Sidebar.Menu>
+										{#if projects.data === undefined}
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+													<span class="min-w-0 truncate">Loading projects…</span>
+												</Sidebar.MenuButton>
+											</Sidebar.MenuItem>
+										{:else if projects.data.length === 0}
+											<Sidebar.MenuItem>
+												<div class="space-y-2 px-2 py-1.5">
+													<p class="text-[11px] leading-snug text-sidebar-foreground/60">
+														Promote a useful chat when the idea is ready for focused work.
+													</p>
+												</div>
+											</Sidebar.MenuItem>
+										{:else}
+											{#each projects.data as project (project._id)}
+												<Sidebar.MenuItem class="mb-0.5 min-w-0 last:mb-0">
+													<Collapsible.Root
+														open={isProjectOpen(project._id)}
+														onOpenChange={(open) => setProjectOpen(project._id, open)}
+													>
+														<div class="flex w-full min-w-0 items-center gap-0.5">
+															<Collapsible.Trigger class="min-h-0 min-w-0 flex-1">
+																{#snippet child({ props })}
+																	<Sidebar.MenuButton
+																		size="sm"
+																		isActive={activeProjectId === project._id && !activeThreadId}
+																		class={cn(navPill, 'w-full min-w-0')}
+																		{...props}
+																	>
+																		<HugeiconsIcon
+																			icon={ArrowRight01Icon}
+																			strokeWidth={2}
+																			class="size-3 shrink-0 transition-transform data-[state=open]:rotate-90"
+																			data-state={isProjectOpen(project._id) ? 'open' : 'closed'}
+																		/>
+																		<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} />
+																		<span class="min-w-0 truncate" title={project.name}
+																			>{project.name}</span
+																		>
+																	</Sidebar.MenuButton>
+																{/snippet}
+															</Collapsible.Trigger>
+															<div
+																class="flex shrink-0 items-center gap-0.5 group-data-[collapsible=icon]:hidden"
+															>
+																<DropdownMenu.Root>
+																	<DropdownMenu.Trigger
+																		type="button"
+																		class="inline-flex size-7 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																		onclick={(e) => e.stopPropagation()}
+																		onpointerdown={(e) => e.stopPropagation()}
+																		aria-label={`Project actions: ${project.name}`}
+																	>
+																		<HugeiconsIcon
+																			icon={MoreHorizontalCircle01Icon}
+																			strokeWidth={2}
+																		/>
+																	</DropdownMenu.Trigger>
+																	<DropdownMenu.Content class="min-w-40" align="end">
+																		<DropdownMenu.Item
+																			variant="destructive"
+																			onclick={() =>
+																				openDeleteProjectDialog(project._id, project.name)}
+																		>
+																			Delete project
+																		</DropdownMenu.Item>
+																	</DropdownMenu.Content>
+																</DropdownMenu.Root>
+																<a
+																	href={workspaceProjectHref(project._id)}
+																	data-workspace-nav-item
+																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																	aria-label={`New chat in ${project.name}`}
+																>
+																	<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
+																</a>
+															</div>
+														</div>
+														<Collapsible.Content
+															class="overflow-hidden pt-0.5 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+														>
+															<Sidebar.MenuSub>
+																{@const threadsForProject = projectThreads(project._id)}
+																{#if threads.data === undefined}
+																	<Sidebar.MenuSubItem>
+																		<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
+																			<span>Loading chats…</span>
+																		</Sidebar.MenuSubButton>
+																	</Sidebar.MenuSubItem>
+																{:else if threadsForProject.length === 0}
+																	<Sidebar.MenuSubItem>
+																		<Sidebar.MenuSubButton class={subNavPill}>
+																			{#snippet child({ props })}
+																				<a
+																					href={workspaceProjectHref(project._id)}
+																					data-workspace-nav-item
+																					{...props}
+																				>
+																					<span class="text-sidebar-foreground/60">Start chat</span>
+																				</a>
+																			{/snippet}
+																		</Sidebar.MenuSubButton>
+																	</Sidebar.MenuSubItem>
+																{:else}
+																	{#each threadsForProject as thread (thread._id)}
+																		<Sidebar.MenuSubItem class="min-w-0">
+																			<div
+																				class="group/subthread flex w-full min-w-0 items-center gap-0.5"
+																			>
+																				<Sidebar.MenuSubButton
+																					size="sm"
+																					isActive={activeThreadId === thread._id}
+																					class={cn(subNavPill, 'min-h-0 min-w-0 flex-1')}
+																				>
+																					{#snippet child({ props })}
+																						<a
+																							href={workspaceThreadHref(thread)}
+																							data-workspace-nav-item
+																							title={formatThreadTitleForDisplay(thread.title)}
+																							{...props}
+																						>
+																							<span class="min-w-0 truncate"
+																								>{formatThreadTitleForDisplay(thread.title)}</span
+																							>
+																						</a>
+																					{/snippet}
+																				</Sidebar.MenuSubButton>
+																				<DropdownMenu.Root>
+																					<DropdownMenu.Trigger
+																						type="button"
+																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																						onclick={(e) => e.stopPropagation()}
+																						onpointerdown={(e) => e.stopPropagation()}
+																						aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
+																					>
+																						<HugeiconsIcon
+																							icon={MoreHorizontalCircle01Icon}
+																							strokeWidth={2}
+																						/>
+																					</DropdownMenu.Trigger>
+																					<DropdownMenu.Content class="min-w-40" align="end">
+																						<DropdownMenu.Item
+																							variant="destructive"
+																							onclick={() =>
+																								openDeleteThreadDialog(
+																									thread._id,
+																									thread.title,
+																									project._id
+																								)}
+																						>
+																							Delete thread
+																						</DropdownMenu.Item>
+																					</DropdownMenu.Content>
+																				</DropdownMenu.Root>
+																			</div>
+																		</Sidebar.MenuSubItem>
+																	{/each}
+																{/if}
+															</Sidebar.MenuSub>
+														</Collapsible.Content>
+													</Collapsible.Root>
+												</Sidebar.MenuItem>
+											{/each}
+										{/if}
+									</Sidebar.Menu>
+								</Sidebar.GroupContent>
+							</Collapsible.Content>
+						</Sidebar.Group>
+					</Collapsible.Root>
+
+					<Collapsible.Root bind:open={openSections.Chats} class="border-0 shadow-none ring-0">
+						<Sidebar.Group class="border-0 shadow-none ring-0">
+							<Collapsible.Trigger class={sectionTrigger}>
+								<HugeiconsIcon
+									icon={ArrowRight01Icon}
+									strokeWidth={2}
+									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								/>
+								<span class="min-w-0 truncate">Inbox</span>
+							</Collapsible.Trigger>
+							<Collapsible.Content
+								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+							>
+								<Sidebar.GroupContent>
+									<Sidebar.Menu>
+										{#if threads.data === undefined}
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+													<span class="min-w-0 truncate">Loading chats…</span>
+												</Sidebar.MenuButton>
+											</Sidebar.MenuItem>
+										{:else if generalThreads.length === 0}
+											<Sidebar.MenuItem>
+												<div class="space-y-2 px-2 py-1.5">
+													<p class="text-[11px] leading-snug text-sidebar-foreground/60">
+														Start with a messy note. Launchpad will help turn it into a project.
+													</p>
+													<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
+														{#snippet child({ props })}
+															<a href={workspaceRootHref()} data-workspace-nav-item {...props}>
+																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
+																<span class="min-w-0 truncate">Start first chat</span>
+															</a>
+														{/snippet}
+													</Sidebar.MenuButton>
+												</div>
+											</Sidebar.MenuItem>
+										{:else}
+											{#each generalThreads as thread (thread._id)}
+												<Sidebar.MenuItem class="min-w-0">
+													<div class="group/inbox-thread flex w-full min-w-0 items-center gap-0.5">
+														<Sidebar.MenuButton
+															size="sm"
+															isActive={activeThreadId === thread._id}
+															class={cn(navPill, 'min-h-0 min-w-0 flex-1')}
+														>
+															{#snippet child({ props })}
+																<a
+																	href={workspaceThreadHref(thread)}
+																	data-workspace-nav-item
+																	title={formatThreadTitleForDisplay(thread.title)}
+																	{...props}
+																>
+																	<span class="min-w-0 truncate"
+																		>{formatThreadTitleForDisplay(thread.title)}</span
+																	>
+																</a>
+															{/snippet}
+														</Sidebar.MenuButton>
+														<DropdownMenu.Root>
+															<DropdownMenu.Trigger
+																type="button"
+																class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																onclick={(e) => e.stopPropagation()}
+																onpointerdown={(e) => e.stopPropagation()}
+																aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
+															>
+																<HugeiconsIcon icon={MoreHorizontalCircle01Icon} strokeWidth={2} />
+															</DropdownMenu.Trigger>
+															<DropdownMenu.Content class="min-w-40" align="end">
+																<DropdownMenu.Item
+																	variant="destructive"
+																	onclick={() =>
+																		openDeleteThreadDialog(thread._id, thread.title, null)}
+																>
+																	Delete thread
+																</DropdownMenu.Item>
+															</DropdownMenu.Content>
+														</DropdownMenu.Root>
+													</div>
+												</Sidebar.MenuItem>
+											{/each}
+										{/if}
+									</Sidebar.Menu>
+								</Sidebar.GroupContent>
+							</Collapsible.Content>
+						</Sidebar.Group>
+					</Collapsible.Root>
+
+					<Collapsible.Root bind:open={openSections.Artifacts} class="border-0 shadow-none ring-0">
+						<Sidebar.Group class="border-0 shadow-none ring-0">
+							<Collapsible.Trigger class={sectionTrigger}>
+								<HugeiconsIcon
+									icon={ArrowRight01Icon}
+									strokeWidth={2}
+									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+								/>
+								<span class="min-w-0 truncate">Artifacts</span>
+							</Collapsible.Trigger>
+							<Collapsible.Content
+								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
+							>
+								<Sidebar.GroupContent>
+									<Sidebar.Menu>
+										{#if artifacts.data === undefined}
+											<Sidebar.MenuItem>
+												<Sidebar.MenuButton size="sm" aria-disabled class={cn(navPill, 'min-w-0')}>
+													<span class="min-w-0 truncate">Loading artifacts…</span>
+												</Sidebar.MenuButton>
+											</Sidebar.MenuItem>
+										{:else if artifacts.data.length === 0}
+											<Sidebar.MenuItem>
+												<p class="px-2 py-1.5 text-[11px] leading-snug text-sidebar-foreground/60">
+													Artifacts appear when a chat saves an idea, PRD, or draftable document.
+												</p>
+											</Sidebar.MenuItem>
+										{:else}
+											{#each artifactGroups as group (group.key)}
+												{#if group.artifacts.length > 0}
+													<li class="list-none px-2 pt-2 pb-0.5 first:pt-0" role="presentation">
+														<p
+															class="text-[11px] font-medium tracking-wide text-sidebar-foreground/55 uppercase"
+														>
+															{group.label}
+														</p>
+													</li>
+													{#each group.artifacts as artifact (artifact._id)}
+														{@const canUseArtifactInThread =
+															Boolean(activeThreadId) &&
+															(activeProjectId
+																? artifact.projectId === activeProjectId
+																: !artifact.projectId) &&
+															!activeThreadArtifactIds.has(artifact._id)}
+														<Sidebar.MenuItem>
+															<Sidebar.MenuButton
+																size="sm"
+																isActive={activeArtifactId === artifact._id && !activeThreadId}
+																class={cn(navPill, 'min-w-0 gap-2')}
+																tooltipContent={artifact.title}
+															>
+																{#snippet child({ props })}
+																	<a
+																		href={workspaceArtifactHref(artifact._id)}
+																		data-workspace-nav-item
+																		{...props}
+																	>
+																		<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
+																		<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
+																			{artifactTypeLabel(artifact.type)}
+																		</span>
+																	</a>
+																{/snippet}
+															</Sidebar.MenuButton>
+															{#if canUseArtifactInThread}
+																<Sidebar.MenuAction
+																	showOnHover
+																	aria-label="Use artifact in this chat"
+																	aria-disabled={Boolean(importingArtifactId)}
+																	onclick={() => useArtifactInThread(artifact._id)}
+																>
+																	{importingArtifactId === artifact._id ? '…' : '+'}
+																</Sidebar.MenuAction>
+															{/if}
+														</Sidebar.MenuItem>
+													{/each}
+												{/if}
+											{/each}
+										{/if}
+									</Sidebar.Menu>
+								</Sidebar.GroupContent>
+							</Collapsible.Content>
+						</Sidebar.Group>
+					</Collapsible.Root>
+				</Sidebar.Content>
+
+				<Sidebar.Footer class="border-t border-sidebar-border/60 p-2">
+					<div class="group-data-[collapsible=icon]:hidden">
+						{#if budget.data}
+							<a
+								href={workspaceSettingsHref()}
+								data-workspace-nav-item
+								class="mb-2 block rounded-full px-2.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+								aria-label={usageTooltip}
+							>
+								<div
+									class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/60"
+								>
+									<span class="font-medium tracking-wide uppercase">AI today</span>
+									<span class="text-sidebar-foreground/75 tabular-nums">
+										{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
+									</span>
+								</div>
+								<div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+									<div
+										class="h-full rounded-full bg-primary transition-[width]"
+										style="width: {usageBarPct}%"
+									></div>
+								</div>
+							</a>
+						{:else if budget.error}
+							<div class="mb-2 space-y-1.5 px-1.5">
+								<p class="text-[10px] leading-snug text-destructive">Could not load usage.</p>
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									class="h-7 w-full text-[10px]"
+									onclick={() => {
+										void invalidateAll();
+									}}
+								>
+									Retry
+								</Button>
+							</div>
+						{:else}
+							<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/50">Loading usage…</p>
+						{/if}
+					</div>
+
+					<div class="mb-1 hidden justify-center group-data-[collapsible=icon]:flex">
+						{#snippet collapsedUsageTooltip()}
+							{#if budget.data}
+								<div class="w-44 space-y-1">
+									<div class="flex items-center justify-between gap-2">
+										<span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+											AI today
+										</span>
+										<span class="text-xs tabular-nums text-foreground">
+											{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
+										</span>
+									</div>
+									<div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+										<div
+											class="h-full rounded-full bg-primary transition-[width]"
+											style="width: {usageBarPct}%"
+										></div>
+									</div>
+									<p class="text-[10px] text-muted-foreground">{budget.data.dateKey}</p>
+								</div>
+							{:else}
+								<span class="text-xs text-muted-foreground">Usage</span>
+							{/if}
+						{/snippet}
+						<Sidebar.Menu>
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton
+									size="sm"
+									class={navPill}
+									tooltipContent={collapsedUsageTooltip}
+									tooltipContentProps={{
+										class:
+											'rounded-lg border border-border/70 bg-popover px-2.5 py-2 text-xs text-foreground'
+									}}
+								>
+									{#snippet child({ props })}
+										<a
+											href={workspaceSettingsHref()}
+											data-workspace-nav-item
+											aria-label={usageTooltip}
+											{...props}
+										>
+											<HugeiconsIcon icon={DollarCircleIcon} strokeWidth={2} />
+										</a>
+									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+						</Sidebar.Menu>
+					</div>
+
+					<Sidebar.Menu class="gap-0.5">
 						<Sidebar.MenuItem>
-							<Sidebar.MenuButton size="sm" class={navPill} tooltipContent={usageTooltip}>
+							<Sidebar.MenuButton
+								size="sm"
+								isActive={isSettingsActive}
+								tooltipContent="Settings"
+								class={cn(navPill, 'min-w-0')}
+							>
 								{#snippet child({ props })}
 									<a
-									href={workspaceSettingsHref()}
-									data-workspace-nav-item
-									aria-label={usageTooltip}
-									{...props}
-								>
-										<HugeiconsIcon icon={DollarCircleIcon} strokeWidth={2} />
+										href={workspaceSettingsHref()}
+										data-workspace-nav-item
+										aria-label="Settings"
+										{...props}
+									>
+										<HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
+										<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
+											>Settings</span
+										>
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>
 						</Sidebar.MenuItem>
+						<ThemeMenu variant="sidebar-label" />
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton
+								size="sm"
+								tooltipContent="Sign out"
+								class={cn(navPill, 'min-w-0')}
+								aria-disabled={isSigningOut}
+								onclick={handleSignOut}
+							>
+								<HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
+								<span class="group-data-[collapsible=icon]:sr-only">
+									{isSigningOut ? 'Signing out…' : 'Sign out'}
+								</span>
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
 					</Sidebar.Menu>
-				</div>
-
-				<Sidebar.Menu class="gap-0.5">
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton
-							size="sm"
-							isActive={isSettingsActive}
-							tooltipContent="Settings"
-							class={cn(navPill, 'min-w-0')}
-						>
-							{#snippet child({ props })}
-								<a
-									href={workspaceSettingsHref()}
-									data-workspace-nav-item
-									aria-label="Settings"
-									{...props}
-								>
-									<HugeiconsIcon icon={Settings01Icon} strokeWidth={2} />
-									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
-										>Settings</span
-									>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<ThemeMenu variant="sidebar-label" />
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton
-							size="sm"
-							tooltipContent="Sign out"
-							class={cn(navPill, 'min-w-0')}
-							aria-disabled={isSigningOut}
-							onclick={handleSignOut}
-						>
-							<HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
-							<span class="group-data-[collapsible=icon]:sr-only">
-								{isSigningOut ? 'Signing out…' : 'Sign out'}
-							</span>
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.Footer>
+				</Sidebar.Footer>
 			</nav>
 		</Sidebar.Root>
 
@@ -1062,17 +1112,26 @@
 						<Kbd.Kbd>K</Kbd.Kbd>
 					</Kbd.KbdGroup>
 				</Button>
-				<div class="min-w-0 flex-1">
-					{#if headerTitle}
-						<p class="truncate text-xs font-semibold tracking-tight text-foreground">
-							{headerTitle}
-						</p>
-					{/if}
-					{#if headerDescription}
-						<p class="truncate text-[11px] text-muted-foreground {headerTitle ? 'mt-0.5' : ''}">
-							{headerDescription}
-						</p>
-					{/if}
+				<div class="flex min-w-0 flex-1 items-center gap-0.5">
+					<WorkspaceTabStrip
+						tabs={tabStrip.data?.tabs ?? []}
+						activeTarget={activeWorkspaceTarget}
+						projects={projects.data}
+						threads={threads.data}
+						artifacts={artifacts.data}
+						onSelectTab={(t) => {
+							void selectWorkspaceTab(t);
+						}}
+						onCloseTab={(id) => {
+							void closeWorkspaceTab(id);
+						}}
+					/>
+					<WorkspaceTabPicker
+						bind:open={tabPickerOpen}
+						projects={projects.data}
+						threads={threads.data}
+						artifacts={artifacts.data}
+					/>
 				</div>
 
 				{#if workspaceArtifactChrome.value}
@@ -1172,9 +1231,9 @@
 			projects={projects.data}
 			threads={threads.data}
 			artifacts={artifacts.data}
-			activeThreadId={activeThreadId}
-			contextPanelOpen={contextPanelOpen}
-			canPromoteThreadToProject={canPromoteThreadToProject}
+			{activeThreadId}
+			{contextPanelOpen}
+			{canPromoteThreadToProject}
 			onRequestPromote={() => {
 				promoteDialogOpen = true;
 			}}
