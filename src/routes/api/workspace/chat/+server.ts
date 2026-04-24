@@ -1,4 +1,3 @@
-import { AI_GATEWAY_API_KEY } from '$env/static/private';
 import { env } from '$env/dynamic/private';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { getThreadQuery } from '$lib/chat';
@@ -16,6 +15,10 @@ import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
+import {
+	OpenRouterNotConfiguredError,
+	resolveWorkspaceLanguageModel
+} from '$lib/server/resolve-workspace-language-model';
 import { syncArtifactMemory } from '$lib/server/launchpad-memory';
 import {
 	addUserMemoryDocument,
@@ -33,7 +36,6 @@ import { tavilyExtract, tavilySearch } from '@tavily/ai-sdk';
 import { ConvexHttpClient } from 'convex/browser';
 import {
 	createAgentUIStreamResponse,
-	createGateway,
 	safeValidateUIMessages,
 	stepCountIs,
 	tool,
@@ -42,10 +44,6 @@ import {
 } from 'ai';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { z } from 'zod';
-
-const gateway = createGateway({
-	apiKey: AI_GATEWAY_API_KEY
-});
 
 /** Max markdown chars per artifact when expanding @artifact: mentions (per request). */
 const MAX_REFERENCED_ARTIFACT_CHARS = 14_000;
@@ -74,6 +72,23 @@ Artifact behavior:
 - Never overwrite existing artifacts. When asked to revise an existing artifact, use proposeArtifactEdit so the user can apply or discard the draft.
 - Only propose edits for artifacts already linked to this thread.
 - PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.
+
+Choice card behavior:
+- requestUserChoice is the canonical UI for asking the user to make a decision.
+- If you are asking a user a question, call requestUserChoice instead of writing the question in prose.
+- If you ask the user to choose between options, call requestUserChoice instead of writing the choice in prose.
+- If you would write “reply with 1/2/3,” “pick one,” “which option,” “choose a direction,” or similar, call requestUserChoice instead.
+- If there are 2-3 plausible short answers, present them as requestUserChoice options.
+- Use requestUserChoice for short clarifications, prioritization decisions, scope choices, tone/style choices, workflow choices, and artifact/project confirmation choices.
+- Ask one choice-card question at a time.
+- Provide 2-3 concrete options and make the recommended option first when there is a sensible default.
+- Always include enough option detail that clicking it is a complete answer.
+- After calling requestUserChoice, wait for the user's answer instead of continuing the substantive response.
+
+Choice card examples:
+- Instead of “Which direction should we take?”, call requestUserChoice with 2-3 direction options.
+- Instead of “Pick one: Support KB / Runbooks / Research wiki”, call requestUserChoice with those three options.
+- Instead of “Do you want quick, balanced, or thorough?”, call requestUserChoice with quick, balanced, and thorough options.
 
 Project behavior:
 - A project is a focused container for related threads and artifacts.
@@ -190,8 +205,18 @@ export const POST: RequestHandler = async ({ request }) => {
 			webSearchApiKey
 		});
 
+		let languageModel;
+		try {
+			languageModel = resolveWorkspaceLanguageModel(body.modelId);
+		} catch (e) {
+			if (e instanceof OpenRouterNotConfiguredError) {
+				return json({ error: e.message }, { status: 400 });
+			}
+			throw e;
+		}
+
 		const agent = new ToolLoopAgent({
-			model: gateway(body.modelId),
+			model: languageModel,
 			instructions,
 			tools,
 			stopWhen: stepCountIs(8)
@@ -539,6 +564,37 @@ function workspaceTools({
 					artifactTitle: artifact.title,
 					proposedTitle,
 					summary: summary?.trim() || 'Created draft change.'
+				};
+			}
+		}),
+		requestUserChoice: tool({
+			description:
+				'Canonical UI tool for asking the user one compact decision or clarification. Use instead of prose like “pick one”, “reply with 1/2/3”, “which option”, or “do you want quick/balanced/thorough”.',
+			inputSchema: z.object({
+				question: z.string().min(1),
+				context: z.string().optional(),
+				options: z
+					.array(
+						z.object({
+							label: z.string().min(1),
+							answer: z.string().min(1),
+							description: z.string().optional()
+						})
+					)
+					.min(2)
+					.max(3),
+				customPlaceholder: z.string().optional()
+			}),
+			execute: async ({ question, context, options, customPlaceholder }) => {
+				return {
+					question: question.trim(),
+					...(context?.trim() ? { context: context.trim() } : {}),
+					options: options.map((option) => ({
+						label: option.label.trim(),
+						answer: option.answer.trim(),
+						...(option.description?.trim() ? { description: option.description.trim() } : {})
+					})),
+					customPlaceholder: customPlaceholder?.trim() || 'Write a custom answer...'
 				};
 			}
 		}),

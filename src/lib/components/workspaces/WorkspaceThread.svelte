@@ -20,6 +20,7 @@
 	import { cn } from '$lib/utils';
 	import { artifactTypeLabel, formatArtifactCreatedAt } from '$lib/artifact-display';
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
+	import IdeaChatChoiceCard from '$lib/components/idea-chat/IdeaChatChoiceCard.svelte';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
 	import {
@@ -49,6 +50,7 @@
 		ModelSelectorInput,
 		ModelSelectorItem,
 		ModelSelectorList,
+		ModelSelectorLogo,
 		ModelSelectorName,
 		ModelSelectorTrigger
 	} from '$lib/components/ai-elements/model-selector';
@@ -66,8 +68,10 @@
 	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
 	import {
 		defaultIdeaAiModelId,
+		ideaAiModelProviderCopy,
 		ideaAiModels,
 		isIdeaAiModelId,
+		listIdeaModelsByProvider,
 		type IdeaAiModelId
 	} from '$lib/idea-ai-models';
 	import {
@@ -417,6 +421,22 @@
 		}
 	};
 
+	async function submitChoiceAnswer(answer: string) {
+		if (!chat || isChatBusy) return;
+		const prevWebSearchRequested = webSearchRequested;
+		chatError = '';
+		saveError = '';
+		try {
+			await chat.sendMessage({ text: answer.trim() });
+			webSearchRequested = false;
+		} catch (error) {
+			console.error(error);
+			webSearchRequested = prevWebSearchRequested;
+			chatError = buildChatErrorMessage(error);
+			throw error;
+		}
+	}
+
 	async function importMentionedArtifacts(threadId: string, artifactIds: string[]) {
 		const rows = mentionableArtifacts.data ?? [];
 		for (const artifactId of artifactIds) {
@@ -704,7 +724,15 @@
 															/>
 														{:else}
 															<div class="border-l border-border/40 pl-4 sm:pl-5">
-																<IdeaChatToolSteps tools={segment.tools} />
+																{#if segment.kind === 'tools'}
+																	<IdeaChatToolSteps tools={segment.tools} />
+																{:else}
+																	<IdeaChatChoiceCard
+																		choice={segment.choice}
+																		disabled={isChatBusy}
+																		onAnswer={submitChoiceAnswer}
+																	/>
+																{/if}
 															</div>
 														{/if}
 													{/each}
@@ -1067,22 +1095,46 @@
 									</button>
 									<ModelSelector bind:open={modelSelectorOpen}>
 										<ModelSelectorTrigger
-											class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+											class="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors [transition-duration:150ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:bg-accent/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 										>
-											{selectedModel.label}
-											<HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} class="size-3" />
+											<ModelSelectorLogo
+												provider={selectedModel.provider === 'openrouter' ? 'openrouter' : 'vercel'}
+												class="size-3 shrink-0"
+											/>
+											<span class="truncate">{selectedModel.label}</span>
+											<HugeiconsIcon
+												icon={ArrowDown01Icon}
+												strokeWidth={2}
+												class="size-3 shrink-0"
+											/>
 										</ModelSelectorTrigger>
-										<ModelSelectorContent class="max-w-sm">
-											<ModelSelectorInput placeholder="Search models..." />
+										<ModelSelectorContent class="w-[min(20rem,calc(100vw-2rem))] sm:max-w-sm">
+											<ModelSelectorInput
+												placeholder="Search models..."
+												class="border-0 border-b border-border/70 bg-transparent"
+											/>
 											<ModelSelectorList>
 												<ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-												<ModelSelectorGroup heading="Models">
-													{#each ideaAiModels as model (model.id)}
+												<ModelSelectorGroup heading={ideaAiModelProviderCopy.gateway}>
+													{#each listIdeaModelsByProvider('gateway') as model (model.id)}
 														<ModelSelectorItem
 															value={model.id}
 															data-checked={selectedModelId === model.id}
 															onclick={() => selectModel(model.id)}
 														>
+															<ModelSelectorLogo provider="vercel" class="shrink-0" />
+															<ModelSelectorName>{model.label}</ModelSelectorName>
+														</ModelSelectorItem>
+													{/each}
+												</ModelSelectorGroup>
+												<ModelSelectorGroup heading={ideaAiModelProviderCopy.openrouter}>
+													{#each listIdeaModelsByProvider('openrouter') as model (model.id)}
+														<ModelSelectorItem
+															value={model.id}
+															data-checked={selectedModelId === model.id}
+															onclick={() => selectModel(model.id)}
+														>
+															<ModelSelectorLogo provider="openrouter" class="shrink-0" />
 															<ModelSelectorName>{model.label}</ModelSelectorName>
 														</ModelSelectorItem>
 													{/each}

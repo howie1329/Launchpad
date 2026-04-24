@@ -78,6 +78,7 @@ Treat the chat-first PRD as **direction**; this file is the **inventory**.
 | -------------------- | -------------------------------------------------------------------------- |
 | `PUBLIC_CONVEX_URL`  | Public Convex URL (client + server HTTP client)                            |
 | `AI_GATEWAY_API_KEY` | Private; Vercel AI Gateway for workspace chat                              |
+| `OPENROUTER_API_KEY` | Private; optional; OpenRouter when using OpenRouter catalog models       |
 | `TAVILY_API_KEY`     | Private; optional Tavily web search and page extraction for workspace chat |
 
 See root [README.md](../README.md) for how to run the app and where to set variables.
