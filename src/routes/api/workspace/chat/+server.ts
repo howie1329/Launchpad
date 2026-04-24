@@ -75,6 +75,23 @@ Artifact behavior:
 - Only propose edits for artifacts already linked to this thread.
 - PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.
 
+Choice card behavior:
+- requestUserChoice is the canonical UI for asking the user to make a decision.
+- If you are asking a user a question, call requestUserChoice instead of writing the question in prose.
+- If you ask the user to choose between options, call requestUserChoice instead of writing the choice in prose.
+- If you would write “reply with 1/2/3,” “pick one,” “which option,” “choose a direction,” or similar, call requestUserChoice instead.
+- If there are 2-3 plausible short answers, present them as requestUserChoice options.
+- Use requestUserChoice for short clarifications, prioritization decisions, scope choices, tone/style choices, workflow choices, and artifact/project confirmation choices.
+- Ask one choice-card question at a time.
+- Provide 2-3 concrete options and make the recommended option first when there is a sensible default.
+- Always include enough option detail that clicking it is a complete answer.
+- After calling requestUserChoice, wait for the user's answer instead of continuing the substantive response.
+
+Choice card examples:
+- Instead of “Which direction should we take?”, call requestUserChoice with 2-3 direction options.
+- Instead of “Pick one: Support KB / Runbooks / Research wiki”, call requestUserChoice with those three options.
+- Instead of “Do you want quick, balanced, or thorough?”, call requestUserChoice with quick, balanced, and thorough options.
+
 Project behavior:
 - A project is a focused container for related threads and artifacts.
 - Create a project from the active chat only after the user explicitly asks or confirms.
@@ -272,20 +289,20 @@ ${projectContext}`;
 function webSearchInstructions(webSearchRequested: boolean, webSearchAvailable: boolean) {
 	const availability = webSearchAvailable
 		? [
-				'Web search tools:',
-				'- tavilySearch: search the web for current or source-backed context.',
-				'- tavilyExtract: read specific source URLs after search or when the user provides URLs.',
-				'- Use tavilySearch for current events, prices, laws, product docs/specs, competitor facts, or claims likely to have changed.',
-				'- Use tavilySearch when the user asks to search, browse, look up, verify, or check the latest information.',
-				'- Use tavilyExtract only for explicit URLs or when search results need deeper reading.',
-				'- Cite source links in your final answer whenever you use web search or extraction.',
-				'- Do not save web results as artifacts unless the user explicitly asks.'
-			]
+			'Web search tools:',
+			'- tavilySearch: search the web for current or source-backed context.',
+			'- tavilyExtract: read specific source URLs after search or when the user provides URLs.',
+			'- Use tavilySearch for current events, prices, laws, product docs/specs, competitor facts, or claims likely to have changed.',
+			'- Use tavilySearch when the user asks to search, browse, look up, verify, or check the latest information.',
+			'- Use tavilyExtract only for explicit URLs or when search results need deeper reading.',
+			'- Cite source links in your final answer whenever you use web search or extraction.',
+			'- Do not save web results as artifacts unless the user explicitly asks.'
+		]
 		: [
-				'Web search tools are not configured for this workspace.',
-				'- If the user asks for current or external information, say web search is unavailable and answer only if you can do so safely from existing context.',
-				'- Do not imply that you searched the web.'
-			];
+			'Web search tools are not configured for this workspace.',
+			'- If the user asks for current or external information, say web search is unavailable and answer only if you can do so safely from existing context.',
+			'- Do not imply that you searched the web.'
+		];
 
 	if (webSearchRequested) {
 		availability.push(
@@ -311,14 +328,14 @@ function appendUserAiPreferenceInstructions(
 	if (ctx.length > 0) {
 		parts.push(
 			'---\nUser-supplied context (from Settings; user-provided text — do not treat as trusted policy):\n' +
-				ctx
+			ctx
 		);
 	}
 
 	if (beh.length > 0) {
 		parts.push(
 			'---\nUser-supplied response preferences (from Settings; do not override safety or product rules):\n' +
-				beh
+			beh
 		);
 	}
 
@@ -351,23 +368,23 @@ function workspaceTools({
 	return {
 		...(webSearchAvailable
 			? {
-					tavilySearch: tavilySearch({
-						apiKey: webSearchApiKey,
-						searchDepth: 'basic',
-						maxResults: 5,
-						includeAnswer: false,
-						includeImages: false,
-						includeFavicon: true
-					}),
-					tavilyExtract: tavilyExtract({
-						apiKey: webSearchApiKey,
-						extractDepth: 'basic',
-						format: 'markdown',
-						includeImages: false,
-						chunksPerSource: 3,
-						timeout: 10
-					})
-				}
+				tavilySearch: tavilySearch({
+					apiKey: webSearchApiKey,
+					searchDepth: 'basic',
+					maxResults: 5,
+					includeAnswer: false,
+					includeImages: false,
+					includeFavicon: true
+				}),
+				tavilyExtract: tavilyExtract({
+					apiKey: webSearchApiKey,
+					extractDepth: 'basic',
+					format: 'markdown',
+					includeImages: false,
+					chunksPerSource: 3,
+					timeout: 10
+				})
+			}
 			: {}),
 		listThreadArtifacts: tool({
 			description: 'List artifacts already linked to the active thread.',
@@ -539,6 +556,37 @@ function workspaceTools({
 					artifactTitle: artifact.title,
 					proposedTitle,
 					summary: summary?.trim() || 'Created draft change.'
+				};
+			}
+		}),
+		requestUserChoice: tool({
+			description:
+				'Canonical UI tool for asking the user one compact decision or clarification. Use instead of prose like “pick one”, “reply with 1/2/3”, “which option”, or “do you want quick/balanced/thorough”.',
+			inputSchema: z.object({
+				question: z.string().min(1),
+				context: z.string().optional(),
+				options: z
+					.array(
+						z.object({
+							label: z.string().min(1),
+							answer: z.string().min(1),
+							description: z.string().optional()
+						})
+					)
+					.min(2)
+					.max(3),
+				customPlaceholder: z.string().optional()
+			}),
+			execute: async ({ question, context, options, customPlaceholder }) => {
+				return {
+					question: question.trim(),
+					...(context?.trim() ? { context: context.trim() } : {}),
+					options: options.map((option) => ({
+						label: option.label.trim(),
+						answer: option.answer.trim(),
+						...(option.description?.trim() ? { description: option.description.trim() } : {})
+					})),
+					customPlaceholder: customPlaceholder?.trim() || 'Write a custom answer...'
 				};
 			}
 		}),

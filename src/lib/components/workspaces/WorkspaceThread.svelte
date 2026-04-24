@@ -20,6 +20,7 @@
 	import { cn } from '$lib/utils';
 	import { artifactTypeLabel, formatArtifactCreatedAt } from '$lib/artifact-display';
 	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
+	import IdeaChatChoiceCard from '$lib/components/idea-chat/IdeaChatChoiceCard.svelte';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
 	import {
@@ -417,6 +418,22 @@
 		}
 	};
 
+	async function submitChoiceAnswer(answer: string) {
+		if (!chat || isChatBusy) return;
+		const prevWebSearchRequested = webSearchRequested;
+		chatError = '';
+		saveError = '';
+		try {
+			await chat.sendMessage({ text: answer.trim() });
+			webSearchRequested = false;
+		} catch (error) {
+			console.error(error);
+			webSearchRequested = prevWebSearchRequested;
+			chatError = buildChatErrorMessage(error);
+			throw error;
+		}
+	}
+
 	async function importMentionedArtifacts(threadId: string, artifactIds: string[]) {
 		const rows = mentionableArtifacts.data ?? [];
 		for (const artifactId of artifactIds) {
@@ -704,7 +721,15 @@
 															/>
 														{:else}
 															<div class="border-l border-border/40 pl-4 sm:pl-5">
-																<IdeaChatToolSteps tools={segment.tools} />
+																{#if segment.kind === 'tools'}
+																	<IdeaChatToolSteps tools={segment.tools} />
+																{:else}
+																	<IdeaChatChoiceCard
+																		choice={segment.choice}
+																		disabled={isChatBusy}
+																		onAnswer={submitChoiceAnswer}
+																	/>
+																{/if}
 															</div>
 														{/if}
 													{/each}

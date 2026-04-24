@@ -12,9 +12,24 @@ export type ToolStepView = {
 	errorText?: string;
 };
 
+export type ChoiceCardOption = {
+	label: string;
+	answer: string;
+	description?: string;
+};
+
+export type ChoiceCardView = {
+	id: string;
+	question: string;
+	context?: string;
+	options: ChoiceCardOption[];
+	customPlaceholder: string;
+};
+
 export type AssistantSegment =
 	| { kind: 'text'; text: string }
-	| { kind: 'tools'; tools: ToolStepView[] };
+	| { kind: 'tools'; tools: ToolStepView[] }
+	| { kind: 'choice'; choice: ChoiceCardView };
 
 const WORKSPACE_TOOL_TITLES: Record<string, string> = {
 	listThreadArtifacts: 'List thread artifacts',
@@ -25,6 +40,7 @@ const WORKSPACE_TOOL_TITLES: Record<string, string> = {
 	createPrdArtifact: 'Save PRD artifact',
 	createProjectFromThread: 'Promote chat to project',
 	proposeArtifactEdit: 'Draft artifact changes',
+	requestUserChoice: 'Choose next step',
 	tavilySearch: 'Search web',
 	tavilyExtract: 'Read web pages'
 };
@@ -38,6 +54,7 @@ const WORKSPACE_RUNNING_SUMMARIES: Record<string, string> = {
 	createPrdArtifact: 'Saving PRD artifact…',
 	createProjectFromThread: 'Promoting chat to project…',
 	proposeArtifactEdit: 'Drafting artifact changes…',
+	requestUserChoice: 'Preparing choices…',
 	tavilySearch: 'Searching the web…',
 	tavilyExtract: 'Reading source pages…'
 };
@@ -181,6 +198,10 @@ function summarizeWorkspaceTool(
 					: 'Drafted artifact changes for review.',
 				detailJson
 			};
+		case 'requestUserChoice': {
+			const question = typeof out.question === 'string' ? out.question : '';
+			return { summary: question || 'Asked for a choice.', detailJson };
+		}
 		default:
 			return { summary: 'Finished.', detailJson };
 	}
@@ -206,6 +227,53 @@ export function toolPartToView(part: unknown): ToolStepView | null {
 		summary,
 		detailJson,
 		errorText
+	};
+}
+
+export function toolPartToChoiceCard(part: unknown): ChoiceCardView | null {
+	if (!part || typeof part !== 'object') return null;
+	const p = part as Record<string, unknown>;
+	const toolName = parseToolName(p);
+	if (toolName !== 'requestUserChoice') return null;
+	if (p.state !== 'output-available') return null;
+
+	const output =
+		p.output && typeof p.output === 'object' ? (p.output as Record<string, unknown>) : {};
+	const question = typeof output.question === 'string' ? output.question.trim() : '';
+	const options = Array.isArray(output.options)
+		? output.options
+				.map((raw): ChoiceCardOption | null => {
+					if (!raw || typeof raw !== 'object') return null;
+					const option = raw as Record<string, unknown>;
+					const label = typeof option.label === 'string' ? option.label.trim() : '';
+					const answer = typeof option.answer === 'string' ? option.answer.trim() : '';
+					const description =
+						typeof option.description === 'string' ? option.description.trim() : '';
+					if (!label || !answer) return null;
+					return {
+						label,
+						answer,
+						...(description ? { description } : {})
+					};
+				})
+				.filter((option): option is ChoiceCardOption => option !== null)
+		: [];
+
+	if (!question || options.length < 2) return null;
+
+	const toolCallId = typeof p.toolCallId === 'string' ? p.toolCallId : `choice-${question}`;
+	const context = typeof output.context === 'string' ? output.context.trim() : '';
+	const customPlaceholder =
+		typeof output.customPlaceholder === 'string' && output.customPlaceholder.trim()
+			? output.customPlaceholder.trim()
+			: 'Write a custom answer...';
+
+	return {
+		id: toolCallId,
+		question,
+		...(context ? { context } : {}),
+		options,
+		customPlaceholder
 	};
 }
 
@@ -253,6 +321,11 @@ export function buildAssistantSegments(message: UIMessage): AssistantSegment[] {
 		if (isToolLikePart(typed)) {
 			const flushed = flushTextBuffer(textBuf);
 			if (flushed) pushText(flushed);
+			const choice = toolPartToChoiceCard(part);
+			if (choice) {
+				out.push({ kind: 'choice', choice });
+				continue;
+			}
 			const view = toolPartToView(part);
 			if (view) appendTool(view);
 			continue;
@@ -269,6 +342,7 @@ export function assistantSegmentsHaveContent(segments: AssistantSegment[]): bool
 	for (const seg of segments) {
 		if (seg.kind === 'text' && seg.text.trim()) return true;
 		if (seg.kind === 'tools' && seg.tools.length > 0) return true;
+		if (seg.kind === 'choice') return true;
 	}
 	return false;
 }
