@@ -223,13 +223,11 @@
 
 	/** Design-system-aligned nav rows: dense, 12px icons */
 	const navPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
-	const navPillPrimary =
-		'bg-primary text-primary-foreground shadow-none hover:bg-primary/90 hover:text-primary-foreground data-[active=true]:bg-primary data-[active=true]:text-primary-foreground';
+		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
 	const sectionTrigger =
-		'group/section flex h-7 w-full items-center gap-1 rounded-md px-2 text-left text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
+		'group/section flex h-7 w-full items-center gap-1 rounded-full px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
 	const subNavPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2.5 text-xs [&>svg]:size-3 data-[active=true]:font-medium';
+		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
 
 	const usageBarPct = $derived(
 		budget.data && budget.data.capUsd > 0
@@ -573,7 +571,7 @@
 								<Sidebar.MenuButton
 									size="sm"
 									isActive={isNewChatActive}
-									class={cn(navPill, navPillPrimary)}
+									class={cn(navPill, 'min-w-0')}
 									tooltipContent="New chat"
 								>
 									{#snippet child({ props })}
@@ -658,7 +656,7 @@
 																<DropdownMenu.Root>
 																	<DropdownMenu.Trigger
 																		type="button"
-																		class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																		class="inline-flex size-7 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																		onclick={(e) => e.stopPropagation()}
 																		onpointerdown={(e) => e.stopPropagation()}
 																		aria-label={`Project actions: ${project.name}`}
@@ -681,7 +679,7 @@
 																<a
 																	href={workspaceProjectHref(project._id)}
 																	data-workspace-nav-item
-																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																	aria-label={`New chat in ${project.name}`}
 																>
 																	<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
@@ -740,7 +738,7 @@
 																				<DropdownMenu.Root>
 																					<DropdownMenu.Trigger
 																						type="button"
-																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																						onclick={(e) => e.stopPropagation()}
 																						onpointerdown={(e) => e.stopPropagation()}
 																						aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -842,7 +840,7 @@
 														<DropdownMenu.Root>
 															<DropdownMenu.Trigger
 																type="button"
-																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground opacity-0 ring-sidebar-ring group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3.5"
+																class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																onclick={(e) => e.stopPropagation()}
 																onpointerdown={(e) => e.stopPropagation()}
 																aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -961,14 +959,14 @@
 							<a
 								href={workspaceSettingsHref()}
 								data-workspace-nav-item
-								class="mb-2 block rounded-md px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+								class="mb-2 block rounded-full px-2.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 								aria-label={usageTooltip}
 							>
 								<div
-									class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/70"
+									class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/60"
 								>
 									<span class="font-medium tracking-wide uppercase">AI today</span>
-									<span class="text-sidebar-foreground tabular-nums">
+									<span class="text-sidebar-foreground/75 tabular-nums">
 										{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
 									</span>
 								</div>
@@ -1000,9 +998,40 @@
 					</div>
 
 					<div class="mb-1 hidden justify-center group-data-[collapsible=icon]:flex">
+						{#snippet collapsedUsageTooltip()}
+							{#if budget.data}
+								<div class="w-44 space-y-1">
+									<div class="flex items-center justify-between gap-2">
+										<span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+											AI today
+										</span>
+										<span class="text-xs tabular-nums text-foreground">
+											{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
+										</span>
+									</div>
+									<div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+										<div
+											class="h-full rounded-full bg-primary transition-[width]"
+											style="width: {usageBarPct}%"
+										></div>
+									</div>
+									<p class="text-[10px] text-muted-foreground">{budget.data.dateKey}</p>
+								</div>
+							{:else}
+								<span class="text-xs text-muted-foreground">Usage</span>
+							{/if}
+						{/snippet}
 						<Sidebar.Menu>
 							<Sidebar.MenuItem>
-								<Sidebar.MenuButton size="sm" class={navPill} tooltipContent={usageTooltip}>
+								<Sidebar.MenuButton
+									size="sm"
+									class={navPill}
+									tooltipContent={collapsedUsageTooltip}
+									tooltipContentProps={{
+										class:
+											'rounded-lg border border-border/70 bg-popover px-2.5 py-2 text-xs text-foreground'
+									}}
+								>
 									{#snippet child({ props })}
 										<a
 											href={workspaceSettingsHref()}
