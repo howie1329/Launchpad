@@ -19,7 +19,11 @@
 	} from '$lib/artifact-mention-tokens';
 	import { cn } from '$lib/utils';
 	import { artifactTypeLabel, formatArtifactCreatedAt } from '$lib/artifact-display';
-	import { listMessagesQuery, saveMessagesMutation } from '$lib/chat';
+	import {
+		forkThreadFromMessageMutation,
+		listMessagesQuery,
+		saveMessagesMutation
+	} from '$lib/chat';
 	import IdeaChatChoiceCard from '$lib/components/idea-chat/IdeaChatChoiceCard.svelte';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
@@ -78,6 +82,12 @@
 		assistantSegmentsHaveContent,
 		buildAssistantSegments
 	} from '$lib/idea-chat-assistant-parts';
+	import WorkspaceMessageActions from '$lib/components/workspaces/WorkspaceMessageActions.svelte';
+	import {
+		buildAssistantMessageCopyText,
+		buildUserMessageCopyText,
+		truncateMessagesAfterUserMessage
+	} from '$lib/workspace-chat-message-actions';
 	import {
 		ArrowDown01Icon,
 		ArrowUp01Icon,
@@ -105,6 +115,8 @@
 	let webSearchRequested = $state(false);
 	let chatError = $state('');
 	let saveError = $state('');
+	let copiedMessageId = $state('');
+	let copyToastClear: ReturnType<typeof setTimeout> | 0 = 0;
 	let contextArtifactId = $state('');
 	let contextDraftChangeId = $state<Id<'artifactDraftChanges'> | null>(null);
 	let lastThreadIdForContext = $state('');
@@ -286,6 +298,11 @@
 	$effect(() => {
 		void activeThreadId;
 		mentionChips = [];
+		copiedMessageId = '';
+		if (copyToastClear) {
+			clearTimeout(copyToastClear);
+			copyToastClear = 0;
+		}
 	});
 
 	$effect(() => {
@@ -574,7 +591,7 @@
 		);
 	}
 
-	async function persistMessages(threadId: string, messages: UIMessage[]) {
+	async function persistMessages(threadId: string, messages: UIMessage[]): Promise<boolean> {
 		try {
 			await getConvexClient().mutation(saveMessagesMutation, {
 				threadId: threadId as Id<'chatThreads'>,
@@ -582,10 +599,12 @@
 				modelId: selectedModelId
 			});
 			saveError = '';
+			return true;
 		} catch (error) {
 			console.error(error);
 			saveError =
 				'Could not save messages to the server. Your latest replies may not persist after refresh—try again or send another message to retry sync.';
+			return false;
 		}
 	}
 
@@ -593,6 +612,95 @@
 		if (!chat || !activeThreadId) return;
 		await persistMessages(activeThreadId, chat.messages);
 	}
+
+	function scheduleCopiedReset() {
+		if (copyToastClear) clearTimeout(copyToastClear);
+		copyToastClear = setTimeout(() => {
+			copiedMessageId = '';
+			copyToastClear = 0;
+		}, 2000);
+	}
+
+	async function copyMessageDisplay(message: UIMessage) {
+		const text =
+			message.role === 'user'
+				? buildUserMessageCopyText(message)
+				: buildAssistantMessageCopyText(message);
+		if (!text) {
+			chatError = 'Nothing to copy for this message yet.';
+			return;
+		}
+		try {
+			await navigator.clipboard.writeText(text);
+			copiedMessageId = message.id;
+			scheduleCopiedReset();
+		} catch {
+			chatError =
+				'Could not copy to the clipboard. Check browser permissions and try again.';
+		}
+	}
+
+	async function retryFromUserMessage(userMessageId: string) {
+		if (!auth.isAuthenticated || !chat || !activeThreadId || isChatBusy) return;
+		chatError = '';
+		saveError = '';
+		try {
+			const truncated = truncateMessagesAfterUserMessage(chat.messages, userMessageId);
+			const ok = await persistMessages(activeThreadId, truncated);
+			if (!ok) return;
+			await tick();
+			if (!chat || isChatBusy) return;
+			await chat.sendMessage();
+		} catch (error) {
+			console.error(error);
+			chatError = buildChatErrorMessage(error);
+		}
+	}
+
+	async function forkFromMessage(messageId: string) {
+		if (!auth.isAuthenticated || !activeThreadId || isChatBusy) return;
+		chatError = '';
+		try {
+			const { threadId } = await getConvexClient().mutation(forkThreadFromMessageMutation, {
+				threadId: activeThreadId as Id<'chatThreads'>,
+				messageId
+			});
+			const projectQuery = activeProjectId
+				? `project=${encodeURIComponent(activeProjectId)}&`
+				: '';
+			await goto(
+				resolve(
+					`/workspace?${projectQuery}thread=${encodeURIComponent(threadId)}` as `/workspace?${string}`
+				),
+				{ noScroll: true, keepFocus: true }
+			);
+		} catch (error) {
+			console.error(error);
+			chatError = 'Could not fork this thread. Try again.';
+		}
+	}
+
+	function dismissChatAlerts() {
+		chatError = '';
+		saveError = '';
+		chat?.clearError();
+	}
+
+	async function retryAssistantRequest() {
+		if (!chat || isChatBusy) return;
+		chat.clearError();
+		chatError = '';
+		try {
+			await chat.sendMessage();
+		} catch (error) {
+			console.error(error);
+			chatError = buildChatErrorMessage(error);
+		}
+	}
+
+	const showStreamFailure = $derived(
+		Boolean(chatError) || chat?.status === 'error'
+	);
 
 	function authHeaders(): Record<string, string> {
 		if (!auth.token) return {};
@@ -708,69 +816,103 @@
 						<ConversationContent
 							class="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-5 sm:px-6"
 						>
-							{#each chat.messages as message, messageIndex (message.id)}
-								<Message from={message.role}>
-									<MessageContent>
-										{#if message.role === 'assistant'}
-											{@const segments = buildAssistantSegments(message)}
-											{#if assistantSegmentsHaveContent(segments)}
-												<!-- gap-2: prose vs tools within one assistant turn; message gap-5 separates turns -->
-												<div class="flex w-full min-w-0 flex-col gap-2">
-													{#each segments as segment, segmentIndex (segmentIndex)}
-														{#if segment.kind === 'text'}
-															<MessageResponse
-																content={segment.text}
-																class="text-xs leading-relaxed"
-															/>
-														{:else}
-															<div class="border-l border-border/40 pl-4 sm:pl-5">
-																{#if segment.kind === 'tools'}
-																	<IdeaChatToolSteps tools={segment.tools} />
-																{:else}
-																	<IdeaChatChoiceCard
-																		choice={segment.choice}
-																		disabled={isChatBusy}
-																		onAnswer={submitChoiceAnswer}
-																	/>
-																{/if}
-															</div>
-														{/if}
-													{/each}
-												</div>
-											{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages)}
-												<MessageResponse
-													content="Thinking..."
-													class="text-xs leading-relaxed text-muted-foreground"
-												/>
-											{:else}
-												<p class="text-xs text-muted-foreground">No response yet.</p>
-											{/if}
-										{:else}
-											{@const composed = parseComposedUserMessage(messageText(message))}
-											<div class="flex w-full min-w-0 flex-col gap-2">
-												{#if composed.artifactIds.length > 0}
-													<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
-														{#each composed.artifactIds as aid (aid)}
-															<span class={artifactMentionPill}>
-																<span
-																	class="size-1.5 shrink-0 rounded-full bg-primary/70"
-																	aria-hidden="true"
-																></span>
-																<span class="max-w-56 min-w-0 truncate"
-																	>{artifactTitleForId(aid)}</span
-																>
-															</span>
+							{#if chat.messages.length === 0 && chat.status === 'ready'}
+								<div
+									class="flex flex-col items-center justify-center gap-2 py-12 text-center"
+									aria-live="polite"
+								>
+									<p class="text-sm font-semibold tracking-tight">Start this thread</p>
+									<p class="max-w-sm text-xs leading-5 text-muted-foreground">
+										Ask a question or describe what you want to build. Use @ to cite artifacts when
+										you want the assistant to read them.
+									</p>
+								</div>
+							{:else}
+								{#each chat.messages as message, messageIndex (message.id)}
+									<Message from={message.role}>
+										<MessageContent>
+											{#if message.role === 'assistant'}
+												{@const segments = buildAssistantSegments(message)}
+												{#if assistantSegmentsHaveContent(segments)}
+													<!-- gap-2: prose vs tools within one assistant turn; message gap-5 separates turns -->
+													<div class="flex w-full min-w-0 flex-col gap-2">
+														{#each segments as segment, segmentIndex (segmentIndex)}
+															{#if segment.kind === 'text'}
+																<MessageResponse
+																	content={segment.text}
+																	class="text-xs leading-relaxed"
+																/>
+															{:else}
+																<div class="border-l border-border/40 pl-4 sm:pl-5">
+																	{#if segment.kind === 'tools'}
+																		<IdeaChatToolSteps tools={segment.tools} />
+																	{:else}
+																		<IdeaChatChoiceCard
+																			choice={segment.choice}
+																			disabled={isChatBusy}
+																			onAnswer={submitChoiceAnswer}
+																		/>
+																	{/if}
+																</div>
+															{/if}
 														{/each}
 													</div>
+												{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages)}
+													<MessageResponse
+														content="Thinking..."
+														class="text-xs leading-relaxed text-muted-foreground"
+													/>
+												{:else}
+													<p class="text-xs text-muted-foreground">No response yet.</p>
 												{/if}
-												{#if composed.body}
-													<p class="text-xs leading-5 whitespace-pre-wrap">{composed.body}</p>
-												{/if}
-											</div>
-										{/if}
-									</MessageContent>
-								</Message>
-							{/each}
+											{:else}
+												{@const composed = parseComposedUserMessage(messageText(message))}
+												<div class="flex w-full min-w-0 flex-col gap-2">
+													{#if composed.artifactIds.length > 0}
+														<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
+															{#each composed.artifactIds as aid (aid)}
+																<span class={artifactMentionPill}>
+																	<span
+																		class="size-1.5 shrink-0 rounded-full bg-primary/70"
+																		aria-hidden="true"
+																	></span>
+																	<span class="max-w-56 min-w-0 truncate"
+																		>{artifactTitleForId(aid)}</span
+																	>
+																</span>
+															{/each}
+														</div>
+													{/if}
+													{#if composed.body}
+														<p class="text-xs leading-5 whitespace-pre-wrap">{composed.body}</p>
+													{/if}
+												</div>
+											{/if}
+										</MessageContent>
+										<WorkspaceMessageActions
+											role={message.role === 'assistant' ? 'assistant' : 'user'}
+											allowRetry={auth.isAuthenticated}
+											allowFork={auth.isAuthenticated}
+											disabled={isChatBusy || !auth.isAuthenticated}
+											copyDisabled={
+												!(
+													message.role === 'user'
+														? buildUserMessageCopyText(message)
+														: buildAssistantMessageCopyText(message)
+												)
+											}
+											copied={copiedMessageId === message.id}
+											onCopy={() => void copyMessageDisplay(message)}
+											onFork={() => void forkFromMessage(message.id)}
+											onRetry={
+												message.role === 'user'
+													? () => void retryFromUserMessage(message.id)
+													: undefined
+											}
+										/>
+									</Message>
+								{/each}
+							{/if}
 
 							{#if chat.status === 'submitted'}
 								<Message from="assistant">
@@ -956,22 +1098,63 @@
 			{#snippet threadComposer()}
 				<div class="shrink-0 bg-background px-4 py-4 sm:px-6">
 					<div class="relative mx-auto w-full max-w-3xl space-y-2">
-						{#if chatError || saveError}
-							<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-								<p class="text-xs text-destructive">{chatError || saveError}</p>
-								{#if saveError && !chatError}
+						{#if showStreamFailure || saveError}
+							<div
+								class="flex flex-col gap-2 rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between"
+								role="alert"
+							>
+								<div class="min-w-0 flex-1 space-y-2 text-xs">
+									{#if showStreamFailure}
+										<div class="space-y-1">
+											<p class="font-medium text-destructive">Assistant reply failed</p>
+											<p class="leading-5 text-muted-foreground">
+												{chatError ||
+													chat?.error?.message ||
+													'Something went wrong. You can retry or keep typing.'}
+											</p>
+										</div>
+									{/if}
+									{#if saveError}
+										<div class="space-y-1">
+											<p class="font-medium text-destructive">Could not save to the server</p>
+											<p class="leading-5 text-muted-foreground">{saveError}</p>
+										</div>
+									{/if}
+								</div>
+								<div class="flex flex-wrap items-center gap-2">
+									{#if showStreamFailure}
+										<Button
+											type="button"
+											variant="secondary"
+											size="sm"
+											class="h-7 text-xs"
+											disabled={isChatBusy}
+											onclick={() => void retryAssistantRequest()}
+										>
+											Retry send
+										</Button>
+									{/if}
+									{#if saveError}
+										<Button
+											type="button"
+											variant="secondary"
+											size="sm"
+											class="h-7 text-xs"
+											onclick={() => void retrySaveMessages()}
+										>
+											Retry sync
+										</Button>
+									{/if}
 									<Button
 										type="button"
-										variant="secondary"
+										variant="ghost"
 										size="sm"
-										class="h-7 shrink-0 self-start text-xs"
-										onclick={() => {
-											void retrySaveMessages();
-										}}
+										class="h-7 text-xs"
+										onclick={dismissChatAlerts}
 									>
-										Retry sync
+										Dismiss
 									</Button>
-								{/if}
+								</div>
 							</div>
 						{/if}
 

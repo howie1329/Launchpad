@@ -64,11 +64,10 @@ flowchart TB
 
 **Exit criteria:** Fork from project thread opens new thread under same project; general stays general; message count matches prefix.
 
-## Phase 5 — Tests and hardening
+## Phase 5 — Hardening and manual QA
 
-- Unit tests: truncate helper, copy string builder (if pure).
-- Convex tests: fork ownership, inheritance, ordering.
-- Manual QA per PRD testing matrix.
+- Run the **manual QA matrix** in the PRD (Testing Decisions); confirm **no orphaned `chatMessages`** after retry/truncate (refresh + optional Convex dashboard check).
+- **Automated tests** (unit / Convex) are **optional** for this iteration—add only if low-cost while implementing.
 
 ## Risk register
 
@@ -84,7 +83,7 @@ flowchart TB
 - [`src/convex/chat.ts`](../../src/convex/chat.ts) (fork mutation; possible delete-tail helper)
 - [`src/lib/chat.ts`](../../src/lib/chat.ts) (Convex client exports if needed)
 - New: `src/lib/workspace-chat-message-actions.ts` or similar (truncate + copy helpers)
-- Tests alongside existing test layout under `src/`
+- Optional: new test files under `src/` if you add automated coverage later
 
 ## Dependencies
 

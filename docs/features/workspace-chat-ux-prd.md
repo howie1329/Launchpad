@@ -89,10 +89,9 @@ Open product choices called out in **Further Notes** should be confirmed before 
 
 ## Testing Decisions
 
-- Prefer **unit tests** for pure logic: truncate-to-user-message, fork prefix selection, clipboard payload builders (where extractable without DOM).
-- **Convex mutation tests** (or integration tests if the repo pattern favors them) for fork: ownership, sequence ordering, project vs general inheritance, message count cap behavior if applicable.
-- **Manual QA** matrix: retry on first vs middle user message; retry with tools in last assistant turn; fork at first message and at last message; fork project vs general; stream error then retry; save error then retry sync; copy user and assistant with multiline text; mobile narrow width.
-- Avoid asserting **implementation details** of `Chat` internals; assert **observable** persistence and UI state transitions where automated tests exist.
+- **v1 acceptance:** **Manual QA only** (no automated test requirement for this feature unless added opportunistically).
+- Use a **manual QA matrix** covering: retry on first vs middle user message; retry with tools in last assistant turn; fork at first message and at last message; fork project vs general; stream error then retry; save error then retry sync; copy user and assistant with multiline text; mobile narrow width; refresh after each flow to confirm Convex matches the UI (especially after truncate).
+- **Optional follow-up:** unit tests for pure helpers (truncate, copy payload builders) or Convex tests for fork ownership—nice to have, not blocking ship for this iteration.
 
 ## Out of Scope
 
@@ -107,6 +106,7 @@ Open product choices called out in **Further Notes** should be confirmed before 
 
 - Retry semantics: **truncate tail**, same thread, fresh assistant response.
 - Fork payload: **messages only**; project threads **inherit `projectId`**.
+- Validation: **manual testing** for v1 (see Testing Decisions).
 
 ### Open product confirmations
 
