@@ -138,6 +138,50 @@ export const listThreadArtifacts = query({
 	}
 });
 
+export const listMentionableArtifacts = query({
+	args: {
+		threadId: v.id('chatThreads')
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return [];
+
+		const thread = await getOwnedThread(ctx, args.threadId, ownerId);
+		const links = await ctx.db
+			.query('threadArtifactLinks')
+			.withIndex('by_threadId_and_updatedAt', (q) => q.eq('threadId', args.threadId))
+			.order('desc')
+			.take(100);
+		const linkedIds = new Set(links.map((link) => link.artifactId));
+		const rows: Array<{ artifact: Doc<'artifacts'>; linkedToThread: boolean }> = [];
+		const seen = new Set<Id<'artifacts'>>();
+
+		for (const link of links) {
+			const artifact = await ctx.db.get(link.artifactId);
+			if (artifact && artifact.ownerId === ownerId) {
+				rows.push({ artifact, linkedToThread: true });
+				seen.add(artifact._id);
+			}
+		}
+
+		if (thread.projectId) {
+			const projectArtifacts = await ctx.db
+				.query('artifacts')
+				.withIndex('by_projectId_and_updatedAt', (q) => q.eq('projectId', thread.projectId))
+				.order('desc')
+				.take(100);
+
+			for (const artifact of projectArtifacts) {
+				if (seen.has(artifact._id)) continue;
+				rows.push({ artifact, linkedToThread: linkedIds.has(artifact._id) });
+				seen.add(artifact._id);
+			}
+		}
+
+		return rows;
+	}
+});
+
 export const getArtifact = query({
 	args: {
 		artifactId: v.id('artifacts')
