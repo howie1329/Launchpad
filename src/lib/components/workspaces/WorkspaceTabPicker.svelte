@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
@@ -46,7 +47,8 @@
 		'outline-none hover:bg-accent focus:bg-accent ' +
 		'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground';
 
-	const headingClass = 'px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
+	const headingClass =
+		'px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
 
 	const projectsCap = 50;
 	const threadsCap = 50;
@@ -58,25 +60,15 @@
 
 	function navTo(href: string) {
 		return () => {
-			void goto(href);
+			void goto(resolve(href as '/workspace'));
 			open = false;
 		};
 	}
 </script>
 
 <DropdownMenu.Root bind:open>
-	<DropdownMenu.Trigger
-		type="button"
-		class="inline-flex shrink-0"
-		aria-label="Add workspace tab"
-	>
-		<Button
-			variant="ghost"
-			size="icon"
-			type="button"
-			class="size-8"
-			aria-label="Add workspace tab"
-		>
+	<DropdownMenu.Trigger type="button" class="inline-flex shrink-0" aria-label="Add workspace tab">
+		<Button variant="ghost" size="icon" type="button" class="size-8" aria-label="Add workspace tab">
 			<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3.5" />
 		</Button>
 	</DropdownMenu.Trigger>
@@ -87,18 +79,20 @@
 					<p class="px-2 py-4 text-center text-xs text-muted-foreground">Loading workspace…</p>
 				{:else}
 					<div class={headingClass}>Open</div>
-					<DropdownMenu.Item
-						class={itemClass}
-						onSelect={navTo(workspaceRootHref())}
-					>
-						<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+					<DropdownMenu.Item class={itemClass} onSelect={navTo(workspaceRootHref())}>
+						<HugeiconsIcon
+							icon={ChatAdd01Icon}
+							strokeWidth={2}
+							class="size-3 text-muted-foreground"
+						/>
 						<span class="min-w-0 flex-1 truncate">New chat</span>
 					</DropdownMenu.Item>
-					<DropdownMenu.Item
-						class={itemClass}
-						onSelect={navTo(workspaceSettingsHref())}
-					>
-						<HugeiconsIcon icon={Settings01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+					<DropdownMenu.Item class={itemClass} onSelect={navTo(workspaceSettingsHref())}>
+						<HugeiconsIcon
+							icon={Settings01Icon}
+							strokeWidth={2}
+							class="size-3 text-muted-foreground"
+						/>
 						<span class="min-w-0 flex-1 truncate">Settings</span>
 					</DropdownMenu.Item>
 					{#if projectsShown.length > 0}
@@ -109,7 +103,11 @@
 								class={itemClass}
 								onSelect={navTo(workspaceProjectHref(project._id))}
 							>
-								<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+								<HugeiconsIcon
+									icon={Folder01Icon}
+									strokeWidth={2}
+									class="size-3 text-muted-foreground"
+								/>
 								<span class="min-w-0 flex-1 truncate">{project.name}</span>
 							</DropdownMenu.Item>
 						{/each}
@@ -118,11 +116,12 @@
 						<DropdownMenu.Separator class="my-1" />
 						<div class={headingClass}>Chats</div>
 						{#each threadsShown as thread (thread._id)}
-							<DropdownMenu.Item
-								class={itemClass}
-								onSelect={navTo(workspaceThreadHref(thread))}
-							>
-								<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+							<DropdownMenu.Item class={itemClass} onSelect={navTo(workspaceThreadHref(thread))}>
+								<HugeiconsIcon
+									icon={Chat01Icon}
+									strokeWidth={2}
+									class="size-3 text-muted-foreground"
+								/>
 								<span class="min-w-0 flex-1 truncate"
 									>{formatThreadTitleForDisplay(thread.title)}</span
 								>
@@ -137,7 +136,11 @@
 								class={itemClass}
 								onSelect={navTo(workspaceArtifactHref(artifact._id))}
 							>
-								<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+								<HugeiconsIcon
+									icon={File01Icon}
+									strokeWidth={2}
+									class="size-3 text-muted-foreground"
+								/>
 								<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
 								<span class="shrink-0 pl-1 text-[11px] text-muted-foreground"
 									>{artifactTypeLabel(artifact.type)}</span
@@ -145,7 +148,9 @@
 							</DropdownMenu.Item>
 						{/each}
 					{/if}
-					<div class="border-t border-border/50 p-2 text-[10px] leading-relaxed text-muted-foreground">
+					<div
+						class="border-t border-border/50 p-2 text-[10px] leading-relaxed text-muted-foreground"
+					>
 						Lists show at most {projectsCap} projects, {threadsCap} chats, and {artifactsCap} documents
 						(newest first).
 					</div>

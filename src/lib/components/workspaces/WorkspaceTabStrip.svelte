@@ -4,7 +4,7 @@
 	import { Cancel01Icon } from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import type { WorkspaceTabTarget } from '$lib/workspaceTabs';
-	import { getWorkspaceTabLabel, hrefForWorkspaceTarget, workspaceTargetsEqual } from '$lib/workspace-tab-target';
+	import { getWorkspaceTabLabel, workspaceTargetsEqual } from '$lib/workspace-tab-target';
 	import type { SavedArtifact } from '$lib/artifacts';
 	import type { SavedChatThread } from '$lib/chat';
 	import type { SavedProject } from '$lib/projects';
@@ -37,7 +37,7 @@
 	aria-label="Workspace tabs"
 >
 	<div
-		class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:thin] [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-0"
+		class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-0"
 	>
 		{#each tabs as tab (tab.id)}
 			{@const { label, missing } = getWorkspaceTabLabel(tab.target, data)}
@@ -46,7 +46,7 @@
 				role="tab"
 				aria-selected={isActive}
 				class={cn(
-					'group flex h-7 min-w-0 max-w-[10rem] shrink-0 items-center gap-0.5 rounded-md border border-transparent pl-1.5 pr-0.5 text-left text-xs transition-colors',
+					'group flex h-7 max-w-[10rem] min-w-0 shrink-0 items-center gap-0.5 rounded-md border border-transparent pr-0.5 pl-1.5 text-left text-xs transition-colors',
 					isActive
 						? 'bg-accent/80 font-medium text-accent-foreground'
 						: 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
@@ -57,7 +57,7 @@
 					type="button"
 					variant="ghost"
 					size="sm"
-					class="h-6 min-w-0 flex-1 gap-0 px-1.5 text-xs font-inherit"
+					class="font-inherit h-6 min-w-0 flex-1 gap-0 px-1.5 text-xs"
 					onclick={() => onSelectTab(tab.target)}
 					title={label}
 					aria-label={missing ? `Missing: ${label}` : label}
