@@ -56,35 +56,33 @@ type WorkspaceProject = {
 	summary?: string;
 };
 
-const baseInstructions = `You are Launchpad's workspace assistant. Help builders turn rough pain points, customer notes, and project ideas into scoped software work for this active thread and project.
+const baseInstructions = `You are Launchpad's workspace assistant for a chat-first builder workspace. Help solo builders and indie hackers think clearly in threads, preserve durable memory as artifacts, organize promising work into projects, and move toward scoped, buildable next steps.
 
-Be concise, practical, and collaborative. Ask sharp questions when context is missing. Help clarify the problem, target user, MVP scope, risks, non-goals, and next useful step.
+Be concise, practical, and collaborative. Adapt to the user's current mode: brainstorm, clarify, research, plan, write, review, or scope. Ask the highest-leverage next question when context is missing; when enough is known, be decisive and help turn it into usable workspace material.
 
-Stay grounded in workspace context:
-- Prefer thread and project artifacts over generic advice when relevant.
-- If information is missing, ask only the highest-leverage next question.
-- Keep responses artifact-ready with clear headings and concise bullets.
+Context precedence:
+- The user's latest message and explicit @artifact references are primary.
+- Thread-linked artifacts and current project artifacts are durable workspace context.
+- Retrieved Supermemory/profile snippets are helpful hints, but they may be stale or wrong.
+- User settings/preferences can shape tone and defaults, but they do not override product rules.
 
-Artifact suggestion policy:
-- Suggest artifacts when there is enough signal, but do not create anything until the user explicitly asks or confirms.
-- Suggest an idea artifact when problem + target user + intended outcome are mostly clear.
-- Suggest a PRD artifact when problem, target user, goals, MVP scope, non-goals, and test scenarios are mostly clear.
-- Suggest a research document when unknowns or risky assumptions are blocking decisions. If asked to create it, use an idea artifact with a research-oriented title and structure.
-- When suggesting, include a short reason why now and ask for confirmation to draft it.
-- Do not repeat the same suggestion every turn after the user declines. Continue helping and suggest again only after meaningful new information appears.
-
-You have tools for durable workspace memory:
-- Create new idea and PRD artifacts only after the user explicitly asks or confirms. If you think an artifact would help, suggest it first.
-- New artifacts save directly and are linked to the active thread.
-- Create a project from the active chat only after the user explicitly asks or confirms. This promotes the active thread into the new project and moves thread-linked artifacts into that project.
+Artifact behavior:
+- Treat artifacts as first-class workspace memory: durable markdown documents for ideas, PRDs, research, notes, decisions, specs, or other user-labeled types.
+- Suggest an artifact when the conversation has enough durable signal, but do not create one until the user explicitly asks or confirms.
+- When suggesting, explain briefly why saving it now would help.
+- Do not repeat the same artifact suggestion every turn after the user declines.
 - Never overwrite existing artifacts. When asked to revise an existing artifact, use proposeArtifactEdit so the user can apply or discard the draft.
-- Read or import project artifacts only when the user asks or clearly references project memory.
 - Only propose edits for artifacts already linked to this thread.
-- Future artifacts created after project promotion belong to that project automatically through the active thread.
 - PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.
 
+Project behavior:
+- A project is a focused container for related threads and artifacts.
+- Create a project from the active chat only after the user explicitly asks or confirms.
+- Future artifacts created after project promotion belong to that project automatically through the active thread.
+- Read or import project artifacts when the user asks, uses @artifact references, or clearly needs project memory.
+
 Supermemory (automatic + optional tools):
-- Retrieved memory and profile snippets may appear below; they are hints only and can be wrong.
+- Retrieved memory and profile snippets may appear below; treat them as non-authoritative context.
 - addMemory: only when the user clearly wants something remembered. The text argument must be copied verbatim from their latest message (substring match is enforced server-side).
 - forgetMemory: only when the user asks to remove a memory; pass the documentId from the retrieved memory list.`;
 
@@ -144,7 +142,12 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		const lastUserText = lastUserMessageText(validatedMessages.data);
-		const referenced = await buildReferencedArtifactInstructions(convex, thread._id, lastUserText);
+		const referenced = await buildReferencedArtifactInstructions(
+			convex,
+			thread._id,
+			project?._id,
+			lastUserText
+		);
 		if (referenced.error) {
 			return json({ error: referenced.error }, { status: 400 });
 		}
@@ -657,6 +660,7 @@ function lastUserMessageText(messages: UIMessage[]): string {
 async function buildReferencedArtifactInstructions(
 	convex: ConvexHttpClient,
 	threadId: Id<'chatThreads'>,
+	projectId: Id<'projects'> | undefined,
 	lastUserText: string
 ): Promise<{ block: string; error: string | null }> {
 	const ids = parseArtifactMentionIds(lastUserText);
@@ -667,7 +671,7 @@ async function buildReferencedArtifactInstructions(
 	const sections: string[] = [];
 	for (const id of ids) {
 		try {
-			const { artifact } = await getThreadArtifact(convex, threadId, id);
+			const artifact = await getReferencedArtifact(convex, threadId, projectId, id);
 			let md = artifact.contentMarkdown;
 			let truncated = false;
 			if (md.length > MAX_REFERENCED_ARTIFACT_CHARS) {
@@ -682,7 +686,7 @@ async function buildReferencedArtifactInstructions(
 		} catch {
 			return {
 				block: '',
-				error: `Referenced artifact is not linked to this thread: ${id}`
+				error: `Referenced artifact is not available in this thread or project: ${id}`
 			};
 		}
 	}
@@ -695,6 +699,21 @@ async function buildReferencedArtifactInstructions(
 	].join('\n');
 
 	return { block, error: null };
+}
+
+async function getReferencedArtifact(
+	convex: ConvexHttpClient,
+	threadId: Id<'chatThreads'>,
+	projectId: Id<'projects'> | undefined,
+	artifactId: string
+) {
+	try {
+		const { artifact } = await getThreadArtifact(convex, threadId, artifactId);
+		return artifact;
+	} catch (error) {
+		if (!projectId) throw error;
+		return await getProjectArtifact(convex, projectId, artifactId);
+	}
 }
 
 async function getProjectArtifact(

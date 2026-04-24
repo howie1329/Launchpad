@@ -23,6 +23,7 @@
 	} from '$lib/workspace-nav';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import {
+		createArtifactMutation,
 		linkArtifactToThreadMutation,
 		listArtifactsQuery,
 		listThreadArtifactsQuery
@@ -38,6 +39,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { cn } from '$lib/utils';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -51,6 +53,7 @@
 		ArrowRight01Icon,
 		ChatAdd01Icon,
 		DollarCircleIcon,
+		File01Icon,
 		Folder01Icon,
 		Logout01Icon,
 		PanelRightCloseIcon,
@@ -73,6 +76,13 @@
 	let promoteSummary = $state('');
 	let promoteError = $state('');
 	let isPromoting = $state(false);
+	let createArtifactDialogOpen = $state(false);
+	let artifactTitle = $state('');
+	let artifactTypePreset = $state('notes');
+	let artifactCustomType = $state('');
+	let artifactBody = $state('');
+	let artifactCreateError = $state('');
+	let isCreatingArtifact = $state(false);
 	let importingArtifactId = $state('');
 	let artifactActionError = $state('');
 	let workspaceNotice = $state('');
@@ -220,6 +230,13 @@
 	};
 
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+	const artifactTypePresets = [
+		{ value: 'idea', label: 'Idea' },
+		{ value: 'prd', label: 'PRD' },
+		{ value: 'research', label: 'Research' },
+		{ value: 'notes', label: 'Notes' },
+		{ value: 'custom', label: 'Custom' }
+	] as const;
 
 	/** Design-system-aligned nav rows: dense, 12px icons */
 	const navPill =
@@ -260,6 +277,73 @@
 		promoteError = '';
 	};
 
+	const openCreateArtifactDialog = () => {
+		artifactTitle = '';
+		artifactTypePreset = 'notes';
+		artifactCustomType = '';
+		artifactBody = '';
+		artifactCreateError = '';
+		createArtifactDialogOpen = true;
+	};
+
+	const closeCreateArtifactDialog = () => {
+		if (isCreatingArtifact) return;
+		createArtifactDialogOpen = false;
+		artifactCreateError = '';
+	};
+
+	const createArtifact = async () => {
+		if (isCreatingArtifact) return;
+
+		const title = artifactTitle.trim();
+		const type =
+			artifactTypePreset === 'custom'
+				? artifactCustomType.trim().toLowerCase()
+				: artifactTypePreset;
+		const contentMarkdown = artifactBody.trim();
+
+		if (!title) {
+			artifactCreateError = 'Artifact title is required.';
+			return;
+		}
+		if (!type) {
+			artifactCreateError = 'Artifact type is required.';
+			return;
+		}
+		if (!contentMarkdown) {
+			artifactCreateError = 'Artifact body is required.';
+			return;
+		}
+
+		isCreatingArtifact = true;
+		artifactCreateError = '';
+
+		try {
+			const result = await getConvexClient().mutation(createArtifactMutation, {
+				type,
+				title,
+				contentMarkdown,
+				metadata: { source: 'manual-workspace-create' },
+				...(activeThreadId ? { sourceThreadId: activeThreadId as Id<'chatThreads'> } : {}),
+				...(!activeThreadId && activeProjectId
+					? { projectId: activeProjectId as Id<'projects'> }
+					: {})
+			});
+			queueArtifactMemorySync(result.artifactId);
+			createArtifactDialogOpen = false;
+			workspaceNotice = 'Artifact created.';
+			await goto(resolve(workspaceArtifactHref(result.artifactId) as '/workspace'));
+		} catch (error) {
+			console.error(error);
+			artifactCreateError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not create this artifact. Please try again.';
+		} finally {
+			isCreatingArtifact = false;
+		}
+	};
+
 	const promoteThreadToProject = async () => {
 		if (isPromoting || !activeThreadId) return;
 
@@ -284,10 +368,12 @@
 			promoteSummary = '';
 			workspaceNotice = 'Project created. This chat and its artifacts now live in the project.';
 			await goto(
-				workspaceThreadHref({
-					_id: activeThreadId as Id<'chatThreads'>,
-					projectId: result.projectId
-				})
+				resolve(
+					workspaceThreadHref({
+						_id: activeThreadId as Id<'chatThreads'>,
+						projectId: result.projectId
+					}) as '/workspace'
+				)
 			);
 		} catch (error) {
 			console.error(error);
@@ -321,14 +407,31 @@
 		}
 	};
 
+	function queueArtifactMemorySync(artifactId: Id<'artifacts'>) {
+		if (!auth.token) return;
+
+		void fetch('/api/workspace/memory/artifact', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${auth.token}`
+			},
+			body: JSON.stringify({ artifactId })
+		}).catch((error) => {
+			console.info('Artifact memory sync skipped', error);
+		});
+	}
+
 	const toggleThreadContext = async () => {
 		if (!activeThreadId) return;
 		await goto(
-			workspaceThreadViewHref({
-				threadId: activeThreadId,
-				projectId: activeProjectId || null,
-				withContext: !contextPanelOpen
-			}),
+			resolve(
+				workspaceThreadViewHref({
+					threadId: activeThreadId,
+					projectId: activeProjectId || null,
+					withContext: !contextPanelOpen
+				}) as '/workspace'
+			),
 			{
 				noScroll: true,
 				keepFocus: true
@@ -522,7 +625,7 @@
 							<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 								{#snippet child({ props })}
 									<a
-										href={workspaceRootHref()}
+										href={resolve(workspaceRootHref() as '/workspace')}
 										data-workspace-nav-item
 										aria-label={sidebarHomeLinkAria}
 										title={sidebarHomeTitleFull}
@@ -576,7 +679,7 @@
 								>
 									{#snippet child({ props })}
 										<a
-											href={workspaceRootHref()}
+											href={resolve(workspaceRootHref() as '/workspace')}
 											data-workspace-nav-item
 											aria-label="New chat"
 											{...props}
@@ -587,6 +690,19 @@
 											>
 										</a>
 									{/snippet}
+								</Sidebar.MenuButton>
+							</Sidebar.MenuItem>
+							<Sidebar.MenuItem>
+								<Sidebar.MenuButton
+									size="sm"
+									class={cn(navPill, 'min-w-0')}
+									tooltipContent="Create artifact"
+									onclick={openCreateArtifactDialog}
+								>
+									<HugeiconsIcon icon={File01Icon} strokeWidth={2} />
+									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
+										>Create artifact</span
+									>
 								</Sidebar.MenuButton>
 							</Sidebar.MenuItem>
 						</Sidebar.Menu>
@@ -677,7 +793,7 @@
 																	</DropdownMenu.Content>
 																</DropdownMenu.Root>
 																<a
-																	href={workspaceProjectHref(project._id)}
+																	href={resolve(workspaceProjectHref(project._id) as '/workspace')}
 																	data-workspace-nav-item
 																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																	aria-label={`New chat in ${project.name}`}
@@ -702,7 +818,9 @@
 																		<Sidebar.MenuSubButton class={subNavPill}>
 																			{#snippet child({ props })}
 																				<a
-																					href={workspaceProjectHref(project._id)}
+																					href={resolve(
+																						workspaceProjectHref(project._id) as '/workspace'
+																					)}
 																					data-workspace-nav-item
 																					{...props}
 																				>
@@ -724,7 +842,9 @@
 																				>
 																					{#snippet child({ props })}
 																						<a
-																							href={workspaceThreadHref(thread)}
+																							href={resolve(
+																								workspaceThreadHref(thread) as '/workspace'
+																							)}
 																							data-workspace-nav-item
 																							title={formatThreadTitleForDisplay(thread.title)}
 																							{...props}
@@ -807,7 +927,11 @@
 													</p>
 													<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 														{#snippet child({ props })}
-															<a href={workspaceRootHref()} data-workspace-nav-item {...props}>
+															<a
+																href={resolve(workspaceRootHref() as '/workspace')}
+																data-workspace-nav-item
+																{...props}
+															>
 																<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
 																<span class="min-w-0 truncate">Start first chat</span>
 															</a>
@@ -826,7 +950,7 @@
 														>
 															{#snippet child({ props })}
 																<a
-																	href={workspaceThreadHref(thread)}
+																	href={resolve(workspaceThreadHref(thread) as '/workspace')}
 																	data-workspace-nav-item
 																	title={formatThreadTitleForDisplay(thread.title)}
 																	{...props}
@@ -920,7 +1044,9 @@
 															>
 																{#snippet child({ props })}
 																	<a
-																		href={workspaceArtifactHref(artifact._id)}
+																		href={resolve(
+																			workspaceArtifactHref(artifact._id) as '/workspace'
+																		)}
 																		data-workspace-nav-item
 																		{...props}
 																	>
@@ -957,7 +1083,7 @@
 					<div class="group-data-[collapsible=icon]:hidden">
 						{#if budget.data}
 							<a
-								href={workspaceSettingsHref()}
+								href={resolve(workspaceSettingsHref() as '/workspace/settings')}
 								data-workspace-nav-item
 								class="mb-2 block rounded-full px-2.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 								aria-label={usageTooltip}
@@ -1002,10 +1128,12 @@
 							{#if budget.data}
 								<div class="w-44 space-y-1">
 									<div class="flex items-center justify-between gap-2">
-										<span class="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+										<span
+											class="text-[10px] font-medium tracking-wide text-muted-foreground uppercase"
+										>
 											AI today
 										</span>
-										<span class="text-xs tabular-nums text-foreground">
+										<span class="text-xs text-foreground tabular-nums">
 											{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
 										</span>
 									</div>
@@ -1034,7 +1162,7 @@
 								>
 									{#snippet child({ props })}
 										<a
-											href={workspaceSettingsHref()}
+											href={resolve(workspaceSettingsHref() as '/workspace/settings')}
 											data-workspace-nav-item
 											aria-label={usageTooltip}
 											{...props}
@@ -1057,7 +1185,7 @@
 							>
 								{#snippet child({ props })}
 									<a
-										href={workspaceSettingsHref()}
+										href={resolve(workspaceSettingsHref() as '/workspace/settings')}
 										data-workspace-nav-item
 										aria-label="Settings"
 										{...props}
@@ -1237,6 +1365,7 @@
 			onRequestPromote={() => {
 				promoteDialogOpen = true;
 			}}
+			onRequestCreateArtifact={openCreateArtifactDialog}
 			onToggleThreadContext={toggleThreadContext}
 		/>
 
@@ -1371,6 +1500,99 @@
 						</Button>
 						<Button type="submit" disabled={isPromoting || !promoteName.trim()}>
 							{isPromoting ? 'Creating…' : 'Create project'}
+						</Button>
+					</Dialog.Footer>
+				</form>
+			</Dialog.Content>
+		</Dialog.Root>
+
+		<Dialog.Root bind:open={createArtifactDialogOpen}>
+			<Dialog.Content class="sm:max-w-2xl" showCloseButton={!isCreatingArtifact}>
+				<form
+					class="space-y-4"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void createArtifact();
+					}}
+				>
+					<Dialog.Header>
+						<Dialog.Title>Create artifact</Dialog.Title>
+						<Dialog.Description>
+							Save a markdown document to this workspace
+							{activeThreadId
+								? ' and link it to the active chat'
+								: activeProjectId
+									? ' project'
+									: ''}.
+						</Dialog.Description>
+					</Dialog.Header>
+
+					<div class="grid gap-3 sm:grid-cols-[1fr_11rem]">
+						<div class="space-y-1.5">
+							<Label for="create-artifact-title">Title</Label>
+							<Input
+								id="create-artifact-title"
+								bind:value={artifactTitle}
+								placeholder="Artifact title"
+								disabled={isCreatingArtifact}
+							/>
+						</div>
+						<div class="space-y-1.5">
+							<Label for="create-artifact-type">Type</Label>
+							<NativeSelect
+								id="create-artifact-type"
+								bind:value={artifactTypePreset}
+								class="w-full"
+								disabled={isCreatingArtifact}
+							>
+								{#each artifactTypePresets as preset (preset.value)}
+									<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
+								{/each}
+							</NativeSelect>
+						</div>
+					</div>
+
+					{#if artifactTypePreset === 'custom'}
+						<div class="space-y-1.5">
+							<Label for="create-artifact-custom-type">Custom type</Label>
+							<Input
+								id="create-artifact-custom-type"
+								bind:value={artifactCustomType}
+								placeholder="decision, spec, notes..."
+								disabled={isCreatingArtifact}
+							/>
+						</div>
+					{/if}
+
+					<div class="space-y-1.5">
+						<Label for="create-artifact-body">Markdown</Label>
+						<Textarea
+							id="create-artifact-body"
+							bind:value={artifactBody}
+							placeholder="# Notes&#10;&#10;Write the durable version here."
+							class="min-h-72 font-mono text-xs"
+							disabled={isCreatingArtifact}
+						/>
+					</div>
+
+					{#if artifactCreateError}
+						<p class="text-xs text-destructive">{artifactCreateError}</p>
+					{/if}
+
+					<Dialog.Footer>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={isCreatingArtifact}
+							onclick={closeCreateArtifactDialog}
+						>
+							Cancel
+						</Button>
+						<Button
+							type="submit"
+							disabled={isCreatingArtifact || !artifactTitle.trim() || !artifactBody.trim()}
+						>
+							{isCreatingArtifact ? 'Creating...' : 'Create artifact'}
 						</Button>
 					</Dialog.Footer>
 				</form>

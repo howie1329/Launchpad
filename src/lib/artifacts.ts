@@ -76,6 +76,11 @@ export type ThreadArtifact = {
 	artifact: SavedArtifact;
 };
 
+export type MentionableArtifact = {
+	artifact: SavedArtifact;
+	linkedToThread: boolean;
+};
+
 export type ThreadDraftChange = {
 	draftChange: ArtifactDraftChange;
 	artifact: SavedArtifact;
@@ -139,6 +144,12 @@ export const listThreadArtifactsQuery = makeFunctionReference<
 	{ threadId: Id<'chatThreads'> },
 	ThreadArtifact[]
 >('artifacts:listThreadArtifacts');
+
+export const listMentionableArtifactsQuery = makeFunctionReference<
+	'query',
+	{ threadId: Id<'chatThreads'> },
+	MentionableArtifact[]
+>('artifacts:listMentionableArtifacts');
 
 export const getArtifactQuery = makeFunctionReference<
 	'query',

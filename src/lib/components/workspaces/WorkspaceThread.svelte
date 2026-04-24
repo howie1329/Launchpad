@@ -5,9 +5,11 @@
 	import { page } from '$app/stores';
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import {
+		linkArtifactToThreadMutation,
+		listMentionableArtifactsQuery,
 		listThreadArtifactsQuery,
 		listThreadDraftChangesQuery,
-		type ThreadArtifact
+		type MentionableArtifact
 	} from '$lib/artifacts';
 	import { draftStatItems, draftSummaryText } from '$lib/artifact-review';
 	import {
@@ -133,6 +135,11 @@
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
 	);
+	const mentionableArtifacts = useQuery(listMentionableArtifactsQuery, () =>
+		auth.isAuthenticated && activeThreadId
+			? { threadId: activeThreadId as Id<'chatThreads'> }
+			: 'skip'
+	);
 	const threadDraftChanges = useQuery(listThreadDraftChangesQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
@@ -187,7 +194,7 @@
 	);
 
 	const filteredMentionArtifacts = $derived.by(() => {
-		const rows = threadArtifacts.data ?? [];
+		const rows = mentionableArtifacts.data ?? [];
 		const q = mentionFilter.trim().toLowerCase();
 		if (!q) return rows;
 		return rows.filter((item) => item.artifact.title.toLowerCase().includes(q));
@@ -351,7 +358,7 @@
 		mentionChips = mentionChips.filter((c) => c.id !== artifactId);
 	}
 
-	async function pickArtifactMention(item: ThreadArtifact) {
+	async function pickArtifactMention(item: MentionableArtifact) {
 		const el = textareaRef;
 		if (!el) return;
 		const text = composerText;
@@ -390,6 +397,12 @@
 		const prevWebSearchRequested = webSearchRequested;
 
 		try {
+			if (activeThreadId) {
+				await importMentionedArtifacts(
+					activeThreadId,
+					prevChips.map((c) => c.id)
+				);
+			}
 			composerText = '';
 			mentionChips = [];
 			await chat.sendMessage({ text: outgoing });
@@ -404,9 +417,24 @@
 		}
 	};
 
+	async function importMentionedArtifacts(threadId: string, artifactIds: string[]) {
+		const rows = mentionableArtifacts.data ?? [];
+		for (const artifactId of artifactIds) {
+			const item = rows.find((row) => row.artifact._id === artifactId);
+			if (!item || item.linkedToThread) continue;
+			await getConvexClient().mutation(linkArtifactToThreadMutation, {
+				threadId: threadId as Id<'chatThreads'>,
+				artifactId: item.artifact._id,
+				reason: 'imported'
+			});
+		}
+	}
+
 	function artifactTitleForId(artifactId: string): string {
 		return (
-			threadArtifacts.data?.find((x) => x.artifact._id === artifactId)?.artifact.title ?? 'Artifact'
+			mentionableArtifacts.data?.find((x) => x.artifact._id === artifactId)?.artifact.title ??
+			threadArtifacts.data?.find((x) => x.artifact._id === artifactId)?.artifact.title ??
+			'Artifact'
 		);
 	}
 
@@ -924,11 +952,13 @@
 								id={mentionListboxId}
 								class="absolute bottom-full left-0 z-20 mb-2 max-h-48 w-[min(28rem,100%)] overflow-y-auto rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-none"
 								role="listbox"
-								aria-label="Thread artifacts"
+								aria-label="Artifacts"
 							>
-								{#if threadArtifacts.error}
-									<p class="px-2 py-2 text-xs text-destructive">{threadArtifacts.error.message}</p>
-								{:else if threadArtifacts.data === undefined}
+								{#if mentionableArtifacts.error}
+									<p class="px-2 py-2 text-xs text-destructive">
+										{mentionableArtifacts.error.message}
+									</p>
+								{:else if mentionableArtifacts.data === undefined}
 									<p class="px-2 py-2 text-xs text-muted-foreground">Loading artifacts…</p>
 								{:else if filteredMentionArtifacts.length === 0}
 									<p class="px-2 py-2 text-xs text-muted-foreground">No matching artifacts.</p>
@@ -958,6 +988,9 @@
 												aria-hidden="true"
 											></span>
 											<span class="min-w-0 flex-1 truncate font-medium">{item.artifact.title}</span>
+											{#if !item.linkedToThread}
+												<span class="shrink-0 text-[10px] text-muted-foreground">Project</span>
+											{/if}
 											<span class="shrink-0 text-[10px] text-muted-foreground">
 												{formatArtifactCreatedAt(item.artifact.createdAt)}
 											</span>
@@ -998,7 +1031,7 @@
 								bind:ref={textareaRef}
 								bind:value={composerText}
 								class="min-h-12 px-3 py-3 text-sm leading-5 focus-visible:ring-0"
-								placeholder="Continue shaping this thread… (@ to cite a thread artifact)"
+								placeholder="Continue shaping this thread... (@ to cite an artifact)"
 								onInputPost={handleComposerInputPost}
 								onKeyDownIntercept={handleComposerKeyDown}
 								role="combobox"
@@ -1024,7 +1057,12 @@
 											focusComposer();
 										}}
 									>
-										<HugeiconsIcon icon={GlobeIcon} strokeWidth={2} class="size-3" aria-hidden="true" />
+										<HugeiconsIcon
+											icon={GlobeIcon}
+											strokeWidth={2}
+											class="size-3"
+											aria-hidden="true"
+										/>
 										Search web
 									</button>
 									<ModelSelector bind:open={modelSelectorOpen}>
@@ -1058,7 +1096,10 @@
 										usage={{ inputTokens: estimatedInputTokens }}
 										modelId={selectedModelId}
 									>
-										<ContextTrigger size="sm" class="h-7 gap-1 px-2 text-xs text-muted-foreground" />
+										<ContextTrigger
+											size="sm"
+											class="h-7 gap-1 px-2 text-xs text-muted-foreground"
+										/>
 										<ContextContent align="start">
 											<ContextContentHeader />
 											<ContextContentBody>
@@ -1070,7 +1111,11 @@
 								</PromptInputTools>
 								<PromptInputSubmit class="size-8 shrink-0" disabled={!canSubmit}>
 									{#if isChatBusy}
-										<HugeiconsIcon icon={Loading03Icon} strokeWidth={2} class="size-4 animate-spin" />
+										<HugeiconsIcon
+											icon={Loading03Icon}
+											strokeWidth={2}
+											class="size-4 animate-spin"
+										/>
 									{:else}
 										<HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} class="size-4" />
 									{/if}

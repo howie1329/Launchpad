@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Kbd from '$lib/components/ui/kbd/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar';
@@ -40,6 +41,7 @@
 		contextPanelOpen = false,
 		canPromoteThreadToProject = false,
 		onRequestPromote,
+		onRequestCreateArtifact,
 		onToggleThreadContext
 	}: {
 		open?: boolean;
@@ -50,6 +52,7 @@
 		contextPanelOpen?: boolean;
 		canPromoteThreadToProject?: boolean;
 		onRequestPromote: () => void;
+		onRequestCreateArtifact: () => void;
 		onToggleThreadContext: () => void | Promise<void>;
 	} = $props();
 
@@ -66,7 +69,7 @@
 	function nav(path: string) {
 		return async () => {
 			try {
-				await goto(path);
+				await goto(resolve(path as '/workspace'));
 			} finally {
 				close();
 			}
@@ -94,8 +97,7 @@
 		'data-selected:bg-accent data-selected:font-medium data-selected:text-accent-foreground ' +
 		'data-selected:hover:bg-accent data-selected:[&_svg]:text-accent-foreground';
 	/** Nav-style section label (docs/design-system.md §2–3) for this overlay. */
-	const paletteGroupHeadingClass =
-		'!text-[11px] uppercase tracking-wide !text-muted-foreground';
+	const paletteGroupHeadingClass = '!text-[11px] uppercase tracking-wide !text-muted-foreground';
 </script>
 
 <Command.CommandDialog
@@ -130,12 +132,20 @@
 				keywords={['settings', 'preferences', 'account', 'usage', 'ai']}
 				onSelect={nav(workspaceSettingsHref())}
 			>
-				<HugeiconsIcon
-					icon={Settings01Icon}
-					strokeWidth={2}
-					class="size-3 text-muted-foreground"
-				/>
+				<HugeiconsIcon icon={Settings01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
 				<span class="min-w-0 flex-1 truncate">Settings</span>
+			</Command.Item>
+			<Command.Item
+				class={paletteItemClass}
+				value="action create artifact document markdown"
+				keywords={['artifact', 'document', 'markdown', 'create', 'new']}
+				onSelect={() => {
+					close();
+					onRequestCreateArtifact();
+				}}
+			>
+				<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+				<span class="min-w-0 flex-1 truncate">Create artifact</span>
 			</Command.Item>
 			<Command.Item
 				class={paletteItemClass}
@@ -157,7 +167,10 @@
 				<Command.Shortcut
 					class="text-muted-foreground/90 group-data-selected/command-item:text-accent-foreground/90"
 				>
-					<Kbd.Group class="inline-flex items-center gap-0.5 pointer-events-none" aria-hidden="true">
+					<Kbd.Group
+						class="pointer-events-none inline-flex items-center gap-0.5"
+						aria-hidden="true"
+					>
 						<Kbd.Kbd>⌘</Kbd.Kbd>
 						<Kbd.Kbd>B</Kbd.Kbd>
 					</Kbd.Group>
@@ -180,7 +193,10 @@
 				<Command.Shortcut
 					class="text-muted-foreground/90 group-data-selected/command-item:text-accent-foreground/90"
 				>
-					<Kbd.Group class="inline-flex items-center gap-0.5 pointer-events-none" aria-hidden="true">
+					<Kbd.Group
+						class="pointer-events-none inline-flex items-center gap-0.5"
+						aria-hidden="true"
+					>
 						<Kbd.Kbd>⌘</Kbd.Kbd>
 						<Kbd.Kbd>⇧</Kbd.Kbd>
 						<Kbd.Kbd>L</Kbd.Kbd>
@@ -232,7 +248,11 @@
 						keywords={[project.name, 'project', 'folder']}
 						onSelect={nav(workspaceProjectHref(project._id))}
 					>
-						<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+						<HugeiconsIcon
+							icon={Folder01Icon}
+							strokeWidth={2}
+							class="size-3 text-muted-foreground"
+						/>
 						<span class="min-w-0 flex-1 truncate">{project.name}</span>
 					</Command.Item>
 				{/each}
@@ -257,9 +277,7 @@
 						onSelect={nav(workspaceThreadHref(thread))}
 					>
 						<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
-						<span class="min-w-0 flex-1 truncate"
-							>{formatThreadTitleForDisplay(thread.title)}</span
-						>
+						<span class="min-w-0 flex-1 truncate">{formatThreadTitleForDisplay(thread.title)}</span>
 					</Command.Item>
 				{/each}
 			</Command.Group>
@@ -283,8 +301,7 @@
 					>
 						<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
 						<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
-						<span
-							class="ml-auto shrink-0 pl-1 text-right text-[11px] text-muted-foreground"
+						<span class="ml-auto shrink-0 pl-1 text-right text-[11px] text-muted-foreground"
 							>{artifactTypeLabel(artifact.type)}</span
 						>
 					</Command.Item>
@@ -293,10 +310,7 @@
 		{/if}
 	</Command.List>
 
-	<div
-		class="border-t border-border/50 px-2.5 py-2"
-		data-workspace-command-footer
-	>
+	<div class="border-t border-border/50 px-2.5 py-2" data-workspace-command-footer>
 		<div class="flex flex-col gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
 			<div class="flex items-center gap-1.5">
 				<HugeiconsIcon
@@ -312,8 +326,8 @@
 				</Kbd.Group>
 			</div>
 			<p class="m-0 text-pretty text-muted-foreground/85">
-				Lists show at most {projectsCap} projects, {threadsCap} chats, and {artifactsCap} documents
-				(newest first). Older items are not in this search until full workspace search exists.
+				Lists show at most {projectsCap} projects, {threadsCap} chats, and {artifactsCap} documents (newest
+				first). Older items are not in this search until full workspace search exists.
 			</p>
 		</div>
 	</div>
