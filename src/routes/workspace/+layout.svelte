@@ -1,8 +1,21 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { afterNavigate, goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
+	import { get } from 'svelte/store';
 	import WorkspaceCommandPalette from '$lib/components/workspaces/WorkspaceCommandPalette.svelte';
+	import WorkspaceTabPicker from '$lib/components/workspaces/WorkspaceTabPicker.svelte';
+	import WorkspaceTabStrip from '$lib/components/workspaces/WorkspaceTabStrip.svelte';
+	import {
+		hrefForWorkspaceTarget,
+		urlToWorkspaceTarget
+	} from '$lib/workspace-tab-target';
+	import {
+		addOrActivateWorkspaceTabMutation,
+		getWorkspaceTabStripQuery,
+		removeWorkspaceTabMutation
+	} from '$lib/workspaceTabs';
+	import type { WorkspaceTabTarget } from '$lib/workspaceTabs';
 	import {
 		workspaceArtifactHref,
 		workspaceProjectHref,
@@ -73,6 +86,7 @@
 	});
 	let openProjectIds = $state<Record<string, boolean>>({});
 	let commandCenterOpen = $state(false);
+	let tabPickerOpen = $state(false);
 	let projectDeleteDialogOpen = $state(false);
 	let projectToDelete: { id: Id<'projects'>; name: string } | null = $state(null);
 	let threadDeleteDialogOpen = $state(false);
@@ -96,6 +110,7 @@
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const tabStrip = useQuery(getWorkspaceTabStripQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const threadArtifacts = useQuery(listThreadArtifactsQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
@@ -130,24 +145,42 @@
 		threads.data?.filter((thread) => thread.scopeType === 'general') ?? []
 	);
 	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact));
-	const headerTitle = $derived(
-		isSettingsActive
-			? 'Settings'
-			: selectedThread
-				? formatThreadTitleForDisplay(selectedThread.title)
-				: (selectedArtifact?.title ??
-						selectedProject?.name ??
-						(activeArtifactId ? 'Artifact' : activeProjectId ? 'Project' : ''))
-	);
-	const headerDescription = $derived(
-		isSettingsActive
-			? 'Manage workspace preferences.'
-			: activeThreadId || activeArtifactId
-				? ''
-				: activeProjectId
-					? 'Start a new chat in this project.'
-					: ''
-	);
+	const activeWorkspaceTarget = $derived.by(() => {
+		const t = urlToWorkspaceTarget($page.url);
+		return t ?? { kind: 'home' as const };
+	});
+
+	function syncWorkspaceTabsFromUrl() {
+		if (!auth.isAuthenticated) return;
+		const url = get(page).url;
+		if (!url.pathname.startsWith('/workspace')) return;
+		const t = urlToWorkspaceTarget(url);
+		if (!t) return;
+		void getConvexClient()
+			.mutation(addOrActivateWorkspaceTabMutation, { target: t })
+			.catch((e) => console.error(e));
+	}
+
+	afterNavigate(syncWorkspaceTabsFromUrl);
+
+	const selectWorkspaceTab = async (target: WorkspaceTabTarget) => {
+		const href = hrefForWorkspaceTarget(target);
+		const u = get(page).url;
+		const next = new URL(href, u.origin);
+		if (u.pathname === next.pathname && u.search === next.search) return;
+		await goto(href, { noScroll: true, keepFocus: true });
+	};
+
+	const closeWorkspaceTab = async (tabId: string) => {
+		const result = await getConvexClient().mutation(removeWorkspaceTabMutation, { tabId });
+		if (!result || !('removed' in result) || !result.removed) return;
+		if (result.removed && 'navigate' in result && result.navigate && 'activeTarget' in result) {
+			await goto(hrefForWorkspaceTarget(result.activeTarget), {
+				noScroll: true,
+				keepFocus: true
+			});
+		}
+	};
 
 	/** Outline Launchpad mark + contextual copy; a11y name comes from the link. */
 	const SIDEBAR_HOME_LABEL_MAX = 24;
@@ -1062,17 +1095,26 @@
 						<Kbd.Kbd>K</Kbd.Kbd>
 					</Kbd.KbdGroup>
 				</Button>
-				<div class="min-w-0 flex-1">
-					{#if headerTitle}
-						<p class="truncate text-xs font-semibold tracking-tight text-foreground">
-							{headerTitle}
-						</p>
-					{/if}
-					{#if headerDescription}
-						<p class="truncate text-[11px] text-muted-foreground {headerTitle ? 'mt-0.5' : ''}">
-							{headerDescription}
-						</p>
-					{/if}
+				<div class="flex min-w-0 flex-1 items-center gap-0.5">
+					<WorkspaceTabStrip
+						tabs={tabStrip.data?.tabs ?? []}
+						activeTarget={activeWorkspaceTarget}
+						projects={projects.data}
+						threads={threads.data}
+						artifacts={artifacts.data}
+						onSelectTab={(t) => {
+							void selectWorkspaceTab(t);
+						}}
+						onCloseTab={(id) => {
+							void closeWorkspaceTab(id);
+						}}
+					/>
+					<WorkspaceTabPicker
+						bind:open={tabPickerOpen}
+						projects={projects.data}
+						threads={threads.data}
+						artifacts={artifacts.data}
+					/>
 				</div>
 
 				{#if workspaceArtifactChrome.value}
