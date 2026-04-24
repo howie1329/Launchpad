@@ -54,7 +54,7 @@ async function removeWorkspaceTabsForDeletedEntity(
 	});
 }
 
-/** Delete a single artifact: drafts, memory sync, links, then artifact. */
+/** Delete a single artifact: versions, memory sync, links, then artifact. */
 async function deleteArtifactAndEdges(
 	ctx: MutationCtx,
 	ownerId: Id<'users'>,
@@ -63,12 +63,12 @@ async function deleteArtifactAndEdges(
 	const art = await ctx.db.get(artifactId);
 	if (!art || art.ownerId !== ownerId) return;
 
-	const drafts = await ctx.db
-		.query('artifactDraftChanges')
-		.withIndex('by_artifactId_and_updatedAt', (q) => q.eq('artifactId', artifactId))
+	const versions = await ctx.db
+		.query('artifactVersions')
+		.withIndex('by_artifactId_and_versionNumber', (q) => q.eq('artifactId', artifactId))
 		.collect();
-	for (const d of drafts) {
-		await ctx.db.delete(d._id);
+	for (const version of versions) {
+		await ctx.db.delete(version._id);
 	}
 
 	const mem = await ctx.db
@@ -218,12 +218,12 @@ async function wipeAllAppDataForUser(ctx: MutationCtx, ownerId: Id<'users'>) {
 		await ctx.db.delete(u._id);
 	}
 
-	const anyDrafts = await ctx.db
-		.query('artifactDraftChanges')
+	const anyVersions = await ctx.db
+		.query('artifactVersions')
 		.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
 		.collect();
-	for (const d of anyDrafts) {
-		await ctx.db.delete(d._id);
+	for (const version of anyVersions) {
+		await ctx.db.delete(version._id);
 	}
 
 	const anyMem = await ctx.db

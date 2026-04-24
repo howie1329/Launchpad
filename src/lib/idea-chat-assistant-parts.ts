@@ -10,6 +10,9 @@ export type ToolStepView = {
 	summary: string;
 	detailJson: string;
 	errorText?: string;
+	actionLabel?: string;
+	actionArtifactId?: string;
+	actionVersionNumber?: number;
 };
 
 export type ChoiceCardOption = {
@@ -39,7 +42,7 @@ const WORKSPACE_TOOL_TITLES: Record<string, string> = {
 	createIdeaArtifact: 'Save idea artifact',
 	createPrdArtifact: 'Save PRD artifact',
 	createProjectFromThread: 'Promote chat to project',
-	proposeArtifactEdit: 'Draft artifact changes',
+	updateThreadArtifact: 'Update artifact',
 	requestUserChoice: 'Choose next step',
 	tavilySearch: 'Search web',
 	tavilyExtract: 'Read web pages'
@@ -53,7 +56,7 @@ const WORKSPACE_RUNNING_SUMMARIES: Record<string, string> = {
 	createIdeaArtifact: 'Saving idea artifact…',
 	createPrdArtifact: 'Saving PRD artifact…',
 	createProjectFromThread: 'Promoting chat to project…',
-	proposeArtifactEdit: 'Drafting artifact changes…',
+	updateThreadArtifact: 'Updating artifact…',
 	requestUserChoice: 'Preparing choices…',
 	tavilySearch: 'Searching the web…',
 	tavilyExtract: 'Reading source pages…'
@@ -96,7 +99,14 @@ function summarizeTool(
 	toolName: string,
 	part: Record<string, unknown>,
 	phase: ToolStepPhase
-): { summary: string; detailJson: string; errorText?: string } {
+): {
+	summary: string;
+	detailJson: string;
+	errorText?: string;
+	actionLabel?: string;
+	actionArtifactId?: string;
+	actionVersionNumber?: number;
+} {
 	if (phase === 'error' && typeof part.errorText === 'string') {
 		return {
 			summary: 'Something went wrong.',
@@ -138,14 +148,21 @@ function summarizeTool(
 function summarizeWorkspaceTool(
 	toolName: string,
 	output: unknown
-): { summary: string; detailJson: string } {
+): {
+	summary: string;
+	detailJson: string;
+	actionLabel?: string;
+	actionArtifactId?: string;
+	actionVersionNumber?: number;
+} {
 	const detailJson = JSON.stringify(output ?? {}, null, 2);
 	const out = output && typeof output === 'object' ? (output as Record<string, unknown>) : {};
 	const title = typeof out.title === 'string' ? out.title : '';
 	const name = typeof out.name === 'string' ? out.name : '';
-	const artifactTitle = typeof out.artifactTitle === 'string' ? out.artifactTitle : '';
 	const artifacts = Array.isArray(out.artifacts) ? out.artifacts : null;
 	const results = Array.isArray(out.results) ? out.results : null;
+	const artifactId = typeof out.artifactId === 'string' ? out.artifactId : '';
+	const versionNumber = typeof out.versionNumber === 'number' ? out.versionNumber : null;
 
 	switch (toolName) {
 		case 'tavilySearch':
@@ -191,12 +208,17 @@ function summarizeWorkspaceTool(
 				detailJson
 			};
 		}
-		case 'proposeArtifactEdit':
+		case 'updateThreadArtifact':
 			return {
-				summary: artifactTitle
-					? `Drafted changes for ${artifactTitle}. Review before applying.`
-					: 'Drafted artifact changes for review.',
-				detailJson
+				summary: title ? `Updated ${title}.` : 'Updated artifact.',
+				detailJson,
+				...(artifactId && versionNumber !== null
+					? {
+							actionLabel: 'View changes',
+							actionArtifactId: artifactId,
+							actionVersionNumber: versionNumber
+						}
+					: {})
 			};
 		case 'requestUserChoice': {
 			const question = typeof out.question === 'string' ? out.question : '';
@@ -217,7 +239,18 @@ export function toolPartToView(part: unknown): ToolStepView | null {
 	const phase = phaseFromState(state);
 	const toolCallId = typeof p.toolCallId === 'string' ? p.toolCallId : `tool-${toolName}`;
 	const title = toolTitleForName(toolName);
-	const { summary, detailJson, errorText } = summarizeTool(toolName, p, phase);
+	const {
+		summary,
+		detailJson,
+		errorText,
+		actionLabel,
+		actionArtifactId,
+		actionVersionNumber
+	} = summarizeTool(
+		toolName,
+		p,
+		phase
+	);
 
 	return {
 		id: toolCallId,
@@ -226,7 +259,10 @@ export function toolPartToView(part: unknown): ToolStepView | null {
 		phase,
 		summary,
 		detailJson,
-		errorText
+		errorText,
+		...(actionLabel ? { actionLabel } : {}),
+		...(actionArtifactId ? { actionArtifactId } : {}),
+		...(actionVersionNumber !== undefined ? { actionVersionNumber } : {})
 	};
 }
 

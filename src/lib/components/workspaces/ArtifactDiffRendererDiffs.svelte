@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { FileDiff, type FileContents } from '@pierre/diffs';
-	import type { ArtifactDraftPatch } from '$lib/artifacts';
+	import { FileDiff, type FileContents, type FileDiffMetadata } from '@pierre/diffs';
 	import { mode } from 'mode-watcher';
 	import { onDestroy } from 'svelte';
 
@@ -11,7 +10,7 @@
 		compact = false,
 		diffStyle = 'unified'
 	}: {
-		patch?: ArtifactDraftPatch;
+		patch?: FileDiffMetadata;
 		original?: string;
 		modified?: string;
 		compact?: boolean;

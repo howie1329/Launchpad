@@ -27,7 +27,7 @@ This document describes **background and long-running orchestration** for Launch
 
 - **Multi-step** process that can span retries, deploys, and long model work **without** keeping the chat request open.
 - Writes **progress and outputs** into Convex so the UI can show status (and subscriptions can update).
-- Should still follow Launchpad rules: **no silent overwrites** of artifacts; durable steps should create **`artifactDraftChanges`** or **new artifacts**, not call apply flows unless product explicitly adds “auto-apply with consent.”
+- Should still follow Launchpad rules: **no silent overwrites** of artifacts; durable steps should create **new artifact versions** or **new artifacts**, not bypass the explicit-write rules unless product explicitly adds “auto-apply with consent.”
 
 Use a durable workflow when work:
 
@@ -42,10 +42,10 @@ Use a durable workflow when work:
 
 Launchpad today: **SvelteKit** + **Convex** + **Vercel AI SDK** + **AI Gateway**. No workflow engine is installed in `package.json` yet; this section is for **choosing** when you add one.
 
-| Runtime | Strengths for Launchpad | Tradeoffs |
-| --- | --- | --- |
-| **[Convex Workflow](https://www.convex.dev/components/workflow)** | Steps are mostly **Convex queries/mutations** (`artifacts`, `projects`, `chatThreads`). Natural fit for **auth and data locality**, realtime status via Convex. | Long **external** calls (many minutes of LLM + HTTP) may need careful chunking or delegation. |
-| **[Trigger.dev](https://trigger.dev/docs/introduction)** | **Queues, schedules, dashboards, retries** for AI-heavy pipelines; decouples long work from SvelteKit serverless limits. | Third service; you **bridge** `runId` ↔ Convex (`workflowRuns`-style table) yourself. |
+| Runtime                                                                  | Strengths for Launchpad                                                                                                                                                  | Tradeoffs                                                                                                                                                     |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[Convex Workflow](https://www.convex.dev/components/workflow)**        | Steps are mostly **Convex queries/mutations** (`artifacts`, `projects`, `chatThreads`). Natural fit for **auth and data locality**, realtime status via Convex.          | Long **external** calls (many minutes of LLM + HTTP) may need careful chunking or delegation.                                                                 |
+| **[Trigger.dev](https://trigger.dev/docs/introduction)**                 | **Queues, schedules, dashboards, retries** for AI-heavy pipelines; decouples long work from SvelteKit serverless limits.                                                 | Third service; you **bridge** `runId` ↔ Convex (`workflowRuns`-style table) yourself.                                                                         |
 | **[Vercel Workflow SDK](https://workflow-sdk.dev/docs/getting-started)** | Durable **TypeScript steps** next to app code; cookbook patterns for branching/checkpointing. Good if you deploy on **Vercel** and want orchestration near `+server.ts`. | Confirm **SvelteKit** + your adapter match the SDK’s supported deployment model; orchestration is not Convex-native—you still **call Convex** from each step. |
 
 **Heuristic:** If a run is **mostly transactions and reads in Convex**, bias **Convex Workflow**. If it is **mostly long/unreliable LLM or external HTTP**, bias **Trigger.dev** or **Vercel Workflow SDK** and persist results into Convex.
@@ -67,10 +67,10 @@ Each entry lists **trigger**, **outline of steps**, **Convex touchpoints**, and 
 1. Load thread-linked artifacts and recent messages (queries).
 2. Gap analysis (model or rules): missing PRD sections, vague scope, etc.
 3. One or more model passes to produce improved markdown.
-4. Persist as **`createArtifactDraftChange`** on the target artifact, **or** `createArtifact` + `linkArtifactToThread` for a new doc (e.g. PRD from idea), per product choice.
+4. Persist as a direct artifact update that creates a new **artifact version**, **or** `createArtifact` + `linkArtifactToThread` for a new doc (e.g. PRD from idea), per product choice.
 5. Optional bounded **critic** pass; only update the **draft**, never apply in the workflow.
 
-**Convex:** `artifacts`, `artifactDraftChanges`, `threadArtifactLinks`, optionally `activityEvents`.
+**Convex:** `artifacts`, `artifactVersions`, `threadArtifactLinks`, optionally `activityEvents`.
 
 **Why durable:** Multiple LLM steps + retries without blocking the chat stream.
 
@@ -109,7 +109,7 @@ Each entry lists **trigger**, **outline of steps**, **Convex touchpoints**, and 
 
 **Trigger:** User or assistant requests “de-risk this scope.”
 
-**Steps:** Ingest thread context → structured list of questions/assumptions → new artifact or **`createArtifactDraftChange`** appending a `## Open questions` section.
+**Steps:** Ingest thread context → structured list of questions/assumptions → new artifact or direct artifact update appending a `## Open questions` section as a new version.
 
 ---
 
@@ -117,9 +117,9 @@ Each entry lists **trigger**, **outline of steps**, **Convex touchpoints**, and 
 
 **Trigger:** “Refresh only MVP scope from latest chat.”
 
-**Steps:** Parse headings (or anchors) → model with **section-only** context → merge server-side → **`createArtifactDraftChange`** with full merged body (until a true section-patch API exists).
+**Steps:** Parse headings (or anchors) → model with **section-only** context → merge server-side → direct artifact update with full merged body (until a true section-patch API exists).
 
-**Why durable:** Merge + retry logic; smaller diffs than full-document `proposeArtifactEdit` for large PRDs.
+**Why durable:** Merge + retry logic; smaller diffs than a full-document artifact update for large PRDs.
 
 ---
 
@@ -175,15 +175,15 @@ Avoid a large DAG early; **human apply/discard** in the artifact reader remains 
 
 Consider a small Convex table (names illustrative):
 
-| Field | Purpose |
-| --- | --- |
-| `kind` | e.g. `artifact_polish`, `promotion`, `backlog` |
-| `ownerId`, `threadId` | Scope and auth |
-| `status` | `pending`, `running`, `completed`, `failed` |
-| `externalRunId` | Trigger.dev / Vercel Workflow run id, if any |
-| `outputArtifactIds`, `outputDraftChangeIds` | Links for UI |
-| `idempotencyKey` | Client-supplied key to prevent duplicate runs on double-submit |
-| `error` | Last failure message |
+| Field                                       | Purpose                                                        |
+| ------------------------------------------- | -------------------------------------------------------------- |
+| `kind`                                      | e.g. `artifact_polish`, `promotion`, `backlog`                 |
+| `ownerId`, `threadId`                       | Scope and auth                                                 |
+| `status`                                    | `pending`, `running`, `completed`, `failed`                    |
+| `externalRunId`                             | Trigger.dev / Vercel Workflow run id, if any                   |
+| `outputArtifactIds`, `outputDraftChangeIds` | Links for UI                                                   |
+| `idempotencyKey`                            | Client-supplied key to prevent duplicate runs on double-submit |
+| `error`                                     | Last failure message                                           |
 
 **Retry-safe steps:** Deduplicate drafts where possible (e.g. by content hash + `pending` on same artifact) or “latest run wins” policy documented in code.
 
@@ -193,7 +193,7 @@ Consider a small Convex table (names illustrative):
 
 - **Chat:** fast steering, short tool loops, user in the loop every turn.
 - **Workflows:** batch and multi-pass work; outputs should be **drafts or new artifacts** unless you add explicit, auditable auto-apply (not recommended for v1).
-- **Do not** call **`applyArtifactDraftChange`** from background jobs without a clear user consent design; it violates the “user controls writes” principle in [product-overview.md](product-overview.md).
+- **Do not** bypass the explicit-write artifact rules from background jobs without a clear user consent design; it violates the “user controls writes” principle in [product-overview.md](product-overview.md).
 
 ---
 

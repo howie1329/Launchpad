@@ -1293,17 +1293,17 @@
 							<Button
 								type="button"
 								size="sm"
-								variant={workspaceArtifactChrome.value.surfaceMode === 'compare'
+								variant={workspaceArtifactChrome.value.surfaceMode === 'history'
 									? 'secondary'
 									: 'ghost'}
 								class="h-7 rounded-sm px-2 text-xs font-medium"
-								disabled={!workspaceArtifactChrome.value.canCompare}
-								title={!workspaceArtifactChrome.value.canCompare
-									? 'No pending AI drafts to compare'
+								disabled={!workspaceArtifactChrome.value.canHistory}
+								title={!workspaceArtifactChrome.value.canHistory
+									? 'No saved versions to inspect yet'
 									: undefined}
-								onclick={() => workspaceArtifactChrome.value?.setCompare()}
+								onclick={() => workspaceArtifactChrome.value?.setHistory()}
 							>
-								Compare
+								History
 							</Button>
 						</div>
 					</div>

@@ -1,18 +1,14 @@
 <script lang="ts">
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import {
-		applyArtifactDraftChangeMutation,
-		discardArtifactDraftChangeMutation,
-		hydrateArtifactDraftChangeReviewDataMutation,
-		listArtifactDraftChangesQuery,
+		listArtifactVersionsQuery,
+		restoreArtifactVersionMutation,
 		updateArtifactMutation,
-		type ArtifactDraftChange,
 		type ArtifactLinkReason,
 		type SavedArtifact
 	} from '$lib/artifacts';
-	import ArtifactDraftList from '$lib/components/workspaces/ArtifactDraftList.svelte';
+	import ArtifactHistorySurface from '$lib/components/workspaces/ArtifactHistorySurface.svelte';
 	import ArtifactReadSurface from '$lib/components/workspaces/ArtifactReadSurface.svelte';
-	import ArtifactReviewSurface from '$lib/components/workspaces/ArtifactReviewSurface.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
 	import { SaveIcon } from '@hugeicons/core-free-icons';
@@ -24,54 +20,51 @@
 		artifact,
 		compact = false,
 		fullWidthContent = false,
-		initialSelectedDraftChangeId = null,
+		initialSelectedVersionNumber = null,
 		showHeader,
 		onBack
 	}: {
 		artifact: SavedArtifact | null | undefined;
 		compact?: boolean;
 		fullWidthContent?: boolean;
-		initialSelectedDraftChangeId?: Id<'artifactDraftChanges'> | null;
-		/** When `false`, never show the optional context toolbar. */
+		initialSelectedVersionNumber?: number | null;
 		showHeader?: boolean;
 		linkReason?: ArtifactLinkReason;
 		onBack?: () => void;
 	} = $props();
 
-	type SurfaceMode = 'read' | 'compare';
+	type SurfaceMode = 'read' | 'history';
 	type ReadSubMode = 'editor' | 'preview';
-	type DiffLayout = 'unified' | 'split';
 
-	let busyDraftChangeId = $state('');
-	let draftError = $state('');
-	let contentDirty = $state(false);
-	let diffLayout = $state<DiffLayout>('unified');
 	let editorValue = $state('');
-	let hydratedArtifactId = $state<Id<'artifacts'> | null>(null);
-	let hydratingDraftChangeId = $state('');
-	let initialSelectionApplied = $state(false);
+	let contentDirty = $state(false);
 	let saveError = $state('');
 	let isSaving = $state(false);
+	let isRestoringVersionId = $state('');
 	let surfaceMode = $state<SurfaceMode>('read');
 	let readMode = $state<ReadSubMode>('editor');
-	let selectedDraftChangeId = $state<Id<'artifactDraftChanges'> | null>(null);
+	let selectedVersionId = $state<Id<'artifactVersions'> | null>(null);
+	let compareBaseVersionId = $state<Id<'artifactVersions'> | null>(null);
+	let editorBaseRevision = $state<number | null>(null);
+	let hydratedArtifactId = $state<Id<'artifacts'> | null>(null);
+	let initialVersionSelectionApplied = $state(false);
 
-	const draftChanges = useQuery(listArtifactDraftChangesQuery, () =>
+	const artifactVersions = useQuery(listArtifactVersionsQuery, () =>
 		auth.isAuthenticated && artifact ? { artifactId: artifact._id as Id<'artifacts'> } : 'skip'
 	);
 
-	const pendingDraftChanges = $derived(
-		draftChanges.data?.filter((draftChange) => draftChange.status === 'pending') ?? []
+	const versions = $derived(artifactVersions.data ?? []);
+	const selectedVersion = $derived(
+		selectedVersionId == null
+			? versions[0]
+			: versions.find((version) => version._id === selectedVersionId)
 	);
-
-	const selectedDraft = $derived(
-		selectedDraftChangeId == null
+	const compareBaseVersion = $derived(
+		compareBaseVersionId == null
 			? undefined
-			: pendingDraftChanges.find((d) => d._id === selectedDraftChangeId)
+			: versions.find((version) => version._id === compareBaseVersionId)
 	);
-
-	const canCompare = $derived(pendingDraftChanges.length > 0);
-
+	const canShowHistory = $derived(versions.length > 0);
 	const canSave = $derived(
 		Boolean(artifact) &&
 			surfaceMode === 'read' &&
@@ -80,125 +73,95 @@
 			editorValue !== (artifact?.contentMarkdown ?? '') &&
 			!isSaving
 	);
+	const newerSavedVersionAvailable = $derived(
+		Boolean(
+			contentDirty &&
+			artifact &&
+			editorBaseRevision !== null &&
+			artifact.revision > editorBaseRevision
+		)
+	);
 
 	$effect(() => {
 		if (artifact === undefined || artifact === null) {
 			hydratedArtifactId = null;
+			editorBaseRevision = null;
 			return;
 		}
 
-		const id = artifact._id;
-		if (hydratedArtifactId !== id) {
-			hydratedArtifactId = id;
+		if (hydratedArtifactId !== artifact._id) {
+			hydratedArtifactId = artifact._id;
 			editorValue = artifact.contentMarkdown;
 			contentDirty = false;
 			saveError = '';
-			initialSelectionApplied = false;
-			surfaceMode = 'read';
+			surfaceMode = initialSelectedVersionNumber ? 'history' : 'read';
 			readMode = 'editor';
-			diffLayout = 'unified';
-			selectedDraftChangeId = initialSelectedDraftChangeId;
-			if (initialSelectedDraftChangeId) {
-				surfaceMode = 'compare';
-			}
+			selectedVersionId = null;
+			compareBaseVersionId = null;
+			editorBaseRevision = artifact.revision;
+			initialVersionSelectionApplied = false;
 			return;
 		}
 
 		if (!contentDirty) {
 			editorValue = artifact.contentMarkdown;
 			saveError = '';
+			editorBaseRevision = artifact.revision;
 		}
 	});
 
 	$effect(() => {
-		const list = pendingDraftChanges;
-		if (list.length === 0) {
-			initialSelectionApplied = false;
-			selectedDraftChangeId = null;
-			if (surfaceMode === 'compare') {
+		if (versions.length === 0) {
+			selectedVersionId = null;
+			compareBaseVersionId = null;
+			if (surfaceMode === 'history') {
 				surfaceMode = 'read';
 			}
 			return;
 		}
-		if (
-			!initialSelectionApplied &&
-			initialSelectedDraftChangeId &&
-			list.some((d) => d._id === initialSelectedDraftChangeId) &&
-			selectedDraftChangeId !== initialSelectedDraftChangeId
-		) {
-			selectedDraftChangeId = initialSelectedDraftChangeId;
-			initialSelectionApplied = true;
-			surfaceMode = 'compare';
-			return;
+
+		if (!initialVersionSelectionApplied && initialSelectedVersionNumber !== null) {
+			const match = versions.find(
+				(version) => version.versionNumber === initialSelectedVersionNumber
+			);
+			if (match) {
+				selectedVersionId = match._id;
+				surfaceMode = 'history';
+			}
+			initialVersionSelectionApplied = true;
 		}
-		if (selectedDraftChangeId == null || !list.some((d) => d._id === selectedDraftChangeId)) {
-			selectedDraftChangeId = list[0]!._id;
+
+		if (
+			selectedVersionId == null ||
+			!versions.some((version) => version._id === selectedVersionId)
+		) {
+			selectedVersionId = versions[0]!._id;
 		}
 	});
 
 	$effect(() => {
-		const draft = selectedDraft;
+		const current = selectedVersion;
+		if (!current) {
+			compareBaseVersionId = null;
+			return;
+		}
+
+		const availableBaseVersions = versions.filter(
+			(version) => version.versionNumber < current.versionNumber
+		);
+
+		if (availableBaseVersions.length === 0) {
+			compareBaseVersionId = null;
+			return;
+		}
+
 		if (
-			!draft ||
-			!draft.needsHydration ||
-			draft.isStale ||
-			hydratingDraftChangeId === draft._id ||
-			busyDraftChangeId === draft._id
+			compareBaseVersionId == null ||
+			!availableBaseVersions.some((version) => version._id === compareBaseVersionId)
 		) {
-			return;
+			compareBaseVersionId = availableBaseVersions[0]!._id;
 		}
-
-		hydratingDraftChangeId = draft._id;
-		void getConvexClient()
-			.mutation(hydrateArtifactDraftChangeReviewDataMutation, { draftChangeId: draft._id })
-			.catch((error) => {
-				console.error(error);
-			})
-			.finally(() => {
-				if (hydratingDraftChangeId === draft._id) {
-					hydratingDraftChangeId = '';
-				}
-			});
 	});
-
-	const applyDraftChange = async (draftChangeId: Id<'artifactDraftChanges'>) => {
-		if (busyDraftChangeId) return;
-
-		draftError = '';
-		busyDraftChangeId = draftChangeId;
-		const draft = pendingDraftChanges.find((item) => item._id === draftChangeId);
-		if (draft?.isStale) {
-			draftError = draft.staleReason ?? 'This draft is stale and cannot be applied.';
-			busyDraftChangeId = '';
-			return;
-		}
-
-		try {
-			await getConvexClient().mutation(applyArtifactDraftChangeMutation, { draftChangeId });
-			if (draft) queueArtifactMemorySync(draft.artifactId);
-		} catch (error) {
-			console.error(error);
-			draftError = getDraftErrorMessage(error, 'apply');
-		} finally {
-			busyDraftChangeId = '';
-		}
-	};
-
-	const discardDraftChange = async (draftChangeId: Id<'artifactDraftChanges'>) => {
-		if (busyDraftChangeId) return;
-
-		draftError = '';
-		busyDraftChangeId = draftChangeId;
-
-		try {
-			await getConvexClient().mutation(discardArtifactDraftChangeMutation, { draftChangeId });
-		} catch (error) {
-			console.error(error);
-			draftError = getDraftErrorMessage(error, 'discard');
-		} finally {
-			busyDraftChangeId = '';
-		}
-	};
 
 	const setReadSurface = () => {
 		if (!artifact) return;
@@ -206,9 +169,9 @@
 		saveError = '';
 	};
 
-	const setCompareSurface = () => {
-		if (!artifact || !canCompare) return;
-		surfaceMode = 'compare';
+	const setHistorySurface = () => {
+		if (!artifact || !canShowHistory) return;
+		surfaceMode = 'history';
 		saveError = '';
 	};
 
@@ -230,11 +193,12 @@
 		saveError = '';
 
 		try {
-			await getConvexClient().mutation(updateArtifactMutation, {
+			const result = await getConvexClient().mutation(updateArtifactMutation, {
 				artifactId: artifact._id,
 				contentMarkdown: editorValue
 			});
 			contentDirty = false;
+			editorBaseRevision = result.versionNumber;
 			queueArtifactMemorySync(artifact._id);
 		} catch (error) {
 			console.error(error);
@@ -244,28 +208,50 @@
 		}
 	};
 
-	const selectDraftForCompare = (draftChangeId: Id<'artifactDraftChanges'>) => {
-		selectedDraftChangeId = draftChangeId;
-		surfaceMode = 'compare';
-	};
+	const restoreVersion = async (artifactVersionId: Id<'artifactVersions'>) => {
+		if (!artifact || isRestoringVersionId) return;
 
-	const setUnifiedDiffLayout = () => {
-		diffLayout = 'unified';
-	};
+		isRestoringVersionId = artifactVersionId;
+		saveError = '';
 
-	const setSplitDiffLayout = () => {
-		diffLayout = 'split';
-	};
-
-	function getDraftErrorMessage(error: unknown, action: 'apply' | 'discard') {
-		const message = error instanceof Error ? error.message : '';
-		if (message.toLowerCase().includes('stale')) {
-			return 'This draft is stale because the artifact changed after the draft was created.';
+		try {
+			const result = await getConvexClient().mutation(restoreArtifactVersionMutation, {
+				artifactVersionId
+			});
+			if (result.restored) {
+				queueArtifactMemorySync(artifact._id);
+				surfaceMode = 'history';
+			}
+		} catch (error) {
+			console.error(error);
+			saveError = 'Could not restore this version. Please try again.';
+		} finally {
+			isRestoringVersionId = '';
 		}
-		return action === 'apply'
-			? 'Could not apply this draft. Please try again.'
-			: 'Could not discard this draft. Please try again.';
-	}
+	};
+
+	const reloadEditorToLatest = () => {
+		if (!artifact) return;
+		editorValue = artifact.contentMarkdown;
+		contentDirty = false;
+		editorBaseRevision = artifact.revision;
+		saveError = '';
+	};
+
+	const viewLatestChanges = () => {
+		if (!canShowHistory) return;
+		selectedVersionId = versions[0]?._id ?? null;
+		surfaceMode = 'history';
+	};
+
+	const selectVersion = (versionId: Id<'artifactVersions'>) => {
+		selectedVersionId = versionId;
+		surfaceMode = 'history';
+	};
+
+	const selectCompareBase = (versionId: Id<'artifactVersions'>) => {
+		compareBaseVersionId = versionId;
+	};
 
 	function queueArtifactMemorySync(artifactId: Id<'artifacts'>) {
 		if (!auth.token) return;
@@ -304,9 +290,9 @@
 		workspaceArtifactChrome.value = {
 			onBack,
 			surfaceMode,
-			canCompare,
+			canHistory: canShowHistory,
 			setRead: setReadSurface,
-			setCompare: setCompareSurface
+			setHistory: setHistorySurface
 		};
 
 		return () => {
@@ -342,40 +328,50 @@
 						? 'space-y-6'
 						: compact
 							? 'space-y-5'
-							: 'mx-auto max-w-3xl space-y-6'}
+							: 'mx-auto max-w-5xl space-y-6'}
 				>
-					{#if draftChanges.data === undefined}
-						<div>
-							<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-								Pending drafts
+					{#if newerSavedVersionAvailable}
+						<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+							<p class="text-sm font-medium text-foreground">A newer saved version exists</p>
+							<p class="mt-1 text-xs leading-5 text-muted-foreground">
+								Your unsaved editor changes are still here. Compare the latest saved version or
+								reload the editor when you are ready.
 							</p>
-							<p class="mt-1 text-xs text-muted-foreground">Loading drafts...</p>
+							<div class="mt-3 flex flex-wrap gap-2">
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2.5 text-xs"
+									onclick={viewLatestChanges}
+								>
+									View changes
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2.5 text-xs"
+									onclick={reloadEditorToLatest}
+								>
+									Reload latest
+								</Button>
+							</div>
 						</div>
-					{:else if pendingDraftChanges.length > 0 || draftError}
-						<ArtifactDraftList
-							drafts={pendingDraftChanges}
-							{selectedDraftChangeId}
-							{busyDraftChangeId}
-							{draftError}
-							onSelect={selectDraftForCompare}
-							onApply={applyDraftChange}
-							onDiscard={discardDraftChange}
-						/>
 					{/if}
 
 					<div class="min-h-0 flex-1">
-						{#if surfaceMode === 'compare'}
-							<ArtifactReviewSurface
+						{#if surfaceMode === 'history'}
+							<ArtifactHistorySurface
 								{artifact}
-								{selectedDraft}
+								{versions}
+								{selectedVersion}
+								{compareBaseVersion}
 								{compact}
-								{diffLayout}
-								{hydratingDraftChangeId}
-								{busyDraftChangeId}
-								onSetUnified={setUnifiedDiffLayout}
-								onSetSplit={setSplitDiffLayout}
-								onApply={applyDraftChange}
-								onDiscard={discardDraftChange}
+								restoringVersionId={isRestoringVersionId}
+								onSelectVersion={selectVersion}
+								onSelectCompareBase={selectCompareBase}
+								onRestore={restoreVersion}
 							/>
 						{:else}
 							<ArtifactReadSurface

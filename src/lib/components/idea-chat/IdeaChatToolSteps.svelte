@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Steps, StepsContent, StepsItem, StepsTrigger } from '$lib/components/prompt-kit/steps';
 	import type { ToolStepView } from '$lib/idea-chat-assistant-parts';
 	import {
@@ -32,6 +33,7 @@
 				return Loading03Icon;
 		}
 	}
+
 </script>
 
 {#snippet triggerLeftIcon()}
@@ -98,6 +100,21 @@
 							<p class="text-[11px] leading-relaxed text-muted-foreground">{tool.summary}</p>
 							{#if tool.errorText && tool.phase === 'error'}
 								<p class="text-[11px] leading-relaxed text-destructive">{tool.errorText}</p>
+							{/if}
+							{#if tool.actionLabel && tool.actionArtifactId && tool.actionVersionNumber !== undefined}
+								<button
+									type="button"
+									class="inline-flex w-fit rounded-sm text-[11px] font-medium text-foreground underline underline-offset-2 hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+									onclick={() => {
+										window.location.assign(
+											`${resolve('/workspace/artifacts/[artifactId]', {
+												artifactId: tool.actionArtifactId
+											})}?version=${tool.actionVersionNumber}`
+										);
+									}}
+								>
+									{tool.actionLabel}
+								</button>
 							{/if}
 							<details class="pt-0.5">
 								<summary

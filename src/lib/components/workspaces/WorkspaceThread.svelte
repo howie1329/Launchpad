@@ -8,10 +8,8 @@
 		linkArtifactToThreadMutation,
 		listMentionableArtifactsQuery,
 		listThreadArtifactsQuery,
-		listThreadDraftChangesQuery,
 		type MentionableArtifact
 	} from '$lib/artifacts';
-	import { draftStatItems, draftSummaryText } from '$lib/artifact-review';
 	import {
 		buildOutgoingUserMessageWithTokens,
 		formatArtifactMentionToken,
@@ -119,7 +117,6 @@
 	let copiedMessageId = $state('');
 	let copyToastClear: ReturnType<typeof setTimeout> | 0 = 0;
 	let contextArtifactId = $state('');
-	let contextDraftChangeId = $state<Id<'artifactDraftChanges'> | null>(null);
 	let lastThreadIdForContext = $state('');
 	let contextSearch = $state('');
 	let contextTypeFilter = $state('all');
@@ -153,11 +150,6 @@
 			: 'skip'
 	);
 	const mentionableArtifacts = useQuery(listMentionableArtifactsQuery, () =>
-		auth.isAuthenticated && activeThreadId
-			? { threadId: activeThreadId as Id<'chatThreads'> }
-			: 'skip'
-	);
-	const threadDraftChanges = useQuery(listThreadDraftChangesQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
@@ -196,14 +188,6 @@
 
 		return rows;
 	});
-	const sortedThreadDraftChanges = $derived(
-		threadDraftChanges.data
-			? [...threadDraftChanges.data].sort(
-					(a, b) => b.draftChange.createdAt - a.draftChange.createdAt
-				)
-			: []
-	);
-
 	const mentionListboxId = $derived(
 		activeThreadId
 			? `workspace-thread-mention-listbox-${activeThreadId}`
@@ -267,7 +251,6 @@
 		if (activeThreadId !== lastThreadIdForContext) {
 			lastThreadIdForContext = activeThreadId;
 			contextArtifactId = '';
-			contextDraftChangeId = null;
 		}
 	});
 
@@ -513,13 +496,9 @@
 		return 'Could not send this message. Please try again.';
 	}
 
-	const openThreadArtifact = async (
-		artifactId: string,
-		draftChangeId?: Id<'artifactDraftChanges'>
-	) => {
+	const openThreadArtifact = async (artifactId: string) => {
 		if (contextPanelOpen) {
 			contextArtifactId = artifactId;
-			contextDraftChangeId = draftChangeId ?? null;
 			return;
 		}
 
@@ -535,12 +514,10 @@
 			}
 		);
 		contextArtifactId = artifactId;
-		contextDraftChangeId = draftChangeId ?? null;
 	};
 
 	const closeThreadArtifact = () => {
 		contextArtifactId = '';
-		contextDraftChangeId = null;
 	};
 
 	function createChat(threadId: string, messages: UIMessage[]) {
@@ -636,8 +613,7 @@
 			copiedMessageId = message.id;
 			scheduleCopiedReset();
 		} catch {
-			chatError =
-				'Could not copy to the clipboard. Check browser permissions and try again.';
+			chatError = 'Could not copy to the clipboard. Check browser permissions and try again.';
 		}
 	}
 
@@ -666,9 +642,7 @@
 				threadId: activeThreadId as Id<'chatThreads'>,
 				messageId
 			});
-			const projectQuery = activeProjectId
-				? `project=${encodeURIComponent(activeProjectId)}&`
-				: '';
+			const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
 			await goto(
 				resolve(
 					`/workspace?${projectQuery}thread=${encodeURIComponent(threadId)}` as `/workspace?${string}`
@@ -699,9 +673,7 @@
 		}
 	}
 
-	const showStreamFailure = $derived(
-		Boolean(chatError) || chat?.status === 'error'
-	);
+	const showStreamFailure = $derived(Boolean(chatError) || chat?.status === 'error');
 
 	function authHeaders(): Record<string, string> {
 		if (!auth.token) return {};
@@ -895,21 +867,15 @@
 											allowRetry={auth.isAuthenticated}
 											allowFork={auth.isAuthenticated}
 											disabled={isChatBusy || !auth.isAuthenticated}
-											copyDisabled={
-												!(
-													message.role === 'user'
-														? buildUserMessageCopyText(message)
-														: buildAssistantMessageCopyText(message)
-												)
-											}
+											copyDisabled={!(message.role === 'user'
+												? buildUserMessageCopyText(message)
+												: buildAssistantMessageCopyText(message))}
 											copied={copiedMessageId === message.id}
 											onCopy={() => void copyMessageDisplay(message)}
 											onFork={() => void forkFromMessage(message.id)}
-											onRetry={
-												message.role === 'user'
-													? () => void retryFromUserMessage(message.id)
-													: undefined
-											}
+											onRetry={message.role === 'user'
+												? () => void retryFromUserMessage(message.id)
+												: undefined}
 										/>
 									</Message>
 								{/each}
@@ -941,7 +907,6 @@
 						<WorkspaceArtifactReader
 							artifact={selectedContextArtifact}
 							compact
-							initialSelectedDraftChangeId={contextDraftChangeId}
 							onBack={closeThreadArtifact}
 						/>
 					{:else}
@@ -996,65 +961,6 @@
 									<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
 								{:else}
 									<div class="space-y-3">
-										{#if threadDraftChanges.error}
-											<p class="px-2 py-1.5 text-xs text-destructive">
-												{threadDraftChanges.error.message}
-											</p>
-										{:else if threadDraftChanges.data === undefined}
-											<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading drafts...</p>
-										{:else if sortedThreadDraftChanges.length > 0}
-											<div class="space-y-1">
-												<p
-													class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-												>
-													Pending drafts
-												</p>
-												{#each sortedThreadDraftChanges as item (item.draftChange._id)}
-													<button
-														type="button"
-														class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-														onclick={() =>
-															openThreadArtifact(item.artifact._id, item.draftChange._id)}
-													>
-														<div class="flex items-center justify-between gap-2">
-															<span class="truncate text-xs font-medium tracking-tight">
-																{item.draftChange.proposedTitle}
-															</span>
-															<span
-																class={cn(
-																	'shrink-0 text-[10px]',
-																	item.draftChange.isStale
-																		? 'text-destructive'
-																		: 'text-muted-foreground'
-																)}
-															>
-																{item.draftChange.isStale ? 'Stale' : 'Draft'}
-															</span>
-														</div>
-														<span class="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-															{draftSummaryText(item.draftChange)}
-														</span>
-														{#if draftStatItems(item.draftChange).length > 0}
-															<div class="flex flex-wrap gap-1">
-																{#each draftStatItems(item.draftChange) as stat, index (`${stat}-${index}`)}
-																	<span
-																		class="rounded-full border border-border/60 bg-muted/20 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-																	>
-																		{stat}
-																	</span>
-																{/each}
-															</div>
-														{/if}
-														{#if item.draftChange.isStale && item.draftChange.staleReason}
-															<span class="text-[11px] leading-4 text-destructive">
-																{item.draftChange.staleReason}
-															</span>
-														{/if}
-													</button>
-												{/each}
-											</div>
-										{/if}
-
 										{#if threadArtifacts.data.length === 0}
 											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
 												No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
