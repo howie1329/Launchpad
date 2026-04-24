@@ -186,11 +186,84 @@ export const saveMessages = mutation({
 			}
 		}
 
+		const stale = await ctx.db
+			.query('chatMessages')
+			.withIndex('by_threadId_and_sequence', (q) =>
+				q.eq('threadId', args.threadId).gte('sequence', args.messages.length)
+			)
+			.collect();
+		for (const row of stale) {
+			await ctx.db.delete(row._id);
+		}
+
 		await ctx.db.patch(thread._id, {
 			updatedAt: now
 		});
 
 		return { saved: args.messages.length };
+	}
+});
+
+export const forkThreadFromMessage = mutation({
+	args: {
+		threadId: v.id('chatThreads'),
+		messageId: v.string()
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireAuthUserId(ctx);
+		const sourceThread = await getOwnedThread(ctx, args.threadId, ownerId);
+		const forkPoint = await ctx.db
+			.query('chatMessages')
+			.withIndex('by_threadId_and_messageId', (q) =>
+				q.eq('threadId', args.threadId).eq('messageId', args.messageId)
+			)
+			.unique();
+		if (!forkPoint) {
+			throw new Error('Message not found');
+		}
+
+		const rows = await ctx.db
+			.query('chatMessages')
+			.withIndex('by_threadId_and_sequence', (q) => q.eq('threadId', args.threadId))
+			.order('asc')
+			.take(200);
+		const prefix = rows.filter((r) => r.sequence <= forkPoint.sequence);
+		if (prefix.length === 0) {
+			throw new Error('Nothing to fork');
+		}
+
+		const now = Date.now();
+		const newThreadId = await ctx.db.insert('chatThreads', {
+			ownerId: sourceThread.ownerId,
+			title: PLACEHOLDER_THREAD_TITLE,
+			scopeType: sourceThread.scopeType,
+			...(sourceThread.projectId ? { projectId: sourceThread.projectId } : {}),
+			createdAt: now,
+			updatedAt: now
+		});
+
+		for (const row of prefix) {
+			const message = assertUIMessage(row.message);
+			const newMessageId = `${newThreadId}:${row.sequence}`;
+			const storedMessage: StoredUIMessage = {
+				...message,
+				id: newMessageId
+			};
+			await ctx.db.insert('chatMessages', {
+				ownerId,
+				threadId: newThreadId,
+				messageId: newMessageId,
+				role: row.role,
+				message: storedMessage,
+				text: extractText(storedMessage),
+				modelId: row.modelId,
+				sequence: row.sequence,
+				createdAt: now,
+				updatedAt: now
+			});
+		}
+
+		return { threadId: newThreadId };
 	}
 });
 

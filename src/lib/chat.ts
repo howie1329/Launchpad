@@ -96,3 +96,18 @@ export const setThreadGeneratedTitleMutation = makeFunctionReference<
 	SetThreadGeneratedTitleArgs,
 	SetThreadGeneratedTitleResult
 >('chat:setThreadGeneratedTitle');
+
+export type ForkThreadFromMessageArgs = {
+	threadId: Id<'chatThreads'>;
+	messageId: string;
+};
+
+export type ForkThreadFromMessageResult = {
+	threadId: Id<'chatThreads'>;
+};
+
+export const forkThreadFromMessageMutation = makeFunctionReference<
+	'mutation',
+	ForkThreadFromMessageArgs,
+	ForkThreadFromMessageResult
+>('chat:forkThreadFromMessage');

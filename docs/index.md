@@ -19,6 +19,8 @@ This folder is organized by intent so product, engineering, and research docs ar
 - [Supermemory integration PRD](./features/supermemory-integration-prd.md)
 - [User-created artifacts and project-wide mentions PRD](./features/user-created-artifacts-project-wide-mentions-prd.md)
 - [User AI preferences plan](./features/user-ai-preferences-plan.md)
+- [Workspace chat UX PRD](./features/workspace-chat-ux-prd.md)
+- [Workspace chat UX implementation plan](./features/workspace-chat-ux-implementation-plan.md)
 
 ### Architecture
 
