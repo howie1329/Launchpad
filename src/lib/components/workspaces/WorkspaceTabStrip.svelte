@@ -46,11 +46,11 @@
 				role="tab"
 				aria-selected={isActive}
 				class={cn(
-					'group flex h-7 max-w-[10rem] min-w-0 shrink-0 items-center gap-0.5 rounded-md border border-transparent pr-0.5 pl-1.5 text-left text-xs transition-colors',
+					'group flex h-7 max-w-[10rem] min-w-0 shrink-0 items-center gap-0.5 rounded-md pr-0.5 pl-1.5 text-left text-xs transition-colors',
 					isActive
-						? 'bg-accent/80 font-medium text-accent-foreground'
-						: 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-					missing && 'border-dashed border-muted-foreground/25 opacity-80'
+						? 'bg-accent font-medium text-accent-foreground'
+						: 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+					missing && 'opacity-65'
 				)}
 			>
 				<Button
@@ -69,7 +69,7 @@
 						type="button"
 						variant="ghost"
 						size="icon"
-						class="size-5 shrink-0 text-muted-foreground opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+						class="size-5 shrink-0 text-muted-foreground opacity-100 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
 						aria-label="Close tab"
 						data-close-tab
 						onclick={(e) => {

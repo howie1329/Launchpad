@@ -43,8 +43,8 @@
 	);
 
 	const itemClass =
-		'flex min-h-0 w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-xs ' +
-		'outline-none hover:bg-accent focus:bg-accent ' +
+		'flex min-h-0 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-xs ' +
+		'outline-none hover:bg-accent/50 focus:bg-accent ' +
 		'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground';
 
 	const headingClass =
@@ -72,7 +72,11 @@
 			<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3.5" />
 		</Button>
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content class="w-[min(100vw-2rem,20rem)] p-0" align="start" sideOffset={6}>
+	<DropdownMenu.Content
+		class="w-[min(100vw-2rem,20rem)] rounded-lg border-border/70 bg-popover p-0"
+		align="start"
+		sideOffset={6}
+	>
 		<ScrollArea class="h-[min(22rem,60vh)]">
 			<div class="p-1">
 				{#if loading}
