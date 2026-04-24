@@ -38,6 +38,7 @@ Required env vars:
 - `PUBLIC_CONVEX_URL` - Convex deployment URL
 - `AI_GATEWAY_API_KEY` - Vercel AI Gateway key
 - `OPENROUTER_API_KEY` - Optional; required for OpenRouter catalog models
+- `GROQ_API_KEY` - Optional; required for Groq catalog models
 - `TAVILY_API_KEY` - Optional web search
 
 ## Stack
