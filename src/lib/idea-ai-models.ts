@@ -54,6 +54,15 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		cachedInputCostPerMillionTokens: 0.25
 	},
 	{
+		id: 'or:arcee-ai/trinity-mini',
+		label: 'Trinity Mini',
+		provider: 'openrouter',
+		openRouterModel: 'arcee-ai/trinity-mini',
+		maxContextTokens: 131_000,
+		inputCostPerMillionTokens: 0.045,
+		outputCostPerMillionTokens: 0.15
+	},
+	{
 		id: 'or:openai/gpt-4o-mini',
 		label: 'GPT-4o mini',
 		provider: 'openrouter',
