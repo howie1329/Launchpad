@@ -64,6 +64,15 @@
 		"data-active": isActive,
 		...restProps,
 	});
+
+	const sidebarTooltipContentProps = $derived({
+		sideOffset: 8,
+		...tooltipContentProps,
+		class: cn(
+			"rounded-lg border border-border/70 bg-popover px-2.5 py-1.5 text-xs text-foreground",
+			tooltipContentProps?.class
+		),
+	});
 </script>
 
 {#snippet Button({ props }: { props?: Record<string, unknown> })}
@@ -90,7 +99,7 @@
 			side="right"
 			align="center"
 			hidden={sidebar.state !== "collapsed" || sidebar.isMobile}
-			{...tooltipContentProps}
+			{...sidebarTooltipContentProps}
 		>
 			{#if typeof tooltipContent === "string"}
 				{tooltipContent}
