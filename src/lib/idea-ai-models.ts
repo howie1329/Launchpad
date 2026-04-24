@@ -1,4 +1,4 @@
-export type IdeaAiModelProvider = 'gateway' | 'openrouter';
+export type IdeaAiModelProvider = 'gateway' | 'openrouter' | 'groq';
 
 type BaseIdeaModel = {
 	label: string;
@@ -23,7 +23,15 @@ type OpenRouterIdeaModel = BaseIdeaModel & {
 	openRouterModel: string;
 };
 
-export type IdeaAiModel = GatewayIdeaModel | OpenRouterIdeaModel;
+type GroqIdeaModel = BaseIdeaModel & {
+	provider: 'groq';
+	/** Stable catalog id; avoids collisions with gateway model ids. */
+	id: `gq:${string}`;
+	/** Groq API model slug (e.g. llama-3.3-70b-versatile). */
+	groqModel: string;
+};
+
+export type IdeaAiModel = GatewayIdeaModel | OpenRouterIdeaModel | GroqIdeaModel;
 
 export const ideaAiModels: readonly IdeaAiModel[] = [
 	{
@@ -88,6 +96,24 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		maxContextTokens: 196_000,
 		inputCostPerMillionTokens: 0.0,
 		outputCostPerMillionTokens: 0.0
+	},
+	{
+		id: 'gq:llama-3.3-70b-versatile',
+		label: 'Llama 3.3 70B',
+		provider: 'groq',
+		groqModel: 'llama-3.3-70b-versatile',
+		maxContextTokens: 128_000,
+		inputCostPerMillionTokens: 0.59,
+		outputCostPerMillionTokens: 0.79
+	},
+	{
+		id: 'gq:llama-3.1-8b-instant',
+		label: 'Llama 3.1 8B Instant',
+		provider: 'groq',
+		groqModel: 'llama-3.1-8b-instant',
+		maxContextTokens: 128_000,
+		inputCostPerMillionTokens: 0.05,
+		outputCostPerMillionTokens: 0.08
 	}
 
 ] as const satisfies readonly IdeaAiModel[];
@@ -112,10 +138,21 @@ export function isOpenRouterIdeaModel(model: IdeaAiModel): model is OpenRouterId
 	return model.provider === 'openrouter';
 }
 
+export function isGroqIdeaModel(model: IdeaAiModel): model is GroqIdeaModel {
+	return model.provider === 'groq';
+}
+
+export function getModelSelectorLogoProvider(model: IdeaAiModel): 'vercel' | 'openrouter' | 'groq' {
+	if (model.provider === 'openrouter') return 'openrouter';
+	if (model.provider === 'groq') return 'groq';
+	return 'vercel';
+}
+
 /** For UI: section lists and labels. */
 export const ideaAiModelProviderCopy: Record<IdeaAiModelProvider, string> = {
 	gateway: 'Vercel AI Gateway',
-	openrouter: 'OpenRouter'
+	openrouter: 'OpenRouter',
+	groq: 'Groq'
 };
 
 export function listIdeaModelsByProvider(provider: IdeaAiModelProvider): readonly IdeaAiModel[] {

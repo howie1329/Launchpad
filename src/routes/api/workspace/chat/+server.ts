@@ -16,6 +16,7 @@ import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects'
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import {
+	GroqNotConfiguredError,
 	OpenRouterNotConfiguredError,
 	resolveWorkspaceLanguageModel
 } from '$lib/server/resolve-workspace-language-model';
@@ -209,7 +210,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		try {
 			languageModel = resolveWorkspaceLanguageModel(body.modelId);
 		} catch (e) {
-			if (e instanceof OpenRouterNotConfiguredError) {
+			if (e instanceof OpenRouterNotConfiguredError || e instanceof GroqNotConfiguredError) {
 				return json({ error: e.message }, { status: 400 });
 			}
 			throw e;

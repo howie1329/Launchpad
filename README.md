@@ -90,6 +90,7 @@ Set variables in `.env.local` or your host environment (names must match what Sv
 - **`PUBLIC_CONVEX_URL`** — Convex deployment URL (required for auth and client queries; see `src/lib/auth.svelte.ts`).
 - **`AI_GATEWAY_API_KEY`** — Private key for Vercel AI Gateway (required for workspace chat streaming; see `src/routes/api/workspace/chat/+server.ts`).
 - **`OPENROUTER_API_KEY`** — Private key for [OpenRouter](https://openrouter.ai/) (optional; required only when the user selects an OpenRouter catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
+- **`GROQ_API_KEY`** — Private key for [Groq](https://groq.com/) (optional; required only when the user selects a Groq catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
 - **`TAVILY_API_KEY`** — Private Tavily key for optional workspace chat web search and page extraction.
 
 Configure the Convex project with `npx convex dev` and follow [Convex environment variables](https://docs.convex.dev/production/environment-variables) for deployment. For AI Gateway, see [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).

@@ -31,6 +31,7 @@
 	import { Suggestion, Suggestions } from '$lib/components/ai-elements/suggestion';
 	import {
 		defaultIdeaAiModelId,
+		getModelSelectorLogoProvider,
 		ideaAiModelProviderCopy,
 		ideaAiModels,
 		listIdeaModelsByProvider,
@@ -174,7 +175,7 @@
 									class="inline-flex h-7 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors [transition-duration:150ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] hover:bg-accent/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 								>
 									<ModelSelectorLogo
-										provider={selectedModel.provider === 'openrouter' ? 'openrouter' : 'vercel'}
+										provider={getModelSelectorLogoProvider(selectedModel)}
 										class="size-3 shrink-0"
 									/>
 									<span class="truncate">{selectedModel.label}</span>
@@ -207,6 +208,18 @@
 													onclick={() => selectModel(model.id)}
 												>
 													<ModelSelectorLogo provider="openrouter" class="shrink-0" />
+													<ModelSelectorName>{model.label}</ModelSelectorName>
+												</ModelSelectorItem>
+											{/each}
+										</ModelSelectorGroup>
+										<ModelSelectorGroup heading={ideaAiModelProviderCopy.groq}>
+											{#each listIdeaModelsByProvider('groq') as model (model.id)}
+												<ModelSelectorItem
+													value={model.id}
+													data-checked={selectedModelId === model.id}
+													onclick={() => selectModel(model.id)}
+												>
+													<ModelSelectorLogo provider="groq" class="shrink-0" />
 													<ModelSelectorName>{model.label}</ModelSelectorName>
 												</ModelSelectorItem>
 											{/each}
