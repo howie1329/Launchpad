@@ -1,4 +1,5 @@
-import { getContext, setContext } from "svelte";
+import { getClientModelCostTable } from '$lib/idea-ai-models';
+import { getContext, setContext } from 'svelte';
 
 export const PERCENT_MAX = 100;
 export const ICON_RADIUS = 10;
@@ -10,11 +11,7 @@ const TOKENS_PER_MILLION = 1_000_000;
 const modelCostsPerMillionTokens: Record<
 	string,
 	{ input: number; output: number; reasoning?: number; cacheRead?: number }
-> = {
-	'openai/gpt-5.4-nano': { input: 0.2, output: 1.25, cacheRead: 0.02 },
-	'openai/gpt-5.4-mini': { input: 0.75, output: 4.5, cacheRead: 0.075 },
-	'openai/gpt-5.4': { input: 2.5, output: 15, cacheRead: 0.25 },
-};
+> = getClientModelCostTable();
 
 export type LanguageModelUsage = {
 	inputTokens?: number;
@@ -50,21 +47,21 @@ export class ContextClass {
 	}
 
 	get displayPercent() {
-		return new Intl.NumberFormat("en-US", {
-			style: "percent",
-			maximumFractionDigits: 1,
+		return new Intl.NumberFormat('en-US', {
+			style: 'percent',
+			maximumFractionDigits: 1
 		}).format(this.usedPercent);
 	}
 
 	get usedTokensFormatted() {
-		return new Intl.NumberFormat("en-US", {
-			notation: "compact",
+		return new Intl.NumberFormat('en-US', {
+			notation: 'compact'
 		}).format(this.usedTokens);
 	}
 
 	get maxTokensFormatted() {
-		return new Intl.NumberFormat("en-US", {
-			notation: "compact",
+		return new Intl.NumberFormat('en-US', {
+			notation: 'compact'
 		}).format(this.maxTokens);
 	}
 
@@ -77,7 +74,7 @@ export class ContextClass {
 	}
 }
 
-let CONTEXT_KEY = Symbol("context");
+const CONTEXT_KEY = Symbol('context');
 
 export function setContextValue(contextInstance: ContextClass) {
 	setContext(CONTEXT_KEY, contextInstance);
@@ -87,7 +84,7 @@ export function getContextValue(): ContextClass {
 	const context = getContext<ContextClass>(CONTEXT_KEY);
 
 	if (!context) {
-		throw new Error("Context components must be used within Context");
+		throw new Error('Context components must be used within Context');
 	}
 
 	return context;
@@ -114,6 +111,6 @@ export function estimateCost(params: {
 		((params.usage.cacheReads || 0) / TOKENS_PER_MILLION) * (cost.cacheRead ?? cost.input);
 
 	return {
-		totalUSD: inputCost + outputCost + reasoningCost + cacheCost,
+		totalUSD: inputCost + outputCost + reasoningCost + cacheCost
 	};
 }
