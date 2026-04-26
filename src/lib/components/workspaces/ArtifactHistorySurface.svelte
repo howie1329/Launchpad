@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { parseDiffFromFile, type FileContents } from '@pierre/diffs';
 	import type { ArtifactVersion, SavedArtifact } from '$lib/artifacts';
 	import {
 		artifactVersionActorLabel,
@@ -40,6 +41,7 @@
 	});
 
 	const compareBaseValue = $derived(compareBaseVersion?._id ?? '');
+	let diffStyle = $state<'unified' | 'split'>('unified');
 	const canRestoreSelected = $derived(
 		Boolean(selectedVersion && selectedVersion.versionNumber !== artifact.revision)
 	);
@@ -50,6 +52,30 @@
 					compareBaseVersion &&
 					compareBaseVersion.contentMarkdown !== selectedVersion.contentMarkdown
 			)
+	);
+	const bodyDiffMetadata = $derived.by(() => {
+		if (!selectedVersion || !compareBaseVersion || !hasBodyChanges) return null;
+		const oldFile: FileContents = {
+			name: 'artifact.md',
+			contents: compareBaseVersion.contentMarkdown
+		};
+		const newFile: FileContents = {
+			name: 'artifact.md',
+			contents: selectedVersion.contentMarkdown
+		};
+
+		try {
+			return parseDiffFromFile(oldFile, newFile, { context: compact ? 2 : 3 });
+		} catch (error) {
+			console.error('Failed to parse artifact history diff metadata', error);
+			return null;
+		}
+	});
+	const bodyDiffAddedLines = $derived.by(
+		() => bodyDiffMetadata?.hunks.reduce((total, hunk) => total + hunk.additionLines, 0) ?? 0
+	);
+	const bodyDiffDeletedLines = $derived.by(
+		() => bodyDiffMetadata?.hunks.reduce((total, hunk) => total + hunk.deletionLines, 0) ?? 0
 	);
 </script>
 
@@ -69,10 +95,10 @@
 					<button
 						type="button"
 						class={cn(
-							'w-full rounded-md border px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+							'w-full rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 							selectedVersion?._id === version._id
-								? 'border-border bg-accent/50'
-								: 'border-transparent hover:bg-accent/40'
+								? 'bg-accent font-medium'
+								: 'hover:bg-accent/50'
 						)}
 						onclick={() => onSelectVersion(version._id)}
 					>
@@ -98,9 +124,7 @@
 
 		<section class="min-w-0 space-y-3">
 			{#if selectedVersion}
-				<div
-					class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2"
-				>
+				<div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-1 pb-2">
 					<div class="space-y-1">
 						<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 							Compare
@@ -111,9 +135,38 @@
 								against version {compareBaseVersion.versionNumber}
 							{/if}
 						</p>
+						{#if hasBodyChanges}
+							<p class="text-[11px] text-muted-foreground">
+								+{bodyDiffAddedLines} / -{bodyDiffDeletedLines} lines
+							</p>
+						{/if}
 					</div>
 
 					<div class="flex flex-wrap items-center gap-2">
+						<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
+							<Button
+								type="button"
+								size="sm"
+								variant={diffStyle === 'unified' ? 'secondary' : 'ghost'}
+								class="h-7 rounded-sm px-2 text-xs font-medium"
+								onclick={() => {
+									diffStyle = 'unified';
+								}}
+							>
+								Unified
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								variant={diffStyle === 'split' ? 'secondary' : 'ghost'}
+								class="h-7 rounded-sm px-2 text-xs font-medium"
+								onclick={() => {
+									diffStyle = 'split';
+								}}
+							>
+								Split
+							</Button>
+						</div>
 						<NativeSelect
 							value={compareBaseValue}
 							size="sm"
@@ -150,7 +203,7 @@
 
 				{#if compareBaseVersion}
 					{#if compareBaseVersion.title !== selectedVersion.title}
-						<div class="rounded-md border border-border/60 bg-background px-3 py-3">
+						<div class="border-b border-border/50 px-1 pb-3">
 							<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 								Title change
 							</p>
@@ -172,17 +225,19 @@
 					{/if}
 
 					{#if hasBodyChanges}
-						<div class={compact ? 'min-h-[14rem]' : 'min-h-[20rem]'}>
+						<div class={cn(compact ? 'min-h-[14rem]' : 'min-h-[20rem]', 'pt-1')}>
 							{#key `${selectedVersion._id}-${compareBaseVersion._id}`}
 								<ArtifactDiffRendererDiffs
+									patch={bodyDiffMetadata ?? undefined}
 									original={compareBaseVersion.contentMarkdown}
 									modified={selectedVersion.contentMarkdown}
+									{diffStyle}
 									{compact}
 								/>
 							{/key}
 						</div>
 					{:else}
-						<div class="rounded-md border border-border/60 bg-background px-3 py-3">
+						<div class="px-1 py-2">
 							<p class="text-sm font-medium text-foreground">No body changes</p>
 							<p class="mt-1 text-xs leading-5 text-muted-foreground">
 								Version {selectedVersion.versionNumber} and version
@@ -191,7 +246,7 @@
 						</div>
 					{/if}
 				{:else}
-					<div class="rounded-md border border-border/60 bg-background px-3 py-3">
+					<div class="px-1 py-2">
 						<p class="text-sm font-medium text-foreground">No earlier version to compare</p>
 						<p class="mt-1 text-xs leading-5 text-muted-foreground">
 							Version {selectedVersion.versionNumber} is the first saved version for this artifact.
