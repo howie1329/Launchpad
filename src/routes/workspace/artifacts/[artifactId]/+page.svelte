@@ -18,6 +18,8 @@
 			? { artifactId: activeArtifactId as Id<'artifacts'> }
 			: 'skip'
 	);
+	const isLoading = $derived(selectedArtifact.data === undefined && !selectedArtifact.error);
+	const isMissing = $derived(selectedArtifact.data === null || Boolean(selectedArtifact.error));
 </script>
 
 <svelte:head>
@@ -25,8 +27,26 @@
 	<meta name="description" content="Saved workspace artifact." />
 </svelte:head>
 
-<WorkspaceArtifactReader
-	artifact={selectedArtifact.data}
-	fullWidthContent
-	{initialSelectedVersionNumber}
-/>
+{#if isLoading}
+	<div class="flex h-full min-h-0 flex-1 items-center justify-center px-4 py-8 text-center">
+		<div>
+			<p class="text-sm font-semibold tracking-tight">Loading artifact</p>
+			<p class="mt-2 text-xs leading-5 text-muted-foreground">Checking artifact access…</p>
+		</div>
+	</div>
+{:else if isMissing}
+	<div class="flex h-full min-h-0 flex-1 items-center justify-center px-4 py-8 text-center">
+		<div class="max-w-sm">
+			<p class="text-sm font-semibold tracking-tight">Artifact not available</p>
+			<p class="mt-2 text-xs leading-5 text-muted-foreground">
+				This artifact does not exist or you no longer have access to it.
+			</p>
+		</div>
+	</div>
+{:else}
+	<WorkspaceArtifactReader
+		artifact={selectedArtifact.data}
+		fullWidthContent
+		{initialSelectedVersionNumber}
+	/>
+{/if}
