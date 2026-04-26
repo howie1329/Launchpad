@@ -71,12 +71,12 @@
 	import {
 		defaultIdeaAiModelId,
 		getModelSelectorLogoProvider,
-		ideaAiModelProviderCopy,
 		ideaAiModels,
 		isIdeaAiModelId,
 		listIdeaModelsByProvider,
 		type IdeaAiModelId
 	} from '$lib/idea-ai-models';
+	import { ideaAiModelProviderGroups } from '$lib/idea-ai-model-selector';
 	import {
 		assistantSegmentsHaveContent,
 		buildAssistantSegments
@@ -87,6 +87,8 @@
 		buildUserMessageCopyText,
 		truncateMessagesAfterUserMessage
 	} from '$lib/workspace-chat-message-actions';
+	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
+	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
 	import {
 		ArrowDown01Icon,
 		ArrowUp01Icon,
@@ -131,11 +133,10 @@
 	let mentionHighlight = $state(0);
 	/** Composer chips (persisted as trailing @artifact: lines on send) */
 	let mentionChips = $state<Array<{ id: string; title: string }>>([]);
+	let pendingAutoStartThreadId = $state('');
 
-	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
-	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
+	const activeThreadId = $derived($page.params.threadId?.trim() ?? '');
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
-	const startRequested = $derived($page.url.searchParams.get('start') === '1');
 	const selectedModel = $derived(
 		ideaAiModels.find((model) => model.id === selectedModelId) ?? ideaAiModels[0]
 	);
@@ -290,11 +291,23 @@
 	});
 
 	$effect(() => {
-		if (!startRequested || !activeThreadId || !chat || startedThreadId === activeThreadId) return;
+		if (!activeThreadId) {
+			pendingAutoStartThreadId = '';
+			return;
+		}
+		pendingAutoStartThreadId = consumeThreadAutoStart(activeThreadId) ? activeThreadId : '';
+	});
+
+	$effect(() => {
+		if (!pendingAutoStartThreadId || !activeThreadId || !chat || startedThreadId === activeThreadId) {
+			return;
+		}
+		if (pendingAutoStartThreadId !== activeThreadId) return;
 		if (!threadMessages.data || threadMessages.data.length !== 1) return;
 		if (chat.status !== 'ready') return;
 
 		startedThreadId = activeThreadId;
+		pendingAutoStartThreadId = '';
 		void startInitialChat(activeThreadId);
 	});
 
@@ -502,11 +515,12 @@
 			return;
 		}
 
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
-
 		await goto(
 			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
+				workspaceThreadViewHref({
+					threadId: activeThreadId,
+					withContext: true
+				}) as `/workspace/thread/${string}?${string}`
 			),
 			{
 				noScroll: true,
@@ -546,27 +560,11 @@
 
 	async function startInitialChat(threadId: string) {
 		try {
-			await removeStartParam(threadId);
 			await chat?.sendMessage();
 		} catch (error) {
 			console.error(error);
 			chatError = 'Could not start the assistant response. Please try again.';
 		}
-	}
-
-	async function removeStartParam(threadId: string) {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
-
-		await goto(
-			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(threadId)}` as `/workspace?${string}`
-			),
-			{
-				replaceState: true,
-				noScroll: true,
-				keepFocus: true
-			}
-		);
 	}
 
 	async function persistMessages(threadId: string, messages: UIMessage[]): Promise<boolean> {
@@ -642,13 +640,10 @@
 				threadId: activeThreadId as Id<'chatThreads'>,
 				messageId
 			});
-			const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
-			await goto(
-				resolve(
-					`/workspace?${projectQuery}thread=${encodeURIComponent(threadId)}` as `/workspace?${string}`
-				),
-				{ noScroll: true, keepFocus: true }
-			);
+			await goto(resolve(workspaceThreadHref(threadId) as `/workspace/thread/${string}`), {
+				noScroll: true,
+				keepFocus: true
+			});
 		} catch (error) {
 			console.error(error);
 			chatError = 'Could not fork this thread. Try again.';
@@ -1205,42 +1200,20 @@
 											/>
 											<ModelSelectorList>
 												<ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.gateway}>
-													{#each listIdeaModelsByProvider('gateway') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="vercel" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.openrouter}>
-													{#each listIdeaModelsByProvider('openrouter') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="openrouter" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.groq}>
-													{#each listIdeaModelsByProvider('groq') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="groq" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
+												{#each ideaAiModelProviderGroups as group (group.provider)}
+													<ModelSelectorGroup heading={group.heading}>
+														{#each listIdeaModelsByProvider(group.provider) as model (model.id)}
+															<ModelSelectorItem
+																value={model.id}
+																data-checked={selectedModelId === model.id}
+																onclick={() => selectModel(model.id)}
+															>
+																<ModelSelectorLogo provider={group.logoProvider} class="shrink-0" />
+																<ModelSelectorName>{model.label}</ModelSelectorName>
+															</ModelSelectorItem>
+														{/each}
+													</ModelSelectorGroup>
+												{/each}
 											</ModelSelectorList>
 										</ModelSelectorContent>
 									</ModelSelector>

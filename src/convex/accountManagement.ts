@@ -15,7 +15,7 @@ function tabTargetMatchesDeletedEntity(
 ) {
 	if (target.kind === 'project') return target.projectId === deleted.projectId;
 	if (target.kind === 'thread') {
-		return target.threadId === deleted.threadId || target.projectId === deleted.projectId;
+		return target.threadId === deleted.threadId;
 	}
 	if (target.kind === 'artifact') return target.artifactId === deleted.artifactId;
 	return false;

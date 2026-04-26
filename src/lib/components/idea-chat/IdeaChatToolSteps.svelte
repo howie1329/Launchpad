@@ -102,13 +102,14 @@
 								<p class="text-[11px] leading-relaxed text-destructive">{tool.errorText}</p>
 							{/if}
 							{#if tool.actionLabel && tool.actionArtifactId && tool.actionVersionNumber !== undefined}
+								{@const actionArtifactId = tool.actionArtifactId}
 								<button
 									type="button"
 									class="inline-flex w-fit rounded-sm text-[11px] font-medium text-foreground underline underline-offset-2 hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 									onclick={() => {
 										window.location.assign(
 											`${resolve('/workspace/artifacts/[artifactId]', {
-												artifactId: tool.actionArtifactId
+												artifactId: actionArtifactId
 											})}?version=${tool.actionVersionNumber}`
 										);
 									}}

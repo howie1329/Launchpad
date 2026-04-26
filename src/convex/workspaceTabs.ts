@@ -11,7 +11,7 @@ export type WorkspaceTabTarget =
 	| { kind: 'home' }
 	| { kind: 'settings' }
 	| { kind: 'project'; projectId: Id<'projects'> }
-	| { kind: 'thread'; threadId: Id<'chatThreads'>; projectId?: Id<'projects'> }
+	| { kind: 'thread'; threadId: Id<'chatThreads'> }
 	| { kind: 'artifact'; artifactId: Id<'artifacts'> };
 
 function newTabId(): string {
@@ -28,7 +28,7 @@ export function workspaceTabTargetsEqual(a: WorkspaceTabTarget, b: WorkspaceTabT
 	if (a.kind === 'project' && b.kind === 'project') return a.projectId === b.projectId;
 	if (a.kind === 'artifact' && b.kind === 'artifact') return a.artifactId === b.artifactId;
 	if (a.kind === 'thread' && b.kind === 'thread') {
-		return a.threadId === b.threadId && a.projectId === b.projectId;
+		return a.threadId === b.threadId;
 	}
 	return false;
 }
@@ -47,19 +47,9 @@ async function assertTargetAccess(
 		return;
 	}
 	if (target.kind === 'thread') {
-		const t = (await ctx.db.get(target.threadId)) as {
-			ownerId: string;
-			projectId?: Id<'projects'>;
-		} | null;
+		const t = (await ctx.db.get(target.threadId)) as { ownerId: string } | null;
 		if (!t || t.ownerId !== ownerId) {
 			throw new Error('Thread not found');
-		}
-		if (target.projectId) {
-			if (t.projectId !== target.projectId) {
-				throw new Error('Thread does not match project');
-			}
-		} else if (t.projectId) {
-			throw new Error('Thread is project-scoped; project id required');
 		}
 		return;
 	}
