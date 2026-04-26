@@ -22,6 +22,7 @@ This folder is organized by intent so product, engineering, and research docs ar
 - [User AI preferences plan](./features/user-ai-preferences-plan.md)
 - [Workspace chat UX PRD](./features/workspace-chat-ux-prd.md)
 - [Workspace chat UX implementation plan](./features/workspace-chat-ux-implementation-plan.md)
+- [Mobile-first responsive implementation plan](./features/mobile-first-responsive-implementation-plan.md)
 
 ### Architecture
 
