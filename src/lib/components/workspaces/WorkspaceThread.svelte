@@ -71,12 +71,12 @@
 	import {
 		defaultIdeaAiModelId,
 		getModelSelectorLogoProvider,
-		ideaAiModelProviderCopy,
 		ideaAiModels,
 		isIdeaAiModelId,
 		listIdeaModelsByProvider,
 		type IdeaAiModelId
 	} from '$lib/idea-ai-models';
+	import { ideaAiModelProviderGroups } from '$lib/idea-ai-model-selector';
 	import {
 		assistantSegmentsHaveContent,
 		buildAssistantSegments
@@ -1205,42 +1205,20 @@
 											/>
 											<ModelSelectorList>
 												<ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.gateway}>
-													{#each listIdeaModelsByProvider('gateway') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="vercel" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.openrouter}>
-													{#each listIdeaModelsByProvider('openrouter') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="openrouter" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.groq}>
-													{#each listIdeaModelsByProvider('groq') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="groq" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
+												{#each ideaAiModelProviderGroups as group (group.provider)}
+													<ModelSelectorGroup heading={group.heading}>
+														{#each listIdeaModelsByProvider(group.provider) as model (model.id)}
+															<ModelSelectorItem
+																value={model.id}
+																data-checked={selectedModelId === model.id}
+																onclick={() => selectModel(model.id)}
+															>
+																<ModelSelectorLogo provider={group.logoProvider} class="shrink-0" />
+																<ModelSelectorName>{model.label}</ModelSelectorName>
+															</ModelSelectorItem>
+														{/each}
+													</ModelSelectorGroup>
+												{/each}
 											</ModelSelectorList>
 										</ModelSelectorContent>
 									</ModelSelector>

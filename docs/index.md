@@ -23,6 +23,7 @@ This folder is organized by intent so product, engineering, and research docs ar
 - [Workspace chat UX PRD](./features/workspace-chat-ux-prd.md)
 - [Workspace chat UX implementation plan](./features/workspace-chat-ux-implementation-plan.md)
 - [Mobile-first responsive implementation plan](./features/mobile-first-responsive-implementation-plan.md)
+- [NVIDIA NIM provider PRD](./features/nvidia-nim-provider-prd.md)
 
 ### Architecture
 

@@ -17,6 +17,7 @@ import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import {
 	GroqNotConfiguredError,
+	NIMNotConfiguredError,
 	OpenRouterNotConfiguredError,
 	resolveWorkspaceLanguageModel
 } from '$lib/server/resolve-workspace-language-model';
@@ -210,7 +211,11 @@ export const POST: RequestHandler = async ({ request }) => {
 		try {
 			languageModel = resolveWorkspaceLanguageModel(body.modelId);
 		} catch (e) {
-			if (e instanceof OpenRouterNotConfiguredError || e instanceof GroqNotConfiguredError) {
+			if (
+				e instanceof OpenRouterNotConfiguredError ||
+				e instanceof GroqNotConfiguredError ||
+				e instanceof NIMNotConfiguredError
+			) {
 				return json({ error: e.message }, { status: 400 });
 			}
 			throw e;
