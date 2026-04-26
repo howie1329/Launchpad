@@ -53,15 +53,25 @@
 					compareBaseVersion.contentMarkdown !== selectedVersion.contentMarkdown
 			)
 	);
+	function asMarkdownFileName(title: string) {
+		const trimmed = title.trim();
+		if (!trimmed) return 'artifact.md';
+		return trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
+	}
+
 	const bodyDiffMetadata = $derived.by(() => {
 		if (!selectedVersion || !compareBaseVersion || !hasBodyChanges) return null;
 		const oldFile: FileContents = {
-			name: 'artifact.md',
-			contents: compareBaseVersion.contentMarkdown
+			name: asMarkdownFileName(compareBaseVersion.title),
+			contents: compareBaseVersion.contentMarkdown,
+			lang: 'markdown',
+			cacheKey: compareBaseVersion._id
 		};
 		const newFile: FileContents = {
-			name: 'artifact.md',
-			contents: selectedVersion.contentMarkdown
+			name: asMarkdownFileName(selectedVersion.title),
+			contents: selectedVersion.contentMarkdown,
+			lang: 'markdown',
+			cacheKey: selectedVersion._id
 		};
 
 		try {
@@ -71,12 +81,6 @@
 			return null;
 		}
 	});
-	const bodyDiffAddedLines = $derived.by(
-		() => bodyDiffMetadata?.hunks.reduce((total, hunk) => total + hunk.additionLines, 0) ?? 0
-	);
-	const bodyDiffDeletedLines = $derived.by(
-		() => bodyDiffMetadata?.hunks.reduce((total, hunk) => total + hunk.deletionLines, 0) ?? 0
-	);
 </script>
 
 <div class={compact ? 'space-y-4' : 'space-y-5'}>
@@ -135,11 +139,6 @@
 								against version {compareBaseVersion.versionNumber}
 							{/if}
 						</p>
-						{#if hasBodyChanges}
-							<p class="text-[11px] text-muted-foreground">
-								+{bodyDiffAddedLines} / -{bodyDiffDeletedLines} lines
-							</p>
-						{/if}
 					</div>
 
 					<div class="flex flex-wrap items-center gap-2">
@@ -231,6 +230,8 @@
 									patch={bodyDiffMetadata ?? undefined}
 									original={compareBaseVersion.contentMarkdown}
 									modified={selectedVersion.contentMarkdown}
+									oldFileName={asMarkdownFileName(compareBaseVersion.title)}
+									newFileName={asMarkdownFileName(selectedVersion.title)}
 									{diffStyle}
 									{compact}
 								/>

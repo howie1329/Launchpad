@@ -12,12 +12,16 @@
 		patch,
 		original,
 		modified,
+		oldFileName = 'artifact.md',
+		newFileName = 'artifact.md',
 		compact = false,
 		diffStyle = 'unified'
 	}: {
 		patch?: FileDiffMetadata;
 		original?: string;
 		modified?: string;
+		oldFileName?: string;
+		newFileName?: string;
 		compact?: boolean;
 		diffStyle?: 'unified' | 'split';
 	} = $props();
@@ -35,10 +39,12 @@
 			dark: 'pierre-dark'
 		},
 		themeType,
-		disableFileHeader: true,
+		disableFileHeader: false,
 		disableLineNumbers: false,
-		overflow: 'wrap' as const,
-		lineDiffType: 'word' as const,
+		diffIndicators: 'bars' as const,
+		hunkSeparators: 'line-info' as const,
+		overflow: 'scroll' as const,
+		lineDiffType: 'word-alt' as const,
 		collapsedContextThreshold: compact ? 4 : 8,
 		expansionLineCount: compact ? 3 : 6
 	});
@@ -47,11 +53,11 @@
 		if (original === undefined || modified === undefined) return null;
 
 		const oldFile: FileContents = {
-			name: 'artifact.md',
+			name: oldFileName,
 			contents: original
 		};
 		const newFile: FileContents = {
-			name: 'artifact.md',
+			name: newFileName,
 			contents: modified
 		};
 
@@ -76,7 +82,6 @@
 
 	function renderDiff() {
 		if (!containerEl) return;
-
 		fileDiff ??= new FileDiff(renderOptions);
 		fileDiff.setOptions(renderOptions);
 
@@ -92,6 +97,8 @@
 		void patch;
 		void original;
 		void modified;
+		void oldFileName;
+		void newFileName;
 		void compact;
 		void diffStyle;
 		void themeType;
@@ -106,7 +113,7 @@
 </script>
 
 <div
-	class="artifact-diff-renderer flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border/50 bg-background"
+	class="artifact-diff-renderer flex min-h-0 flex-1 flex-col overflow-hidden"
 >
 	<div class="min-h-0 flex-1 overflow-auto" bind:this={containerEl}></div>
 </div>
@@ -114,8 +121,5 @@
 <style>
 	.artifact-diff-renderer {
 		min-height: 12rem;
-	}
-	.artifact-diff-renderer :global(pre) {
-		margin: 0;
 	}
 </style>
