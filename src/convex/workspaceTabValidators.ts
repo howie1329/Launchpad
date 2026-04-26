@@ -5,11 +5,7 @@ export const workspaceTabTarget = v.union(
 	v.object({ kind: v.literal('home') }),
 	v.object({ kind: v.literal('settings') }),
 	v.object({ kind: v.literal('project'), projectId: v.id('projects') }),
-	v.object({
-		kind: v.literal('thread'),
-		threadId: v.id('chatThreads'),
-		projectId: v.optional(v.id('projects'))
-	}),
+	v.object({ kind: v.literal('thread'), threadId: v.id('chatThreads') }),
 	v.object({ kind: v.literal('artifact'), artifactId: v.id('artifacts') })
 )
 

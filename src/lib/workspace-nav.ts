@@ -12,36 +12,28 @@ export function workspaceSettingsHref() {
 
 export function workspaceProjectHref(projectId: string | Id<'projects'>) {
 	return resolve(
-		`/workspace?project=${encodeURIComponent(String(projectId))}` as '/workspace?${string}'
+		`/workspace/project/${encodeURIComponent(String(projectId))}` as `/workspace/project/${string}`
 	);
 }
 
-/**
- * Resolves a thread the same way as the workspace sidebar: project-scoped threads
- * include `project` + `thread`; general threads are `thread` only.
- */
-export function workspaceThreadHref(thread: Pick<SavedChatThread, '_id' | 'projectId'>) {
-	if (thread.projectId) {
-		return resolve(
-			`/workspace?project=${encodeURIComponent(String(thread.projectId))}&thread=${encodeURIComponent(String(thread._id))}` as '/workspace?${string}'
-		);
-	}
+export function workspaceThreadHref(
+	thread: string | Id<'chatThreads'> | Pick<SavedChatThread, '_id'>
+) {
+	const threadId = typeof thread === 'string' ? thread : String(thread._id);
 	return resolve(
-		`/workspace?thread=${encodeURIComponent(String(thread._id))}` as '/workspace?${string}'
+		`/workspace/thread/${encodeURIComponent(threadId)}` as `/workspace/thread/${string}`
 	);
 }
 
-/** `thread` + optional `context=1` for the thread context panel (see workspace layout). */
 export function workspaceThreadViewHref(args: {
 	threadId: string;
-	projectId?: string | null;
 	withContext?: boolean;
 }) {
 	const p = new URLSearchParams();
-	if (args.projectId) p.set('project', String(args.projectId));
-	p.set('thread', args.threadId);
 	if (args.withContext) p.set('context', '1');
-	return resolve(`/workspace?${p.toString()}` as '/workspace?${string}');
+	const query = p.toString();
+	const base = workspaceThreadHref(args.threadId);
+	return query ? resolve(`${base}?${query}` as `/workspace/thread/${string}?${string}`) : base;
 }
 
 export function workspaceArtifactHref(artifactId: string | Id<'artifacts'>) {

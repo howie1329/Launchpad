@@ -18,24 +18,20 @@ export function urlToWorkspaceTarget(url: URL): WorkspaceTabTarget | null {
 	if (path === '/workspace/settings') {
 		return { kind: 'settings' };
 	}
+	const projectMatch = /^\/workspace\/project\/([^/]+)\/?$/.exec(path);
+	if (projectMatch?.[1]) {
+		return { kind: 'project', projectId: projectMatch[1] as Id<'projects'> };
+	}
+	const threadMatch = /^\/workspace\/thread\/([^/]+)\/?$/.exec(path);
+	if (threadMatch?.[1]) {
+		return { kind: 'thread', threadId: threadMatch[1] as Id<'chatThreads'> };
+	}
 	const artifactMatch = /^\/workspace\/artifacts\/([^/]+)\/?$/.exec(path);
 	if (artifactMatch?.[1]) {
 		return { kind: 'artifact', artifactId: artifactMatch[1] as Id<'artifacts'> };
 	}
 	if (path !== '/workspace' && path !== '/workspace/') {
 		return null;
-	}
-	const project = url.searchParams.get('project')?.trim() ?? '';
-	const thread = url.searchParams.get('thread')?.trim() ?? '';
-	if (thread) {
-		return {
-			kind: 'thread',
-			threadId: thread as Id<'chatThreads'>,
-			...(project ? { projectId: project as Id<'projects'> } : {})
-		};
-	}
-	if (project) {
-		return { kind: 'project', projectId: project as Id<'projects'> };
 	}
 	return { kind: 'home' };
 }
@@ -51,10 +47,7 @@ export function hrefForWorkspaceTarget(target: WorkspaceTabTarget): string {
 		case 'artifact':
 			return workspaceArtifactHref(target.artifactId);
 		case 'thread': {
-			const thread: Pick<SavedChatThread, '_id' | 'projectId'> = {
-				_id: target.threadId,
-				...(target.projectId ? { projectId: target.projectId } : {})
-			};
+			const thread: Pick<SavedChatThread, '_id'> = { _id: target.threadId };
 			return workspaceThreadHref(thread);
 		}
 	}
@@ -97,7 +90,7 @@ export function workspaceTargetsEqual(a: WorkspaceTabTarget, b: WorkspaceTabTarg
 	if (a.kind === 'project' && b.kind === 'project') return a.projectId === b.projectId;
 	if (a.kind === 'artifact' && b.kind === 'artifact') return a.artifactId === b.artifactId;
 	if (a.kind === 'thread' && b.kind === 'thread') {
-		return a.threadId === b.threadId && a.projectId === b.projectId;
+		return a.threadId === b.threadId;
 	}
 	return false;
 }

@@ -108,15 +108,17 @@
 
 	const pathname = $derived($page.url.pathname);
 	const isSettingsActive = $derived(pathname === '/workspace/settings');
-	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
-	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
+	const routeProjectId = $derived(
+		/^\/workspace\/project\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
+	);
+	const activeThreadId = $derived(
+		/^\/workspace\/thread\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
+	);
 	const activeArtifactId = $derived(
 		/^\/workspace\/artifacts\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
 	);
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
-	const isNewChatActive = $derived(
-		pathname === '/workspace' && !activeProjectId && !activeThreadId
-	);
+	const isNewChatActive = $derived(pathname === '/workspace');
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
@@ -130,11 +132,12 @@
 	const workspaceListError = $derived(
 		projects.error ?? threads.error ?? artifacts.error ?? budget.error
 	);
-	const selectedProject = $derived(
-		projects.data?.find((project) => project._id === activeProjectId) ?? null
-	);
 	const selectedThread = $derived(
 		threads.data?.find((thread) => thread._id === activeThreadId) ?? null
+	);
+	const activeProjectId = $derived(routeProjectId || selectedThread?.projectId || '');
+	const selectedProject = $derived(
+		projects.data?.find((project) => project._id === activeProjectId) ?? null
 	);
 	const canPromoteThreadToProject = $derived(
 		Boolean(
@@ -370,9 +373,8 @@
 			await goto(
 				resolve(
 					workspaceThreadHref({
-						_id: activeThreadId as Id<'chatThreads'>,
-						projectId: result.projectId
-					}) as '/workspace'
+						_id: activeThreadId as Id<'chatThreads'>
+					}) as `/workspace/thread/${string}`
 				)
 			);
 		} catch (error) {
@@ -428,9 +430,8 @@
 			resolve(
 				workspaceThreadViewHref({
 					threadId: activeThreadId,
-					projectId: activeProjectId || null,
 					withContext: !contextPanelOpen
-				}) as '/workspace'
+				}) as `/workspace/thread/${string}${string}`
 			),
 			{
 				noScroll: true,
@@ -570,11 +571,7 @@
 			void invalidateAll();
 			if (activeThreadId === id) {
 				if (tidProject) {
-					await goto(
-						resolve(
-							`/workspace?project=${encodeURIComponent(String(tidProject))}` as '/workspace?${string}'
-						)
-					);
+					await goto(resolve(workspaceProjectHref(tidProject) as `/workspace/project/${string}`));
 				} else {
 					await goto(resolve('/workspace'));
 				}
