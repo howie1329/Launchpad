@@ -1,46 +1,45 @@
 <script lang="ts" module>
-	import { tv, type VariantProps } from "tailwind-variants";
+	import { tv, type VariantProps } from 'tailwind-variants';
 
 	export const sidebarMenuButtonVariants = tv({
-		base: "ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground gap-2 rounded-md p-2 text-left text-xs transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! focus-visible:ring-2 data-active:font-medium peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+		base: 'ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground gap-2 rounded-md p-2 text-left text-xs transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! focus-visible:ring-2 data-active:font-medium peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate',
 		variants: {
 			variant: {
-				default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-				outline: "border border-sidebar-border/70 bg-background hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+				default: 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+				outline:
+					'border border-sidebar-border/70 bg-background hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
 			},
 			size: {
-				default: "h-8 text-xs",
-				sm: "h-7 text-xs",
-				lg: "h-12 text-xs group-data-[collapsible=icon]:p-0!",
-			},
+				default: 'h-8 text-xs',
+				sm: 'h-7 text-xs',
+				lg: 'h-12 text-xs group-data-[collapsible=icon]:p-0!'
+			}
 		},
 		defaultVariants: {
-			variant: "default",
-			size: "default",
-		},
+			variant: 'default',
+			size: 'default'
+		}
 	});
 
-	export type SidebarMenuButtonVariant = VariantProps<
-		typeof sidebarMenuButtonVariants
-	>["variant"];
-	export type SidebarMenuButtonSize = VariantProps<typeof sidebarMenuButtonVariants>["size"];
+	export type SidebarMenuButtonVariant = VariantProps<typeof sidebarMenuButtonVariants>['variant'];
+	export type SidebarMenuButtonSize = VariantProps<typeof sidebarMenuButtonVariants>['size'];
 </script>
 
 <script lang="ts">
-	import * as Tooltip from "$lib/components/ui/tooltip/index.js";
-	import { cn, type WithElementRef, type WithoutChildrenOrChild } from "$lib/utils.js";
-	import { mergeProps } from "bits-ui";
-	import type { ComponentProps, Snippet } from "svelte";
-	import type { HTMLAttributes } from "svelte/elements";
-	import { useSidebar } from "./context.svelte.js";
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { cn, type WithElementRef, type WithoutChildrenOrChild } from '$lib/utils.js';
+	import { mergeProps } from 'bits-ui';
+	import type { ComponentProps, Snippet } from 'svelte';
+	import type { HTMLAttributes } from 'svelte/elements';
+	import { useSidebar } from './context.svelte.js';
 
 	let {
 		ref = $bindable(null),
 		class: className,
 		children,
 		child,
-		variant = "default",
-		size = "default",
+		variant = 'default',
+		size = 'default',
 		isActive = false,
 		tooltipContent,
 		tooltipContentProps,
@@ -58,20 +57,20 @@
 
 	const buttonProps = $derived({
 		class: cn(sidebarMenuButtonVariants({ variant, size }), className),
-		"data-slot": "sidebar-menu-button",
-		"data-sidebar": "menu-button",
-		"data-size": size,
-		"data-active": isActive,
-		...restProps,
+		'data-slot': 'sidebar-menu-button',
+		'data-sidebar': 'menu-button',
+		'data-size': size,
+		'data-active': isActive,
+		...restProps
 	});
 
 	const sidebarTooltipContentProps = $derived({
 		sideOffset: 8,
 		...tooltipContentProps,
 		class: cn(
-			"rounded-lg border border-border/70 bg-popover px-2.5 py-1.5 text-xs text-foreground",
+			'rounded-lg border border-border/70 bg-popover px-2.5 py-1.5 text-xs text-foreground',
 			tooltipContentProps?.class
-		),
+		)
 	});
 </script>
 
@@ -98,10 +97,10 @@
 		<Tooltip.Content
 			side="right"
 			align="center"
-			hidden={sidebar.state !== "collapsed" || sidebar.isMobile}
+			hidden={sidebar.state !== 'collapsed' || sidebar.isMobile}
 			{...sidebarTooltipContentProps}
 		>
-			{#if typeof tooltipContent === "string"}
+			{#if typeof tooltipContent === 'string'}
 				{tooltipContent}
 			{:else if tooltipContent}
 				{@render tooltipContent()}

@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Button, type ButtonProps } from "$lib/components/ui/button/index.js";
-	import { cn } from "$lib/utils";
-	import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-	import { HugeiconsIcon } from "@hugeicons/svelte";
-	import type { Snippet } from "svelte";
-	import { getMessageBranchContext } from "../context/message-context.svelte.js";
+	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
+	import { cn } from '$lib/utils';
+	import { ArrowRight01Icon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import type { Snippet } from 'svelte';
+	import { getMessageBranchContext } from '../context/message-context.svelte.js';
 
-	type MessageButtonProps = Omit<ButtonProps, "children" | "type" | "href">;
+	type MessageButtonProps = Omit<ButtonProps, 'children' | 'type' | 'href'>;
 
 	type Props = MessageButtonProps & {
 		class?: string;
@@ -27,7 +27,7 @@
 	size="icon"
 	type="button"
 	variant="ghost"
-	class={cn("size-7", className)}
+	class={cn('size-7', className)}
 	{...restProps}
 >
 	{#if children}

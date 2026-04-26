@@ -1,11 +1,11 @@
-import Root from "./Artifact.svelte";
-import Header from "./ArtifactHeader.svelte";
-import Close from "./ArtifactClose.svelte";
-import Title from "./ArtifactTitle.svelte";
-import Description from "./ArtifactDescription.svelte";
-import Actions from "./ArtifactActions.svelte";
-import Action from "./ArtifactAction.svelte";
-import Content from "./ArtifactContent.svelte";
+import Root from './Artifact.svelte';
+import Header from './ArtifactHeader.svelte';
+import Close from './ArtifactClose.svelte';
+import Title from './ArtifactTitle.svelte';
+import Description from './ArtifactDescription.svelte';
+import Actions from './ArtifactActions.svelte';
+import Action from './ArtifactAction.svelte';
+import Content from './ArtifactContent.svelte';
 
 export {
 	Root,
@@ -24,5 +24,5 @@ export {
 	Description as ArtifactDescription,
 	Actions as ArtifactActions,
 	Action as ArtifactAction,
-	Content as ArtifactContent,
+	Content as ArtifactContent
 };

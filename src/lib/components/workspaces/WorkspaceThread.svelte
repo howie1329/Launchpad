@@ -299,7 +299,12 @@
 	});
 
 	$effect(() => {
-		if (!pendingAutoStartThreadId || !activeThreadId || !chat || startedThreadId === activeThreadId) {
+		if (
+			!pendingAutoStartThreadId ||
+			!activeThreadId ||
+			!chat ||
+			startedThreadId === activeThreadId
+		) {
 			return;
 		}
 		if (pendingAutoStartThreadId !== activeThreadId) return;

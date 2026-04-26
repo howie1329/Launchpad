@@ -1,7 +1,7 @@
 <script lang="ts" module>
-	import { cn, type WithElementRef } from "$lib/utils";
-	import type { HTMLAttributes } from "svelte/elements";
-	import type { Snippet } from "svelte";
+	import { cn, type WithElementRef } from '$lib/utils';
+	import type { HTMLAttributes } from 'svelte/elements';
+	import type { Snippet } from 'svelte';
 
 	export interface ConversationProps extends WithElementRef<HTMLAttributes<HTMLDivElement>> {
 		children?: Snippet;
@@ -11,13 +11,13 @@
 </script>
 
 <script lang="ts">
-	import { setStickToBottomContext } from "./stick-to-bottom-context.svelte.js";
+	import { setStickToBottomContext } from './stick-to-bottom-context.svelte.js';
 
 	let {
 		class: className,
 		children,
-		initial = "smooth",
-		resize = "smooth",
+		initial = 'smooth',
+		resize = 'smooth',
 		ref = $bindable(null),
 		...restProps
 	}: ConversationProps = $props();
@@ -27,7 +27,7 @@
 
 <div
 	bind:this={ref}
-	class={cn("relative flex h-full flex-col overflow-hidden", className)}
+	class={cn('relative flex h-full flex-col overflow-hidden', className)}
 	role="log"
 	{...restProps}
 >

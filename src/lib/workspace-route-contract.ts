@@ -29,10 +29,7 @@ export function workspaceThreadHref(
 	);
 }
 
-export function workspaceThreadViewHref(args: {
-	threadId: string;
-	withContext?: boolean;
-}) {
+export function workspaceThreadViewHref(args: { threadId: string; withContext?: boolean }) {
 	const p = new URLSearchParams();
 	if (args.withContext) p.set('context', '1');
 	const query = p.toString();

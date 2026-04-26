@@ -33,7 +33,6 @@
 				return Loading03Icon;
 		}
 	}
-
 </script>
 
 {#snippet triggerLeftIcon()}

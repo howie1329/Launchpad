@@ -1,10 +1,10 @@
-import type Supermemory from 'supermemory'
-import type { SearchDocumentsParams } from 'supermemory/resources/search'
-import type { Id } from '../../../convex/_generated/dataModel'
-import { getSupermemoryClient } from './client'
-import { memoryLog } from './log'
-import { projectMemoryContainerTag, userMemoryContainerTag } from './tags'
-import { errorMessage, MEMORY_SEARCH_TIMEOUT_MS, withTimeout } from './fallback'
+import type Supermemory from 'supermemory';
+import type { SearchDocumentsParams } from 'supermemory/resources/search';
+import type { Id } from '../../../convex/_generated/dataModel';
+import { getSupermemoryClient } from './client';
+import { memoryLog } from './log';
+import { projectMemoryContainerTag, userMemoryContainerTag } from './tags';
+import { errorMessage, MEMORY_SEARCH_TIMEOUT_MS, withTimeout } from './fallback';
 
 /** Limit retrieval to Launchpad-owned document kinds (metadata.sourceType). */
 const memorySourceFilter = {
@@ -12,21 +12,21 @@ const memorySourceFilter = {
 		{ key: 'sourceType', value: 'artifact', filterType: 'metadata' as const },
 		{ key: 'sourceType', value: 'user_note', filterType: 'metadata' as const }
 	]
-} satisfies SearchDocumentsParams.Or
+} satisfies SearchDocumentsParams.Or;
 
 export type RetrievedMemory = {
-	documentId: string
-	content: string
-	containerTag: string
-	score: number
-	source: string
-	title?: string
-	artifactId?: string
-	updatedAt?: string
-}
+	documentId: string;
+	content: string;
+	containerTag: string;
+	score: number;
+	source: string;
+	title?: string;
+	artifactId?: string;
+	updatedAt?: string;
+};
 
 function stringMetadata(value: unknown) {
-	return typeof value === 'string' && value.trim() ? value : undefined
+	return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
 async function searchContainer(
@@ -46,7 +46,7 @@ async function searchContainer(
 				filters: memorySourceFilter
 			}),
 			MEMORY_SEARCH_TIMEOUT_MS
-		)
+		);
 
 		return response.results
 			.map((result): RetrievedMemory | null => {
@@ -56,10 +56,10 @@ async function searchContainer(
 						.map((chunk) => chunk.content)
 						.join('\n\n') ||
 					result.summary ||
-					''
-				if (!content.trim()) return null
+					'';
+				if (!content.trim()) return null;
 
-				const metadata = result.metadata ?? {}
+				const metadata = result.metadata ?? {};
 				return {
 					documentId: result.documentId,
 					content,
@@ -69,29 +69,29 @@ async function searchContainer(
 					title: stringMetadata(metadata.title) ?? result.title ?? undefined,
 					artifactId: stringMetadata(metadata.artifactId),
 					updatedAt: result.updatedAt
-				}
+				};
 			})
-			.filter((result): result is RetrievedMemory => result !== null)
+			.filter((result): result is RetrievedMemory => result !== null);
 	} catch (error) {
 		memoryLog('supermemory.retrieval_skipped', {
 			containerTag,
 			error: errorMessage(error)
-		})
-		return []
+		});
+		return [];
 	}
 }
 
 function dedupeMemories(memories: RetrievedMemory[]) {
-	const seen = new Set<string>()
-	const unique: RetrievedMemory[] = []
+	const seen = new Set<string>();
+	const unique: RetrievedMemory[] = [];
 
 	for (const memory of memories) {
-		if (seen.has(memory.documentId)) continue
-		seen.add(memory.documentId)
-		unique.push(memory)
+		if (seen.has(memory.documentId)) continue;
+		seen.add(memory.documentId);
+		unique.push(memory);
 	}
 
-	return unique
+	return unique;
 }
 
 export async function retrieveRelevantMemories({
@@ -99,24 +99,24 @@ export async function retrieveRelevantMemories({
 	projectId,
 	query
 }: {
-	ownerId: Id<'users'> | string
-	projectId?: Id<'projects'> | string
-	query: string
+	ownerId: Id<'users'> | string;
+	projectId?: Id<'projects'> | string;
+	query: string;
 }): Promise<RetrievedMemory[]> {
-	const sm = getSupermemoryClient()
-	const cleanQuery = query.trim()
+	const sm = getSupermemoryClient();
+	const cleanQuery = query.trim();
 
-	if (!sm || !cleanQuery) return []
+	if (!sm || !cleanQuery) return [];
 
 	const searches = [
 		projectId
 			? searchContainer(sm, projectMemoryContainerTag(projectId), cleanQuery, 3)
 			: Promise.resolve([]),
 		searchContainer(sm, userMemoryContainerTag(ownerId), cleanQuery, 2)
-	]
-	const results = await Promise.all(searches)
+	];
+	const results = await Promise.all(searches);
 
 	return dedupeMemories(results.flat())
 		.sort((a, b) => b.score - a.score)
-		.slice(0, 5)
+		.slice(0, 5);
 }

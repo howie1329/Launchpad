@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { Button, type ButtonProps } from "$lib/components/ui/button/index.js";
+	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
 	import {
 		Tooltip,
 		TooltipContent,
 		TooltipProvider,
-		TooltipTrigger,
-	} from "$lib/components/ui/tooltip/index.js";
-	import { cn } from "$lib/utils";
-	import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/svelte";
+		TooltipTrigger
+	} from '$lib/components/ui/tooltip/index.js';
+	import { cn } from '$lib/utils';
+	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
 
 	interface Props extends ButtonProps {
 		class?: string;
 		tooltip?: string;
 		label?: string;
 		icon?: IconSvgElement;
-		size?: ButtonProps["size"];
-		variant?: ButtonProps["variant"];
+		size?: ButtonProps['size'];
+		variant?: ButtonProps['variant'];
 	}
 
 	let {
@@ -24,8 +24,8 @@
 		icon,
 		children,
 		class: className,
-		size = "sm",
-		variant = "ghost",
+		size = 'sm',
+		variant = 'ghost',
 		...restProps
 	}: Props = $props();
 
@@ -34,7 +34,7 @@
 
 {#snippet buttonContent()}
 	<Button
-		class={cn("text-muted-foreground hover:text-foreground size-8 p-0", className)}
+		class={cn('size-8 p-0 text-muted-foreground hover:text-foreground', className)}
 		{size}
 		type="button"
 		{variant}

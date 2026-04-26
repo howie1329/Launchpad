@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { CollapsibleTrigger } from "$lib/components/ui/collapsible/index.js";
-	import { cn } from "$lib/utils";
-	import { ArrowDown01Icon, SearchIcon } from "@hugeicons/core-free-icons";
-	import { HugeiconsIcon } from "@hugeicons/svelte";
-	import { Collapsible as CollapsiblePrimitive } from "bits-ui";
-	import type { Snippet } from "svelte";
+	import { CollapsibleTrigger } from '$lib/components/ui/collapsible/index.js';
+	import { cn } from '$lib/utils';
+	import { ArrowDown01Icon, SearchIcon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import { Collapsible as CollapsiblePrimitive } from 'bits-ui';
+	import type { Snippet } from 'svelte';
 
 	export interface TaskTriggerProps extends CollapsiblePrimitive.TriggerProps {
 		title: string;
@@ -18,13 +18,13 @@
 </script>
 
 {#if children}
-	<CollapsibleTrigger class={cn("group", className)} {...restProps}>
+	<CollapsibleTrigger class={cn('group', className)} {...restProps}>
 		{@render children?.()}
 	</CollapsibleTrigger>
 {:else}
-	<CollapsibleTrigger class={cn("group", className)} {...restProps}>
+	<CollapsibleTrigger class={cn('group', className)} {...restProps}>
 		<div
-			class="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 text-sm transition-colors"
+			class="flex w-full cursor-pointer items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
 		>
 			<HugeiconsIcon icon={SearchIcon} strokeWidth={2} class="size-4" />
 			<p class="text-sm">{title}</p>

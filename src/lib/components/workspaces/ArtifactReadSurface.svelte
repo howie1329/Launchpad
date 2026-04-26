@@ -1,14 +1,14 @@
 <script lang="ts">
-	import ArtifactCodeEditor from '$lib/components/workspaces/ArtifactCodeEditor.svelte'
-	import { getArtifactPreviewStreamdownTheme } from '$lib/streamdown/artifactPreviewTheme'
-	import { cn } from '$lib/utils'
-	import minDark from '@shikijs/themes/min-dark'
-	import minLight from '@shikijs/themes/min-light'
-	import { mode } from 'mode-watcher'
-	import Code from 'svelte-streamdown/code'
-	import MathRenderer from 'svelte-streamdown/math'
-	import Mermaid from 'svelte-streamdown/mermaid'
-	import { Streamdown, type StreamdownProps } from 'svelte-streamdown'
+	import ArtifactCodeEditor from '$lib/components/workspaces/ArtifactCodeEditor.svelte';
+	import { getArtifactPreviewStreamdownTheme } from '$lib/streamdown/artifactPreviewTheme';
+	import { cn } from '$lib/utils';
+	import minDark from '@shikijs/themes/min-dark';
+	import minLight from '@shikijs/themes/min-light';
+	import { mode } from 'mode-watcher';
+	import Code from 'svelte-streamdown/code';
+	import MathRenderer from 'svelte-streamdown/math';
+	import Mermaid from 'svelte-streamdown/mermaid';
+	import { Streamdown, type StreamdownProps } from 'svelte-streamdown';
 
 	let {
 		artifactId,
@@ -18,24 +18,24 @@
 		saveError = '',
 		onChange
 	}: {
-		artifactId: string
-		value: string
-		compact?: boolean
-		readMode: 'editor' | 'preview'
-		saveError?: string
-		onChange: (nextValue: string) => void
-	} = $props()
+		artifactId: string;
+		value: string;
+		compact?: boolean;
+		readMode: 'editor' | 'preview';
+		saveError?: string;
+		onChange: (nextValue: string) => void;
+	} = $props();
 
-	type StreamdownComponents = NonNullable<StreamdownProps['components']>
+	type StreamdownComponents = NonNullable<StreamdownProps['components']>;
 	const streamdownComponents = {
 		code: Code,
 		mermaid: Mermaid,
 		math: MathRenderer
-	} satisfies StreamdownComponents
+	} satisfies StreamdownComponents;
 
-	const streamdownTheme = $derived(mode.current === 'dark' ? 'min-dark' : 'min-light')
+	const streamdownTheme = $derived(mode.current === 'dark' ? 'min-dark' : 'min-light');
 
-	const previewStreamdownTheme = $derived(getArtifactPreviewStreamdownTheme(compact))
+	const previewStreamdownTheme = $derived(getArtifactPreviewStreamdownTheme(compact));
 </script>
 
 <div class="min-h-0 flex-1">
@@ -48,7 +48,7 @@
 	{:else}
 		<div
 			class={cn(
-				'bg-background text-foreground overflow-y-auto px-4 py-3',
+				'overflow-y-auto bg-background px-4 py-3 text-foreground',
 				compact ? 'min-h-[12rem]' : 'min-h-[18rem]'
 			)}
 		>

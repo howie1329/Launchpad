@@ -38,7 +38,7 @@
 		</div>
 	</div>
 {:else}
-	<div class="h-full min-h-0 flex flex-1 flex-col">
+	<div class="flex h-full min-h-0 flex-1 flex-col">
 		<WorkspaceThread />
 	</div>
 {/if}

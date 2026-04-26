@@ -17,7 +17,9 @@
 </script>
 
 <svelte:head>
-	<title>{project.data?.name ? `${project.data.name} | Workspace` : 'Project | Workspace'} | Launchpad</title>
+	<title
+		>{project.data?.name ? `${project.data.name} | Workspace` : 'Project | Workspace'} | Launchpad</title
+	>
 	<meta name="description" content="Project workspace context." />
 </svelte:head>
 

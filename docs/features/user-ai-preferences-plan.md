@@ -4,7 +4,7 @@
 
 Adding one or more text areas under **Settings** so users can inject **custom instructions** into workspace chat is a **reasonable product idea** for Launchpad-style assistants: it lets people encode stable context (role, product, constraints) and stylistic preferences (tone, format) without repeating them every thread.
 
-Whether **two** fields (“memory” + “AI instructions”) is the right split depends on clarity for users and on how you **compose** them in the system prompt. This doc frames the tradeoffs and what to watch for in *this* codebase.
+Whether **two** fields (“memory” + “AI instructions”) is the right split depends on clarity for users and on how you **compose** them in the system prompt. This doc frames the tradeoffs and what to watch for in _this_ codebase.
 
 ---
 
@@ -30,13 +30,11 @@ Whether **two** fields (“memory” + “AI instructions”) is the right split
 
 ## One field vs two (“memory” + “AI instructions”)
 
-
 | Approach            | When it fits                                                                                                                                                                            |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Single textarea** | Simplest mental model; users use headings themselves. Easiest to ship.                                                                                                                  |
 | **Two fields**      | Helps separate **factual context** (“I’m a PM at X, our users are Y”) from **behavior** (“Prefer short answers; ask before suggesting artifacts”). Reduces one blob getting unreadable. |
 | **More than two**   | Usually unnecessary until you have strong analytics showing confusion; consider **presets** or **snippets** later instead.                                                              |
-
 
 **Recommendation**: Two fields is **fine** if the UI explains the split in one sentence each. If you cannot articulate a crisp difference, ship **one** field first and split later based on feedback.
 

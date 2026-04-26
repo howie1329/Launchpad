@@ -194,11 +194,11 @@ Out of scope for phase 1:
 
 ## Risks and mitigations
 
-| Risk | Mitigation |
-| --- | --- |
-| Mobile header regressions break desktop affordances | Implement mobile-specific variants and keep desktop path unchanged behind `md`+ classes |
-| Too many one-off class tweaks | Consolidate repeated patterns into a few shared utility class constants per component area |
-| Context flow confusion on mobile | Prefer one interaction model (sheet or drill-in) and use it consistently |
+| Risk                                                | Mitigation                                                                                 |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Mobile header regressions break desktop affordances | Implement mobile-specific variants and keep desktop path unchanged behind `md`+ classes    |
+| Too many one-off class tweaks                       | Consolidate repeated patterns into a few shared utility class constants per component area |
+| Context flow confusion on mobile                    | Prefer one interaction model (sheet or drill-in) and use it consistently                   |
 
 ## Rollout approach
 

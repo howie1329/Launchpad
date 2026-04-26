@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { CollapsibleTrigger } from "$lib/components/ui/collapsible";
-	import { cn } from "$lib/utils";
-	import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
-	import { HugeiconsIcon } from "@hugeicons/svelte";
+	import { CollapsibleTrigger } from '$lib/components/ui/collapsible';
+	import { cn } from '$lib/utils';
+	import { ArrowDown01Icon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
 
-	import type { Snippet } from "svelte";
+	import type { Snippet } from 'svelte';
 
 	let {
 		class: className,
 		leftIcon,
 		swapIconOnHover = true,
-		children,
+		children
 	}: {
 		class?: string;
 		leftIcon?: Snippet;
@@ -21,14 +21,14 @@
 
 <CollapsibleTrigger
 	class={cn(
-		"group text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center justify-start gap-1 text-sm transition-colors",
+		'group flex w-full cursor-pointer items-center justify-start gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground',
 		className
 	)}
 >
 	<div class="flex items-center gap-2">
 		{#if leftIcon}
 			<span class="relative inline-flex size-4 items-center justify-center">
-				<span class={cn("transition-opacity", swapIconOnHover && "group-hover:opacity-0")}>
+				<span class={cn('transition-opacity', swapIconOnHover && 'group-hover:opacity-0')}>
 					{@render leftIcon()}
 				</span>
 				{#if swapIconOnHover}

@@ -239,18 +239,8 @@ export function toolPartToView(part: unknown): ToolStepView | null {
 	const phase = phaseFromState(state);
 	const toolCallId = typeof p.toolCallId === 'string' ? p.toolCallId : `tool-${toolName}`;
 	const title = toolTitleForName(toolName);
-	const {
-		summary,
-		detailJson,
-		errorText,
-		actionLabel,
-		actionArtifactId,
-		actionVersionNumber
-	} = summarizeTool(
-		toolName,
-		p,
-		phase
-	);
+	const { summary, detailJson, errorText, actionLabel, actionArtifactId, actionVersionNumber } =
+		summarizeTool(toolName, p, phase);
 
 	return {
 		id: toolCallId,

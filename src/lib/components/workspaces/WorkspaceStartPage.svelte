@@ -91,7 +91,9 @@
 	});
 
 	const landingTitle = $derived(
-		projectName.trim() ? `Start a chat in ${projectName.trim()}.` : 'Turn a rough idea into a project.'
+		projectName.trim()
+			? `Start a chat in ${projectName.trim()}.`
+			: 'Turn a rough idea into a project.'
 	);
 	const landingDescription = $derived(
 		projectName.trim()
@@ -100,7 +102,7 @@
 	);
 </script>
 
-<div class="h-full min-h-0 flex flex-1 flex-col" in:fly={pageFlyIn}>
+<div class="flex h-full min-h-0 flex-1 flex-col" in:fly={pageFlyIn}>
 	<WorkspaceChatLanding
 		title={landingTitle}
 		description={landingDescription}

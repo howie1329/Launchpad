@@ -1,17 +1,17 @@
-import Root from "./ModelSelector.svelte";
-import Trigger from "./ModelSelectorTrigger.svelte";
-import Content from "./ModelSelectorContent.svelte";
-import Dialog from "./ModelSelectorDialog.svelte";
-import Input from "./ModelSelectorInput.svelte";
-import List from "./ModelSelectorList.svelte";
-import Empty from "./ModelSelectorEmpty.svelte";
-import Group from "./ModelSelectorGroup.svelte";
-import Item from "./ModelSelectorItem.svelte";
-import Shortcut from "./ModelSelectorShortcut.svelte";
-import Separator from "./ModelSelectorSeparator.svelte";
-import Logo from "./ModelSelectorLogo.svelte";
-import LogoGroup from "./ModelSelectorLogoGroup.svelte";
-import Name from "./ModelSelectorName.svelte";
+import Root from './ModelSelector.svelte';
+import Trigger from './ModelSelectorTrigger.svelte';
+import Content from './ModelSelectorContent.svelte';
+import Dialog from './ModelSelectorDialog.svelte';
+import Input from './ModelSelectorInput.svelte';
+import List from './ModelSelectorList.svelte';
+import Empty from './ModelSelectorEmpty.svelte';
+import Group from './ModelSelectorGroup.svelte';
+import Item from './ModelSelectorItem.svelte';
+import Shortcut from './ModelSelectorShortcut.svelte';
+import Separator from './ModelSelectorSeparator.svelte';
+import Logo from './ModelSelectorLogo.svelte';
+import LogoGroup from './ModelSelectorLogoGroup.svelte';
+import Name from './ModelSelectorName.svelte';
 
 export {
 	Root,
@@ -42,5 +42,5 @@ export {
 	Separator as ModelSelectorSeparator,
 	Logo as ModelSelectorLogo,
 	LogoGroup as ModelSelectorLogoGroup,
-	Name as ModelSelectorName,
+	Name as ModelSelectorName
 };

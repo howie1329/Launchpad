@@ -32,9 +32,11 @@ export function getArtifactPreviewStreamdownTheme(compact: boolean): DeepPartial
 		code: {
 			base: 'my-3 w-full overflow-hidden rounded-lg border border-border/50 flex flex-col',
 			container: 'relative overflow-visible bg-muted/30 p-2 font-mono text-xs',
-			header: 'flex items-center justify-between bg-muted/40 px-2 py-1 text-muted-foreground text-[11px]',
+			header:
+				'flex items-center justify-between bg-muted/40 px-2 py-1 text-muted-foreground text-[11px]',
 			pre: 'overflow-x-auto font-mono p-0 text-xs',
-			skeleton: 'block rounded-md font-mono text-transparent bg-border/50 scale-y-90 animate-pulse whitespace-nowrap'
+			skeleton:
+				'block rounded-md font-mono text-transparent bg-border/50 scale-y-90 animate-pulse whitespace-nowrap'
 		},
 		codespan: { base: 'bg-muted/50 rounded px-1.5 py-0.5 font-mono text-foreground text-[0.9em]' },
 		blockquote: {
@@ -70,5 +72,5 @@ export function getArtifactPreviewStreamdownTheme(compact: boolean): DeepPartial
 			popover:
 				'min-w-[250px] max-w-md fixed z-[1000] max-h-md overflow-y-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-sm'
 		}
-	}
+	};
 }

@@ -41,26 +41,26 @@ Think in conversation threads, persist decisions as markdown artifacts, organize
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | SvelteKit, Svelte 5 (runes), TypeScript |
-| UI | Tailwind CSS v4, shadcn-svelte |
-| Backend | Convex (data, realtime, auth) |
-| Auth | Convex Auth |
-| Client | convex-svelte |
-| AI | Vercel AI SDK, models via Vercel AI Gateway |
-| Artifact Editing | CodeMirror, Streamdown |
-| Search | Tavily SDK (optional) |
-| Memory | Supermemory integration |
+| Layer            | Technology                                  |
+| ---------------- | ------------------------------------------- |
+| Frontend         | SvelteKit, Svelte 5 (runes), TypeScript     |
+| UI               | Tailwind CSS v4, shadcn-svelte              |
+| Backend          | Convex (data, realtime, auth)               |
+| Auth             | Convex Auth                                 |
+| Client           | convex-svelte                               |
+| AI               | Vercel AI SDK, models via Vercel AI Gateway |
+| Artifact Editing | CodeMirror, Streamdown                      |
+| Search           | Tavily SDK (optional)                       |
+| Memory           | Supermemory integration                     |
 
 ---
 
 ## Routes
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Marketing home |
-| `/auth` | Sign in/up |
-| `/workspace` | Main workspace (sidebar, chat, artifacts) |
-| `/workspace/settings` | Timezone, AI cap, usage, activity |
-| `/workspace/artifacts/[artifactId]` | Full-page artifact reader/editor |
+| Route                               | Purpose                                   |
+| ----------------------------------- | ----------------------------------------- |
+| `/`                                 | Marketing home                            |
+| `/auth`                             | Sign in/up                                |
+| `/workspace`                        | Main workspace (sidebar, chat, artifacts) |
+| `/workspace/settings`               | Timezone, AI cap, usage, activity         |
+| `/workspace/artifacts/[artifactId]` | Full-page artifact reader/editor          |
