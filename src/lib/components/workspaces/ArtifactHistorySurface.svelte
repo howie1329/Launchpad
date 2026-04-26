@@ -12,6 +12,7 @@
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import { cn } from '$lib/utils';
 	import type { Id } from '../../../convex/_generated/dataModel';
+	import TestDiffRender from './TestDiffRender.svelte';
 
 	let {
 		artifact,
@@ -45,13 +46,12 @@
 	const canRestoreSelected = $derived(
 		Boolean(selectedVersion && selectedVersion.versionNumber !== artifact.revision)
 	);
-	const hasBodyChanges = $derived.by(
-		() =>
-			Boolean(
-				selectedVersion &&
-					compareBaseVersion &&
-					compareBaseVersion.contentMarkdown !== selectedVersion.contentMarkdown
-			)
+	const hasBodyChanges = $derived.by(() =>
+		Boolean(
+			selectedVersion &&
+			compareBaseVersion &&
+			compareBaseVersion.contentMarkdown !== selectedVersion.contentMarkdown
+		)
 	);
 	function asMarkdownFileName(title: string) {
 		const trimmed = title.trim();
@@ -83,6 +83,13 @@
 	});
 </script>
 
+<div>
+	<TestDiffRender
+		originalContents={compareBaseVersion?.contentMarkdown ?? ''}
+		modifiedContents={selectedVersion?.contentMarkdown ?? ''}
+	/>
+</div>
+
 <div class={compact ? 'space-y-4' : 'space-y-5'}>
 	<div class={compact ? 'space-y-4' : 'grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]'}>
 		<section class="space-y-2">
@@ -100,9 +107,7 @@
 						type="button"
 						class={cn(
 							'w-full rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-							selectedVersion?._id === version._id
-								? 'bg-accent font-medium'
-								: 'hover:bg-accent/50'
+							selectedVersion?._id === version._id ? 'bg-accent font-medium' : 'hover:bg-accent/50'
 						)}
 						onclick={() => onSelectVersion(version._id)}
 					>
@@ -128,7 +133,9 @@
 
 		<section class="min-w-0 space-y-3">
 			{#if selectedVersion}
-				<div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-1 pb-2">
+				<div
+					class="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-1 pb-2"
+				>
 					<div class="space-y-1">
 						<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 							Compare
