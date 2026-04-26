@@ -6,7 +6,7 @@
 	import WorkspaceCommandPalette from '$lib/components/workspaces/WorkspaceCommandPalette.svelte';
 	import WorkspaceTabPicker from '$lib/components/workspaces/WorkspaceTabPicker.svelte';
 	import WorkspaceTabStrip from '$lib/components/workspaces/WorkspaceTabStrip.svelte';
-	import { hrefForWorkspaceTarget, urlToWorkspaceTarget } from '$lib/workspace-tab-target';
+	import { hrefForWorkspaceTarget, urlToWorkspaceTarget } from '$lib/workspace-route-contract';
 	import {
 		addOrActivateWorkspaceTabMutation,
 		getWorkspaceTabStripQuery,
@@ -20,7 +20,7 @@
 		workspaceSettingsHref,
 		workspaceThreadHref,
 		workspaceThreadViewHref
-	} from '$lib/workspace-nav';
+	} from '$lib/workspace-route-contract';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import {
 		createArtifactMutation,
@@ -48,6 +48,11 @@
 	import { createProjectFromThreadMutation, listProjectsQuery } from '$lib/projects';
 	import { deleteProjectMutation, deleteThreadMutation } from '$lib/account-management';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
+	import {
+		isWorkspaceHomePath,
+		isWorkspaceSettingsPath,
+		workspacePathIds
+	} from '$lib/workspace-shell-route-state';
 	import {
 		ArrowLeft01Icon,
 		ArrowRight01Icon,
@@ -107,18 +112,13 @@
 	let deleteNavError = $state('');
 
 	const pathname = $derived($page.url.pathname);
-	const isSettingsActive = $derived(pathname === '/workspace/settings');
-	const routeProjectId = $derived(
-		/^\/workspace\/project\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
-	);
-	const activeThreadId = $derived(
-		/^\/workspace\/thread\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
-	);
-	const activeArtifactId = $derived(
-		/^\/workspace\/artifacts\/([^/]+)/.exec(pathname)?.[1]?.trim() ?? ''
-	);
+	const pathIds = $derived(workspacePathIds(pathname));
+	const isSettingsActive = $derived(isWorkspaceSettingsPath(pathname));
+	const routeProjectId = $derived(pathIds.projectId);
+	const activeThreadId = $derived(pathIds.threadId);
+	const activeArtifactId = $derived(pathIds.artifactId);
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
-	const isNewChatActive = $derived(pathname === '/workspace');
+	const isNewChatActive = $derived(isWorkspaceHomePath(pathname));
 	const projects = useQuery(listProjectsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));

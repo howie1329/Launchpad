@@ -8,7 +8,7 @@
 	import { prefersReducedMotion } from '$lib/prefers-reduced-motion.svelte';
 	import { getSafePostAuthRedirect } from '$lib/safeRedirect';
 	import { markThreadForAutoStart } from '$lib/workspace-thread-start';
-	import { workspaceThreadHref } from '$lib/workspace-nav';
+	import { workspaceThreadHref } from '$lib/workspace-route-contract';
 	import type { Id } from '../../../convex/_generated/dataModel';
 	import { Package01Icon, Target01Icon, TaskDaily01Icon } from '@hugeicons/core-free-icons';
 	import { backOut } from 'svelte/easing';

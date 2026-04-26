@@ -1,6 +1,6 @@
 import { v } from 'convex/values'
 
-/** Canonical workspace destination; matches URL routing in `src/lib/workspace-nav.ts`. */
+/** Canonical workspace destination; matches URL routing in `src/lib/workspace-route-contract.ts`. */
 export const workspaceTabTarget = v.union(
 	v.object({ kind: v.literal('home') }),
 	v.object({ kind: v.literal('settings') }),

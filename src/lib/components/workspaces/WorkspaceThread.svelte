@@ -88,7 +88,7 @@
 		truncateMessagesAfterUserMessage
 	} from '$lib/workspace-chat-message-actions';
 	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
-	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-nav';
+	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
 	import {
 		ArrowDown01Icon,
 		ArrowUp01Icon,
