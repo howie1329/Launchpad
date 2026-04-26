@@ -17,6 +17,7 @@ This folder is organized by intent so product, engineering, and research docs ar
 - [Chat-first Launchpad PRD](./features/chat-first-launchpad-prd.md)
 - [Artifact version history PRD](./features/artifact-version-history-prd.md)
 - [Diffs full replacement PRD](./features/diffs-full-replacement-prd.md)
+- [Artifact history diff rendering fix plan](./features/artifact-history-diff-rendering-fix-plan.md)
 - [Supermemory integration PRD](./features/supermemory-integration-prd.md)
 - [User-created artifacts and project-wide mentions PRD](./features/user-created-artifacts-project-wide-mentions-prd.md)
 - [User AI preferences plan](./features/user-ai-preferences-plan.md)

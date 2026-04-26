@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { FileDiff, type FileContents, type FileDiffMetadata } from '@pierre/diffs';
+	import {
+		FileDiff,
+		parseDiffFromFile,
+		type FileContents,
+		type FileDiffMetadata
+	} from '@pierre/diffs';
 	import { mode } from 'mode-watcher';
 	import { onDestroy } from 'svelte';
 
@@ -34,7 +39,6 @@
 		disableLineNumbers: true,
 		overflow: 'wrap' as const,
 		lineDiffType: 'word' as const,
-		expandUnchanged: true,
 		collapsedContextThreshold: compact ? 4 : 8,
 		expansionLineCount: compact ? 3 : 6,
 		unsafeCSS: `
@@ -72,6 +76,20 @@
 		return { oldFile, newFile };
 	}
 
+	function buildFileDiffMetadata(fallbackFiles: { oldFile: FileContents; newFile: FileContents } | null) {
+		if (patch) return patch;
+		if (!fallbackFiles) return null;
+
+		try {
+			return parseDiffFromFile(fallbackFiles.oldFile, fallbackFiles.newFile, {
+				context: compact ? 2 : 3
+			});
+		} catch (error) {
+			console.error('Failed to parse artifact diff metadata', error);
+			return null;
+		}
+	}
+
 	function renderDiff() {
 		if (!containerEl) return;
 
@@ -79,13 +97,9 @@
 		fileDiff.setOptions(renderOptions);
 
 		const fallbackFiles = buildFallbackFiles();
+		const fileDiffMetadata = buildFileDiffMetadata(fallbackFiles);
 		fileDiff.render({
-			fileDiff: patch,
-			...(patch
-				? {}
-				: fallbackFiles
-					? { oldFile: fallbackFiles.oldFile, newFile: fallbackFiles.newFile }
-					: {}),
+			...(fileDiffMetadata ? { fileDiff: fileDiffMetadata } : {}),
 			fileContainer: containerEl
 		});
 	}

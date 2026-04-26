@@ -43,6 +43,14 @@
 	const canRestoreSelected = $derived(
 		Boolean(selectedVersion && selectedVersion.versionNumber !== artifact.revision)
 	);
+	const hasBodyChanges = $derived.by(
+		() =>
+			Boolean(
+				selectedVersion &&
+					compareBaseVersion &&
+					compareBaseVersion.contentMarkdown !== selectedVersion.contentMarkdown
+			)
+	);
 </script>
 
 <div class={compact ? 'space-y-4' : 'space-y-5'}>
@@ -163,15 +171,25 @@
 						</div>
 					{/if}
 
-					<div class={compact ? 'min-h-[14rem]' : 'min-h-[20rem]'}>
-						{#key `${selectedVersion._id}-${compareBaseVersion._id}`}
-							<ArtifactDiffRendererDiffs
-								original={compareBaseVersion.contentMarkdown}
-								modified={selectedVersion.contentMarkdown}
-								{compact}
-							/>
-						{/key}
-					</div>
+					{#if hasBodyChanges}
+						<div class={compact ? 'min-h-[14rem]' : 'min-h-[20rem]'}>
+							{#key `${selectedVersion._id}-${compareBaseVersion._id}`}
+								<ArtifactDiffRendererDiffs
+									original={compareBaseVersion.contentMarkdown}
+									modified={selectedVersion.contentMarkdown}
+									{compact}
+								/>
+							{/key}
+						</div>
+					{:else}
+						<div class="rounded-md border border-border/60 bg-background px-3 py-3">
+							<p class="text-sm font-medium text-foreground">No body changes</p>
+							<p class="mt-1 text-xs leading-5 text-muted-foreground">
+								Version {selectedVersion.versionNumber} and version
+								{compareBaseVersion.versionNumber} have identical body content.
+							</p>
+						</div>
+					{/if}
 				{:else}
 					<div class="rounded-md border border-border/60 bg-background px-3 py-3">
 						<p class="text-sm font-medium text-foreground">No earlier version to compare</p>
