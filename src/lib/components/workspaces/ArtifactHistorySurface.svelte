@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { parseDiffFromFile, type FileContents } from '@pierre/diffs';
 	import type { ArtifactVersion, SavedArtifact } from '$lib/artifacts';
 	import {
 		artifactVersionActorLabel,
@@ -12,7 +11,6 @@
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import { cn } from '$lib/utils';
 	import type { Id } from '../../../convex/_generated/dataModel';
-	import TestDiffRender from './TestDiffRender.svelte';
 
 	let {
 		artifact,
@@ -58,37 +56,7 @@
 		if (!trimmed) return 'artifact.md';
 		return trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
 	}
-
-	const bodyDiffMetadata = $derived.by(() => {
-		if (!selectedVersion || !compareBaseVersion || !hasBodyChanges) return null;
-		const oldFile: FileContents = {
-			name: asMarkdownFileName(compareBaseVersion.title),
-			contents: compareBaseVersion.contentMarkdown,
-			lang: 'markdown',
-			cacheKey: compareBaseVersion._id
-		};
-		const newFile: FileContents = {
-			name: asMarkdownFileName(selectedVersion.title),
-			contents: selectedVersion.contentMarkdown,
-			lang: 'markdown',
-			cacheKey: selectedVersion._id
-		};
-
-		try {
-			return parseDiffFromFile(oldFile, newFile, { context: compact ? 2 : 3 });
-		} catch (error) {
-			console.error('Failed to parse artifact history diff metadata', error);
-			return null;
-		}
-	});
 </script>
-
-<div>
-	<TestDiffRender
-		originalContents={compareBaseVersion?.contentMarkdown ?? ''}
-		modifiedContents={selectedVersion?.contentMarkdown ?? ''}
-	/>
-</div>
 
 <div class={compact ? 'space-y-4' : 'space-y-5'}>
 	<div class={compact ? 'space-y-4' : 'grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]'}>
@@ -234,7 +202,6 @@
 						<div class={cn(compact ? 'min-h-[14rem]' : 'min-h-[20rem]', 'pt-1')}>
 							{#key `${selectedVersion._id}-${compareBaseVersion._id}`}
 								<ArtifactDiffRendererDiffs
-									patch={bodyDiffMetadata ?? undefined}
 									original={compareBaseVersion.contentMarkdown}
 									modified={selectedVersion.contentMarkdown}
 									oldFileName={asMarkdownFileName(compareBaseVersion.title)}
