@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FileDiff, type FileContents } from '@pierre/diffs';
+	import { FileDiff, parseDiffFromFile, type FileContents } from '@pierre/diffs';
 	import { mode } from 'mode-watcher';
 	import { onDestroy } from 'svelte';
 
@@ -52,6 +52,16 @@
 		contents: modified,
 		lang: 'markdown'
 	});
+	const parsedDiff = $derived(
+		parseDiffFromFile(
+			oldFile,
+			newFile,
+			{
+				context: compact ? 2 : 3
+			},
+			true
+		)
+	);
 
 	function renderDiff() {
 		if (!containerEl) return;
@@ -59,8 +69,7 @@
 		fileDiff.setOptions(renderOptions);
 
 		fileDiff.render({
-			oldFile,
-			newFile,
+			fileDiff: parsedDiff,
 			containerWrapper: containerEl
 		});
 	}
@@ -73,6 +82,7 @@
 		void compact;
 		void diffStyle;
 		void themeType;
+		void parsedDiff;
 		if (!containerEl) return;
 		renderDiff();
 	});

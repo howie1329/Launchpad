@@ -58,10 +58,18 @@
 	}
 </script>
 
-<div class={compact ? 'space-y-4' : 'space-y-5'}>
-	<div class={compact ? 'space-y-4' : 'grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]'}>
-		<section class="space-y-2">
-			<div class="px-1">
+<div class={compact ? 'space-y-4' : 'min-h-[calc(100vh-8rem)]'}>
+	<div
+		class={compact
+			? 'space-y-4'
+			: 'grid min-h-[calc(100vh-8rem)] overflow-hidden rounded-md border border-border bg-background lg:grid-cols-[17rem_minmax(0,1fr)]'}
+	>
+		<section
+			class={compact
+				? 'space-y-2'
+				: 'min-h-0 border-b border-border bg-muted/10 p-4 lg:border-r lg:border-b-0'}
+		>
+			<div class={compact ? 'px-1' : ''}>
 				<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 					Version history
 				</p>
@@ -69,13 +77,15 @@
 					Every saved artifact edit becomes a version you can compare or restore.
 				</p>
 			</div>
-			<div class="space-y-1">
+			<div class={compact ? 'space-y-1' : 'mt-5 space-y-2'}>
 				{#each versions as version (version._id)}
 					<button
 						type="button"
 						class={cn(
-							'w-full rounded-md px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-							selectedVersion?._id === version._id ? 'bg-accent font-medium' : 'hover:bg-accent/50'
+							'w-full rounded-md border px-3 py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+							selectedVersion?._id === version._id
+								? 'border-foreground/50 bg-background font-medium shadow-sm'
+								: 'border-border/70 bg-background/70 hover:bg-accent/50'
 						)}
 						onclick={() => onSelectVersion(version._id)}
 					>
@@ -99,10 +109,13 @@
 			</div>
 		</section>
 
-		<section class="min-w-0 space-y-3">
+		<section class={compact ? 'min-w-0 space-y-3' : 'min-w-0 overflow-hidden p-4'}>
 			{#if selectedVersion}
 				<div
-					class="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 px-1 pb-2"
+					class={cn(
+						'flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-3',
+						compact ? 'px-1' : ''
+					)}
 				>
 					<div class="space-y-1">
 						<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
@@ -117,7 +130,7 @@
 					</div>
 
 					<div class="flex flex-wrap items-center gap-2">
-						<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
+						<div class="inline-flex items-center rounded-md border border-border/70 bg-background p-0.5">
 							<Button
 								type="button"
 								size="sm"
@@ -144,7 +157,7 @@
 						<NativeSelect
 							value={compareBaseValue}
 							size="sm"
-							class="min-w-44"
+							class="min-w-36 sm:min-w-44"
 							disabled={compareBaseOptions.length === 0}
 							onchange={(event) => {
 								const target = event.currentTarget as HTMLSelectElement;
@@ -166,7 +179,7 @@
 							type="button"
 							variant="ghost"
 							size="sm"
-							class="h-8 px-3 text-xs"
+							class="h-8 px-2.5 text-xs sm:px-3"
 							disabled={!canRestoreSelected || restoringVersionId === selectedVersion._id}
 							onclick={() => onRestore(selectedVersion._id)}
 						>
@@ -177,7 +190,7 @@
 
 				{#if compareBaseVersion}
 					{#if compareBaseVersion.title !== selectedVersion.title}
-						<div class="border-b border-border/50 px-1 pb-3">
+						<div class="border-b border-border/50 py-3">
 							<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
 								Title change
 							</p>
@@ -199,7 +212,7 @@
 					{/if}
 
 					{#if hasBodyChanges}
-						<div class={cn(compact ? 'min-h-[14rem]' : 'min-h-[20rem]', 'pt-1')}>
+						<div class={cn(compact ? 'min-h-[14rem]' : 'min-h-[28rem]', 'pt-4')}>
 							{#key `${selectedVersion._id}-${compareBaseVersion._id}`}
 								<ArtifactDiffRendererDiffs
 									original={compareBaseVersion.contentMarkdown}
@@ -212,7 +225,7 @@
 							{/key}
 						</div>
 					{:else}
-						<div class="px-1 py-2">
+						<div class="py-4">
 							<p class="text-sm font-medium text-foreground">No body changes</p>
 							<p class="mt-1 text-xs leading-5 text-muted-foreground">
 								Version {selectedVersion.versionNumber} and version
@@ -221,7 +234,7 @@
 						</div>
 					{/if}
 				{:else}
-					<div class="px-1 py-2">
+					<div class="py-4">
 						<p class="text-sm font-medium text-foreground">No earlier version to compare</p>
 						<p class="mt-1 text-xs leading-5 text-muted-foreground">
 							Version {selectedVersion.versionNumber} is the first saved version for this artifact.
