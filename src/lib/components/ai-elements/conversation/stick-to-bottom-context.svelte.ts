@@ -3,11 +3,11 @@ import {
 	useIntersectionObserver,
 	useMutationObserver,
 	useResizeObserver,
-	watch,
-} from "runed";
-import { setContext, getContext } from "svelte";
+	watch
+} from 'runed';
+import { setContext, getContext } from 'svelte';
 
-const STICK_TO_BOTTOM_CONTEXT_KEY = Symbol("stick-to-bottom-context");
+const STICK_TO_BOTTOM_CONTEXT_KEY = Symbol('stick-to-bottom-context');
 
 class StickToBottomContext {
 	#element: HTMLElement | null = $state(null);
@@ -28,7 +28,7 @@ class StickToBottomContext {
 			isAtBottom: this.#isAtBottom,
 			userHasScrolled: this.#userHasScrolled,
 			hasElement: !!this.#element,
-			hasSentinel: !!this.#sentinel,
+			hasSentinel: !!this.#sentinel
 		};
 	}
 
@@ -44,8 +44,8 @@ class StickToBottomContext {
 			}
 		);
 
-		useEventListener(() => this.#element, "scroll", this.#handleScroll, {
-			passive: true,
+		useEventListener(() => this.#element, 'scroll', this.#handleScroll, {
+			passive: true
 		});
 
 		useIntersectionObserver(
@@ -60,17 +60,20 @@ class StickToBottomContext {
 			},
 			{
 				threshold: 0,
-				root: () => this.#element,
+				root: () => this.#element
 			}
 		);
 
-		useResizeObserver(() => this.#element, () => {
-			// Check position after resize
-			this.#checkScrollPosition();
-			if (this.#isAtBottom && !this.#userHasScrolled) {
-				this.scrollToBottom("auto");
+		useResizeObserver(
+			() => this.#element,
+			() => {
+				// Check position after resize
+				this.#checkScrollPosition();
+				if (this.#isAtBottom && !this.#userHasScrolled) {
+					this.scrollToBottom('auto');
+				}
 			}
-		});
+		);
 
 		useMutationObserver(
 			() => this.#element,
@@ -86,14 +89,14 @@ class StickToBottomContext {
 
 					// Auto-scroll if conditions were met
 					if (shouldAutoScroll) {
-						this.scrollToBottom("smooth");
+						this.scrollToBottom('smooth');
 					}
 				});
 			},
 			{
 				childList: true,
 				subtree: true,
-				characterData: true,
+				characterData: true
 			}
 		);
 	}
@@ -102,13 +105,13 @@ class StickToBottomContext {
 		this.#element = element;
 	}
 
-	scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+	scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
 		if (!this.#element) return;
 
 		this.#userHasScrolled = false; // Reset user scroll flag when programmatically scrolling
 		this.#element.scrollTo({
 			top: this.#element.scrollHeight,
-			behavior,
+			behavior
 		});
 	};
 
@@ -134,12 +137,12 @@ class StickToBottomContext {
 	#createSentinel() {
 		if (!this.#element) return;
 
-		this.#sentinel = document.createElement("div");
-		this.#sentinel.style.height = "1px";
-		this.#sentinel.style.width = "100%";
-		this.#sentinel.style.pointerEvents = "none";
-		this.#sentinel.style.opacity = "0";
-		this.#sentinel.setAttribute("data-stick-to-bottom-sentinel", "");
+		this.#sentinel = document.createElement('div');
+		this.#sentinel.style.height = '1px';
+		this.#sentinel.style.width = '100%';
+		this.#sentinel.style.pointerEvents = 'none';
+		this.#sentinel.style.opacity = '0';
+		this.#sentinel.setAttribute('data-stick-to-bottom-sentinel', '');
 
 		// Append to the end of the scrollable content, not positioned absolutely
 		this.#element.appendChild(this.#sentinel);
@@ -173,7 +176,7 @@ export function setStickToBottomContext(): StickToBottomContext {
 export function getStickToBottomContext(): StickToBottomContext {
 	const context = getContext<StickToBottomContext>(STICK_TO_BOTTOM_CONTEXT_KEY);
 	if (!context) {
-		throw new Error("StickToBottomContext must be used within a Conversation component");
+		throw new Error('StickToBottomContext must be used within a Conversation component');
 	}
 	return context;
 }

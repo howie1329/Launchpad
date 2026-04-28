@@ -1,4 +1,4 @@
-export type IdeaAiModelProvider = 'gateway' | 'openrouter' | 'groq';
+export type IdeaAiModelProvider = 'gateway' | 'openrouter' | 'groq' | 'nim';
 
 type BaseIdeaModel = {
 	label: string;
@@ -31,7 +31,15 @@ type GroqIdeaModel = BaseIdeaModel & {
 	groqModel: string;
 };
 
-export type IdeaAiModel = GatewayIdeaModel | OpenRouterIdeaModel | GroqIdeaModel;
+type NimIdeaModel = BaseIdeaModel & {
+	provider: 'nim';
+	/** Stable catalog id; avoids collisions with other providers. */
+	id: `nm:${string}`;
+	/** NVIDIA NIM API model slug (e.g. deepseek-ai/deepseek-r1). */
+	nimModel: string;
+};
+
+export type IdeaAiModel = GatewayIdeaModel | OpenRouterIdeaModel | GroqIdeaModel | NimIdeaModel;
 
 export const ideaAiModels: readonly IdeaAiModel[] = [
 	{
@@ -114,8 +122,16 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		maxContextTokens: 128_000,
 		inputCostPerMillionTokens: 0.05,
 		outputCostPerMillionTokens: 0.08
+	},
+	{
+		id: 'nm:moonshotai/kimi-k2-thinking',
+		label: 'NIM Kimi K2 Thinking',
+		provider: 'nim',
+		nimModel: 'moonshotai/kimi-k2-thinking',
+		maxContextTokens: 128_000,
+		inputCostPerMillionTokens: 0.8,
+		outputCostPerMillionTokens: 2.4
 	}
-
 ] as const satisfies readonly IdeaAiModel[];
 
 export type IdeaAiModelId = (typeof ideaAiModels)[number]['id'];
@@ -142,9 +158,16 @@ export function isGroqIdeaModel(model: IdeaAiModel): model is GroqIdeaModel {
 	return model.provider === 'groq';
 }
 
-export function getModelSelectorLogoProvider(model: IdeaAiModel): 'vercel' | 'openrouter' | 'groq' {
+export function isNimIdeaModel(model: IdeaAiModel): model is NimIdeaModel {
+	return model.provider === 'nim';
+}
+
+export function getModelSelectorLogoProvider(
+	model: IdeaAiModel
+): 'vercel' | 'openrouter' | 'groq' | 'nvidia' {
 	if (model.provider === 'openrouter') return 'openrouter';
 	if (model.provider === 'groq') return 'groq';
+	if (model.provider === 'nim') return 'nvidia';
 	return 'vercel';
 }
 
@@ -152,7 +175,8 @@ export function getModelSelectorLogoProvider(model: IdeaAiModel): 'vercel' | 'op
 export const ideaAiModelProviderCopy: Record<IdeaAiModelProvider, string> = {
 	gateway: 'Vercel AI Gateway',
 	openrouter: 'OpenRouter',
-	groq: 'Groq'
+	groq: 'Groq',
+	nim: 'NVIDIA NIM'
 };
 
 export function listIdeaModelsByProvider(provider: IdeaAiModelProvider): readonly IdeaAiModel[] {

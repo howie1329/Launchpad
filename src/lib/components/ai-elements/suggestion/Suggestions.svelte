@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
-	import { cn } from "$lib/utils";
-	import type { Snippet } from "svelte";
+	import { ScrollArea } from '$lib/components/ui/scroll-area/index.js';
+	import { cn } from '$lib/utils';
+	import type { Snippet } from 'svelte';
 
 	interface Props {
 		children?: Snippet;
 		class?: string;
-		orientation?: "vertical" | "horizontal" | "both";
+		orientation?: 'vertical' | 'horizontal' | 'both';
 		scrollbarXClasses?: string;
 		scrollbarYClasses?: string;
 	}
@@ -14,7 +14,7 @@
 	let {
 		children,
 		class: className,
-		orientation = "horizontal",
+		orientation = 'horizontal',
 		scrollbarXClasses,
 		scrollbarYClasses,
 		...restProps
@@ -28,7 +28,7 @@
 	class="w-full whitespace-nowrap"
 	{...restProps}
 >
-	<div class={cn("flex w-max flex-nowrap items-center gap-2", className)}>
+	<div class={cn('flex w-max flex-nowrap items-center gap-2', className)}>
 		{@render children?.()}
 	</div>
 </ScrollArea>

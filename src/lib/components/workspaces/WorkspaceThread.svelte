@@ -8,10 +8,8 @@
 		linkArtifactToThreadMutation,
 		listMentionableArtifactsQuery,
 		listThreadArtifactsQuery,
-		listThreadDraftChangesQuery,
 		type MentionableArtifact
 	} from '$lib/artifacts';
-	import { draftStatItems, draftSummaryText } from '$lib/artifact-review';
 	import {
 		buildOutgoingUserMessageWithTokens,
 		formatArtifactMentionToken,
@@ -73,12 +71,12 @@
 	import {
 		defaultIdeaAiModelId,
 		getModelSelectorLogoProvider,
-		ideaAiModelProviderCopy,
 		ideaAiModels,
 		isIdeaAiModelId,
 		listIdeaModelsByProvider,
 		type IdeaAiModelId
 	} from '$lib/idea-ai-models';
+	import { ideaAiModelProviderGroups } from '$lib/idea-ai-model-selector';
 	import {
 		assistantSegmentsHaveContent,
 		buildAssistantSegments
@@ -87,8 +85,11 @@
 	import {
 		buildAssistantMessageCopyText,
 		buildUserMessageCopyText,
-		truncateMessagesAfterUserMessage
+		truncateMessagesAfterUserMessage,
+		uiMessageText
 	} from '$lib/workspace-chat-message-actions';
+	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
+	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
 	import {
 		ArrowDown01Icon,
 		ArrowUp01Icon,
@@ -119,7 +120,6 @@
 	let copiedMessageId = $state('');
 	let copyToastClear: ReturnType<typeof setTimeout> | 0 = 0;
 	let contextArtifactId = $state('');
-	let contextDraftChangeId = $state<Id<'artifactDraftChanges'> | null>(null);
 	let lastThreadIdForContext = $state('');
 	let contextSearch = $state('');
 	let contextTypeFilter = $state('all');
@@ -134,11 +134,10 @@
 	let mentionHighlight = $state(0);
 	/** Composer chips (persisted as trailing @artifact: lines on send) */
 	let mentionChips = $state<Array<{ id: string; title: string }>>([]);
+	let pendingAutoStartThreadId = $state('');
 
-	const activeThreadId = $derived($page.url.searchParams.get('thread')?.trim() ?? '');
-	const activeProjectId = $derived($page.url.searchParams.get('project')?.trim() ?? '');
+	const activeThreadId = $derived($page.params.threadId?.trim() ?? '');
 	const contextPanelOpen = $derived($page.url.searchParams.get('context') === '1');
-	const startRequested = $derived($page.url.searchParams.get('start') === '1');
 	const selectedModel = $derived(
 		ideaAiModels.find((model) => model.id === selectedModelId) ?? ideaAiModels[0]
 	);
@@ -153,11 +152,6 @@
 			: 'skip'
 	);
 	const mentionableArtifacts = useQuery(listMentionableArtifactsQuery, () =>
-		auth.isAuthenticated && activeThreadId
-			? { threadId: activeThreadId as Id<'chatThreads'> }
-			: 'skip'
-	);
-	const threadDraftChanges = useQuery(listThreadDraftChangesQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
 			: 'skip'
@@ -196,14 +190,6 @@
 
 		return rows;
 	});
-	const sortedThreadDraftChanges = $derived(
-		threadDraftChanges.data
-			? [...threadDraftChanges.data].sort(
-					(a, b) => b.draftChange.createdAt - a.draftChange.createdAt
-				)
-			: []
-	);
-
 	const mentionListboxId = $derived(
 		activeThreadId
 			? `workspace-thread-mention-listbox-${activeThreadId}`
@@ -246,7 +232,7 @@
 		Boolean((composerText.trim() || mentionChips.length > 0) && chat && !isChatBusy)
 	);
 	const contextText = $derived(
-		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
+		`${chat?.messages.map((message) => uiMessageText(message)).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
 	);
 	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4));
 	const artifactMentionPill =
@@ -267,7 +253,6 @@
 		if (activeThreadId !== lastThreadIdForContext) {
 			lastThreadIdForContext = activeThreadId;
 			contextArtifactId = '';
-			contextDraftChangeId = null;
 		}
 	});
 
@@ -307,12 +292,29 @@
 	});
 
 	$effect(() => {
-		if (!startRequested || !activeThreadId || !chat || startedThreadId === activeThreadId) return;
+		if (!activeThreadId) {
+			pendingAutoStartThreadId = '';
+			return;
+		}
+		pendingAutoStartThreadId = consumeThreadAutoStart(activeThreadId) ? activeThreadId : '';
+	});
+
+	$effect(() => {
+		if (
+			!pendingAutoStartThreadId ||
+			!activeThreadId ||
+			!chat ||
+			startedThreadId === activeThreadId
+		) {
+			return;
+		}
+		if (pendingAutoStartThreadId !== activeThreadId) return;
 		if (!threadMessages.data || threadMessages.data.length !== 1) return;
 		if (chat.status !== 'ready') return;
 
 		startedThreadId = activeThreadId;
-		void startInitialChat(activeThreadId);
+		pendingAutoStartThreadId = '';
+		void startInitialChat();
 	});
 
 	const focusComposer = () => {
@@ -513,21 +515,18 @@
 		return 'Could not send this message. Please try again.';
 	}
 
-	const openThreadArtifact = async (
-		artifactId: string,
-		draftChangeId?: Id<'artifactDraftChanges'>
-	) => {
+	const openThreadArtifact = async (artifactId: string) => {
 		if (contextPanelOpen) {
 			contextArtifactId = artifactId;
-			contextDraftChangeId = draftChangeId ?? null;
 			return;
 		}
 
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
-
 		await goto(
 			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(activeThreadId)}&context=1` as `/workspace?${string}`
+				workspaceThreadViewHref({
+					threadId: activeThreadId,
+					withContext: true
+				}) as `/workspace/thread/${string}?${string}`
 			),
 			{
 				noScroll: true,
@@ -535,12 +534,10 @@
 			}
 		);
 		contextArtifactId = artifactId;
-		contextDraftChangeId = draftChangeId ?? null;
 	};
 
 	const closeThreadArtifact = () => {
 		contextArtifactId = '';
-		contextDraftChangeId = null;
 	};
 
 	function createChat(threadId: string, messages: UIMessage[]) {
@@ -567,29 +564,13 @@
 		});
 	}
 
-	async function startInitialChat(threadId: string) {
+	async function startInitialChat() {
 		try {
-			await removeStartParam(threadId);
 			await chat?.sendMessage();
 		} catch (error) {
 			console.error(error);
 			chatError = 'Could not start the assistant response. Please try again.';
 		}
-	}
-
-	async function removeStartParam(threadId: string) {
-		const projectQuery = activeProjectId ? `project=${encodeURIComponent(activeProjectId)}&` : '';
-
-		await goto(
-			resolve(
-				`/workspace?${projectQuery}thread=${encodeURIComponent(threadId)}` as `/workspace?${string}`
-			),
-			{
-				replaceState: true,
-				noScroll: true,
-				keepFocus: true
-			}
-		);
 	}
 
 	async function persistMessages(threadId: string, messages: UIMessage[]): Promise<boolean> {
@@ -636,8 +617,7 @@
 			copiedMessageId = message.id;
 			scheduleCopiedReset();
 		} catch {
-			chatError =
-				'Could not copy to the clipboard. Check browser permissions and try again.';
+			chatError = 'Could not copy to the clipboard. Check browser permissions and try again.';
 		}
 	}
 
@@ -666,15 +646,10 @@
 				threadId: activeThreadId as Id<'chatThreads'>,
 				messageId
 			});
-			const projectQuery = activeProjectId
-				? `project=${encodeURIComponent(activeProjectId)}&`
-				: '';
-			await goto(
-				resolve(
-					`/workspace?${projectQuery}thread=${encodeURIComponent(threadId)}` as `/workspace?${string}`
-				),
-				{ noScroll: true, keepFocus: true }
-			);
+			await goto(resolve(workspaceThreadHref(threadId) as `/workspace/thread/${string}`), {
+				noScroll: true,
+				keepFocus: true
+			});
 		} catch (error) {
 			console.error(error);
 			chatError = 'Could not fork this thread. Try again.';
@@ -699,9 +674,7 @@
 		}
 	}
 
-	const showStreamFailure = $derived(
-		Boolean(chatError) || chat?.status === 'error'
-	);
+	const showStreamFailure = $derived(Boolean(chatError) || chat?.status === 'error');
 
 	function authHeaders(): Record<string, string> {
 		if (!auth.token) return {};
@@ -725,14 +698,6 @@
 		} catch {
 			// Non-blocking; sidebar keeps placeholder until next visit or retry.
 		}
-	}
-
-	function messageText(message: UIMessage) {
-		return message.parts
-			.filter((part) => part.type === 'text')
-			.map((part) => part.text)
-			.join('\n')
-			.trim();
 	}
 
 	function assistantAwaitingStreamContent(
@@ -867,7 +832,7 @@
 													<p class="text-xs text-muted-foreground">No response yet.</p>
 												{/if}
 											{:else}
-												{@const composed = parseComposedUserMessage(messageText(message))}
+												{@const composed = parseComposedUserMessage(uiMessageText(message))}
 												<div class="flex w-full min-w-0 flex-col gap-2">
 													{#if composed.artifactIds.length > 0}
 														<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
@@ -895,21 +860,15 @@
 											allowRetry={auth.isAuthenticated}
 											allowFork={auth.isAuthenticated}
 											disabled={isChatBusy || !auth.isAuthenticated}
-											copyDisabled={
-												!(
-													message.role === 'user'
-														? buildUserMessageCopyText(message)
-														: buildAssistantMessageCopyText(message)
-												)
-											}
+											copyDisabled={!(message.role === 'user'
+												? buildUserMessageCopyText(message)
+												: buildAssistantMessageCopyText(message))}
 											copied={copiedMessageId === message.id}
 											onCopy={() => void copyMessageDisplay(message)}
 											onFork={() => void forkFromMessage(message.id)}
-											onRetry={
-												message.role === 'user'
-													? () => void retryFromUserMessage(message.id)
-													: undefined
-											}
+											onRetry={message.role === 'user'
+												? () => void retryFromUserMessage(message.id)
+												: undefined}
 										/>
 									</Message>
 								{/each}
@@ -941,7 +900,6 @@
 						<WorkspaceArtifactReader
 							artifact={selectedContextArtifact}
 							compact
-							initialSelectedDraftChangeId={contextDraftChangeId}
 							onBack={closeThreadArtifact}
 						/>
 					{:else}
@@ -996,65 +954,6 @@
 									<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
 								{:else}
 									<div class="space-y-3">
-										{#if threadDraftChanges.error}
-											<p class="px-2 py-1.5 text-xs text-destructive">
-												{threadDraftChanges.error.message}
-											</p>
-										{:else if threadDraftChanges.data === undefined}
-											<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading drafts...</p>
-										{:else if sortedThreadDraftChanges.length > 0}
-											<div class="space-y-1">
-												<p
-													class="px-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase"
-												>
-													Pending drafts
-												</p>
-												{#each sortedThreadDraftChanges as item (item.draftChange._id)}
-													<button
-														type="button"
-														class="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-														onclick={() =>
-															openThreadArtifact(item.artifact._id, item.draftChange._id)}
-													>
-														<div class="flex items-center justify-between gap-2">
-															<span class="truncate text-xs font-medium tracking-tight">
-																{item.draftChange.proposedTitle}
-															</span>
-															<span
-																class={cn(
-																	'shrink-0 text-[10px]',
-																	item.draftChange.isStale
-																		? 'text-destructive'
-																		: 'text-muted-foreground'
-																)}
-															>
-																{item.draftChange.isStale ? 'Stale' : 'Draft'}
-															</span>
-														</div>
-														<span class="line-clamp-2 text-[11px] leading-4 text-muted-foreground">
-															{draftSummaryText(item.draftChange)}
-														</span>
-														{#if draftStatItems(item.draftChange).length > 0}
-															<div class="flex flex-wrap gap-1">
-																{#each draftStatItems(item.draftChange) as stat, index (`${stat}-${index}`)}
-																	<span
-																		class="rounded-full border border-border/60 bg-muted/20 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-																	>
-																		{stat}
-																	</span>
-																{/each}
-															</div>
-														{/if}
-														{#if item.draftChange.isStale && item.draftChange.staleReason}
-															<span class="text-[11px] leading-4 text-destructive">
-																{item.draftChange.staleReason}
-															</span>
-														{/if}
-													</button>
-												{/each}
-											</div>
-										{/if}
-
 										{#if threadArtifacts.data.length === 0}
 											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
 												No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
@@ -1299,42 +1198,20 @@
 											/>
 											<ModelSelectorList>
 												<ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.gateway}>
-													{#each listIdeaModelsByProvider('gateway') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="vercel" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.openrouter}>
-													{#each listIdeaModelsByProvider('openrouter') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="openrouter" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
-												<ModelSelectorGroup heading={ideaAiModelProviderCopy.groq}>
-													{#each listIdeaModelsByProvider('groq') as model (model.id)}
-														<ModelSelectorItem
-															value={model.id}
-															data-checked={selectedModelId === model.id}
-															onclick={() => selectModel(model.id)}
-														>
-															<ModelSelectorLogo provider="groq" class="shrink-0" />
-															<ModelSelectorName>{model.label}</ModelSelectorName>
-														</ModelSelectorItem>
-													{/each}
-												</ModelSelectorGroup>
+												{#each ideaAiModelProviderGroups as group (group.provider)}
+													<ModelSelectorGroup heading={group.heading}>
+														{#each listIdeaModelsByProvider(group.provider) as model (model.id)}
+															<ModelSelectorItem
+																value={model.id}
+																data-checked={selectedModelId === model.id}
+																onclick={() => selectModel(model.id)}
+															>
+																<ModelSelectorLogo provider={group.logoProvider} class="shrink-0" />
+																<ModelSelectorName>{model.label}</ModelSelectorName>
+															</ModelSelectorItem>
+														{/each}
+													</ModelSelectorGroup>
+												{/each}
 											</ModelSelectorList>
 										</ModelSelectorContent>
 									</ModelSelector>
@@ -1374,6 +1251,15 @@
 				</div>
 			{/snippet}
 
+			{#snippet chatColumn()}
+				<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+					<div class="min-h-0 min-w-0 flex-1">
+						{@render threadConversation()}
+					</div>
+					{@render threadComposer()}
+				</div>
+			{/snippet}
+
 			<div
 				class="flex min-h-0 flex-1 flex-col"
 				in:fly|local={threadReadyIn}
@@ -1381,20 +1267,10 @@
 			>
 				{#if !contextPanelOpen || !mediaMinLg}
 					{#if !contextPanelOpen}
-						<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-							<div class="min-h-0 min-w-0 flex-1">
-								{@render threadConversation()}
-							</div>
-							{@render threadComposer()}
-						</div>
+						{@render chatColumn()}
 					{:else}
 						<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-							<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-								<div class="min-h-0 min-w-0 flex-1">
-									{@render threadConversation()}
-								</div>
-								{@render threadComposer()}
-							</div>
+							{@render chatColumn()}
 							{@render threadContextAside(
 								'max-h-[min(44vh,25rem)] w-full shrink-0 border-t border-border/50'
 							)}
@@ -1407,12 +1283,7 @@
 						class="min-h-0 w-full flex-1 overflow-hidden"
 					>
 						<Pane defaultSize={60} minSize={15} class="flex min-h-0 min-w-0 flex-col">
-							<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-								<div class="min-h-0 min-w-0 flex-1">
-									{@render threadConversation()}
-								</div>
-								{@render threadComposer()}
-							</div>
+							{@render chatColumn()}
 						</Pane>
 						<Handle withHandle />
 						<Pane defaultSize={40} minSize={15} maxSize={90} class="flex min-h-0 min-w-0 flex-col">

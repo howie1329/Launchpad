@@ -3,6 +3,7 @@
 ## Overview
 
 This plan implements 3 features:
+
 1. **Account Management** - Reset and Delete Account in Danger Zone
 2. **Landing Page CTA** - Show "Go to Launchpad" when already signed in
 3. **Sidebar Deletion Menus** - Three-dot menus for projects and threads
@@ -40,14 +41,15 @@ This plan implements 3 features:
 #### 1.1 Backend - Convex Mutations
 
 **Files to create:**
+
 - `src/convex/accountManagement.ts` - Mutations for reset and delete
 
 **Mutations:**
 
-| Mutation | Description |
-|----------|-------------|
-| `resetAccount` | Wipe all user data (userSettings, projects, chatThreads, chatMessages, artifacts, threadArtifactLinks, artifactDraftChanges, aiUsageEvents, aiDailyUsage, activityEvents, memorySyncs). Keep users table entry. Return success. |
-| `deleteAccount` | Same as reset + delete from users table. Log out + redirect to landing. |
+| Mutation        | Description                                                                                                                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resetAccount`  | Wipe all user data (userSettings, projects, chatThreads, chatMessages, artifacts, artifactVersions, threadArtifactLinks, aiUsageEvents, aiDailyUsage, activityEvents, memorySyncs). Keep users table entry. Return success. |
+| `deleteAccount` | Same as reset + delete from users table. Log out + redirect to landing.                                                                                                                                                     |
 
 **Queries needed:**
 | Query | Description |
@@ -59,16 +61,19 @@ This plan implements 3 features:
 **File:** `src/routes/workspace/settings/+page.svelte`
 
 **Add at bottom:**
+
 - Separator
 - "Danger Zone" section with two buttons in red/destructive style:
   - "Reset Account" button → opens ResetConfirmDialog
   - "Delete Account" button → opens DeleteConfirmDialog
 
 **Dialogs:** Two dialog components (or single component with props):
+
 - ResetConfirmDialog: Warning text + Cancel + Confirm button
 - DeleteConfirmDialog: Warning text + Cancel + Confirm button
 
 **State:**
+
 - `resetDialogOpen: boolean`
 - `deleteDialogOpen: boolean`
 - `isResetting: boolean`
@@ -77,6 +82,7 @@ This plan implements 3 features:
 - `deleteError: string`
 
 **Actions:**
+
 - On Reset confirm → call `resetAccount` mutation → on success, invalidate queries (refetch data)
 - On Delete confirm → call `deleteAccount` mutation → on success, sign out → redirect to /
 
@@ -89,9 +95,11 @@ This plan implements 3 features:
 **File:** `src/routes/+page.svelte`
 
 **Current logic:**
+
 - Uses `AuthControls` component which shows "Sign out" when authenticated
 
 **Changes to AuthControls:**
+
 - File: `src/lib/components/AuthControls.svelte`
 - Add prop: `signedInCta?: string` (default: "Go to Launchpad")
 - Add prop: `signedInHref?: string` (default: "/workspace")
@@ -100,6 +108,7 @@ This plan implements 3 features:
 **OR** modify landing page directly to check auth state and show different button:
 
 **Landing page changes:**
+
 - Import auth state
 - If authenticated: show Button with href="/workspace" and label "Go to Launchpad"
 - If not authenticated: show "Sign in" button (current behavior)
@@ -114,10 +123,10 @@ This plan implements 3 features:
 
 **Mutations:**
 
-| Mutation | Description |
-|----------|-------------|
+| Mutation        | Description                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `deleteProject` | Delete project + cascade delete all linked threads + delete all artifacts (via projectId and via sourceThreadId for each thread's artifacts) |
-| `deleteThread` | Delete thread + delete all linked messages + delete all linked artifacts + delete threadArtifactLinks |
+| `deleteThread`  | Delete thread + delete all linked messages + delete all linked artifacts + delete threadArtifactLinks                                        |
 
 **Note:** Since 1:1 assumption (artifacts belong to single thread), cascade is straightforward.
 
@@ -126,16 +135,19 @@ This plan implements 3 features:
 **File:** `src/routes/workspace/+layout.svelte`
 
 **Add to project item:**
+
 - Three-dot menu button (MoreHorizontal icon from Hugeicons)
 - Dropdown menu with "Delete project" item
 - On click → open confirmation dialog
 
 **Add to thread item:**
+
 - Three-dot menu button
 - Dropdown menu with "Delete thread" item
 - On click → open confirmation dialog
 
 **Dialogs:**
+
 - `projectDeleteDialogOpen: boolean`
 - `projectToDelete: { id: string; name: string } | null`
 - `threadDeleteDialogOpen: boolean`
@@ -144,6 +156,7 @@ This plan implements 3 features:
 - `isDeletingThread: boolean`
 
 **Styling:**
+
 - Three-dot menu: use shadcn dropdown-menu or popover
 - Destructive/red styling for delete actions
 
@@ -151,19 +164,20 @@ This plan implements 3 features:
 
 ## File Summary
 
-| File | Change | Description |
-|------|--------|-------------|
-| `src/convex/accountManagement.ts` | Create | Convex mutations for reset, delete, deleteProject, deleteThread |
-| `src/routes/workspace/settings/+page.svelte` | Modify | Add Danger Zone section with reset/delete buttons and dialogs |
-| `src/lib/components/AuthControls.svelte` | Modify | Add signedInCta prop for custom label when authenticated |
-| `src/routes/+page.svelte` | Modify | Use AuthControls with signedInCta="Go to Launchpad" |
-| `src/routes/workspace/+layout.svelte` | Modify | Add three-dot menus to projects and threads in sidebar |
+| File                                         | Change | Description                                                     |
+| -------------------------------------------- | ------ | --------------------------------------------------------------- |
+| `src/convex/accountManagement.ts`            | Create | Convex mutations for reset, delete, deleteProject, deleteThread |
+| `src/routes/workspace/settings/+page.svelte` | Modify | Add Danger Zone section with reset/delete buttons and dialogs   |
+| `src/lib/components/AuthControls.svelte`     | Modify | Add signedInCta prop for custom label when authenticated        |
+| `src/routes/+page.svelte`                    | Modify | Use AuthControls with signedInCta="Go to Launchpad"             |
+| `src/routes/workspace/+layout.svelte`        | Modify | Add three-dot menus to projects and threads in sidebar          |
 
 ---
 
 ## Acceptance Criteria
 
 ### Account Reset
+
 - [ ] User clicks "Reset Account" in Danger Zone
 - [ ] Confirmation dialog appears with warning text
 - [ ] User clicks "Confirm reset"
@@ -172,6 +186,7 @@ This plan implements 3 features:
 - [ ] Workspace reflects empty state
 
 ### Account Delete
+
 - [ ] User clicks "Delete Account" in Danger Zone
 - [ ] Confirmation dialog appears with warning text
 - [ ] User clicks "Confirm delete"
@@ -181,11 +196,13 @@ This plan implements 3 features:
 - [ ] Redirected to landing page
 
 ### Landing Page CTA
+
 - [ ] When user is already signed in and visits /
 - [ ] Button shows "Go to Launchpad" (not "Sign out")
 - [ ] Clicking button navigates to /workspace
 
 ### Project Deletion
+
 - [ ] Projects show three-dot menu in sidebar
 - [ ] Clicking menu shows "Delete project" option
 - [ ] Clicking "Delete project" shows confirmation dialog
@@ -193,6 +210,7 @@ This plan implements 3 features:
 - [ ] Sidebar updates to reflect deletion
 
 ### Thread Deletion
+
 - [ ] Threads show three-dot menu in sidebar
 - [ ] Clicking menu shows "Delete thread" option
 - [ ] Clicking "Delete thread" shows confirmation dialog

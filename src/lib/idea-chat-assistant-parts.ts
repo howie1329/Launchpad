@@ -10,6 +10,9 @@ export type ToolStepView = {
 	summary: string;
 	detailJson: string;
 	errorText?: string;
+	actionLabel?: string;
+	actionArtifactId?: string;
+	actionVersionNumber?: number;
 };
 
 export type ChoiceCardOption = {
@@ -31,36 +34,29 @@ export type AssistantSegment =
 	| { kind: 'tools'; tools: ToolStepView[] }
 	| { kind: 'choice'; choice: ChoiceCardView };
 
-const WORKSPACE_TOOL_TITLES: Record<string, string> = {
-	listThreadArtifacts: 'List thread artifacts',
-	readThreadArtifact: 'Read thread artifact',
-	listProjectArtifacts: 'List project artifacts',
-	importProjectArtifactToThread: 'Use project artifact',
-	createIdeaArtifact: 'Save idea artifact',
-	createPrdArtifact: 'Save PRD artifact',
-	createProjectFromThread: 'Promote chat to project',
-	proposeArtifactEdit: 'Draft artifact changes',
-	requestUserChoice: 'Choose next step',
-	tavilySearch: 'Search web',
-	tavilyExtract: 'Read web pages'
-};
-
-const WORKSPACE_RUNNING_SUMMARIES: Record<string, string> = {
-	listThreadArtifacts: 'Checking thread artifacts…',
-	readThreadArtifact: 'Reading artifact…',
-	listProjectArtifacts: 'Checking project artifacts…',
-	importProjectArtifactToThread: 'Adding artifact to this chat…',
-	createIdeaArtifact: 'Saving idea artifact…',
-	createPrdArtifact: 'Saving PRD artifact…',
-	createProjectFromThread: 'Promoting chat to project…',
-	proposeArtifactEdit: 'Drafting artifact changes…',
-	requestUserChoice: 'Preparing choices…',
-	tavilySearch: 'Searching the web…',
-	tavilyExtract: 'Reading source pages…'
+const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = {
+	listThreadArtifacts: { title: 'List thread artifacts', running: 'Checking thread artifacts…' },
+	readThreadArtifact: { title: 'Read thread artifact', running: 'Reading artifact…' },
+	listProjectArtifacts: { title: 'List project artifacts', running: 'Checking project artifacts…' },
+	importProjectArtifactToThread: {
+		title: 'Use project artifact',
+		running: 'Adding artifact to this chat…'
+	},
+	createIdeaArtifact: { title: 'Save idea artifact', running: 'Saving idea artifact…' },
+	createPrdArtifact: { title: 'Save PRD artifact', running: 'Saving PRD artifact…' },
+	createProjectFromThread: {
+		title: 'Promote chat to project',
+		running: 'Promoting chat to project…'
+	},
+	updateThreadArtifact: { title: 'Update artifact', running: 'Updating artifact…' },
+	requestUserChoice: { title: 'Choose next step', running: 'Preparing choices…' },
+	tavilySearch: { title: 'Search web', running: 'Searching the web…' },
+	tavilyExtract: { title: 'Read web pages', running: 'Reading source pages…' }
 };
 
 function toolTitleForName(toolName: string): string {
-	if (WORKSPACE_TOOL_TITLES[toolName]) return WORKSPACE_TOOL_TITLES[toolName];
+	const meta = WORKSPACE_TOOL_META[toolName];
+	if (meta) return meta.title;
 	return toolName
 		.replace(/([A-Z])/g, ' $1')
 		.replace(/^./, (s) => s.toUpperCase())
@@ -96,7 +92,14 @@ function summarizeTool(
 	toolName: string,
 	part: Record<string, unknown>,
 	phase: ToolStepPhase
-): { summary: string; detailJson: string; errorText?: string } {
+): {
+	summary: string;
+	detailJson: string;
+	errorText?: string;
+	actionLabel?: string;
+	actionArtifactId?: string;
+	actionVersionNumber?: number;
+} {
 	if (phase === 'error' && typeof part.errorText === 'string') {
 		return {
 			summary: 'Something went wrong.',
@@ -114,10 +117,11 @@ function summarizeTool(
 			detailJson: JSON.stringify(part, null, 2)
 		};
 	}
-	if (WORKSPACE_TOOL_TITLES[toolName]) {
+	const meta = WORKSPACE_TOOL_META[toolName];
+	if (meta) {
 		if (phase === 'running') {
 			return {
-				summary: WORKSPACE_RUNNING_SUMMARIES[toolName] ?? 'Running…',
+				summary: meta.running,
 				detailJson: JSON.stringify({ input: part.input }, null, 2)
 			};
 		}
@@ -138,14 +142,21 @@ function summarizeTool(
 function summarizeWorkspaceTool(
 	toolName: string,
 	output: unknown
-): { summary: string; detailJson: string } {
+): {
+	summary: string;
+	detailJson: string;
+	actionLabel?: string;
+	actionArtifactId?: string;
+	actionVersionNumber?: number;
+} {
 	const detailJson = JSON.stringify(output ?? {}, null, 2);
 	const out = output && typeof output === 'object' ? (output as Record<string, unknown>) : {};
 	const title = typeof out.title === 'string' ? out.title : '';
 	const name = typeof out.name === 'string' ? out.name : '';
-	const artifactTitle = typeof out.artifactTitle === 'string' ? out.artifactTitle : '';
 	const artifacts = Array.isArray(out.artifacts) ? out.artifacts : null;
 	const results = Array.isArray(out.results) ? out.results : null;
+	const artifactId = typeof out.artifactId === 'string' ? out.artifactId : '';
+	const versionNumber = typeof out.versionNumber === 'number' ? out.versionNumber : null;
 
 	switch (toolName) {
 		case 'tavilySearch':
@@ -191,12 +202,17 @@ function summarizeWorkspaceTool(
 				detailJson
 			};
 		}
-		case 'proposeArtifactEdit':
+		case 'updateThreadArtifact':
 			return {
-				summary: artifactTitle
-					? `Drafted changes for ${artifactTitle}. Review before applying.`
-					: 'Drafted artifact changes for review.',
-				detailJson
+				summary: title ? `Updated ${title}.` : 'Updated artifact.',
+				detailJson,
+				...(artifactId && versionNumber !== null
+					? {
+							actionLabel: 'View changes',
+							actionArtifactId: artifactId,
+							actionVersionNumber: versionNumber
+						}
+					: {})
 			};
 		case 'requestUserChoice': {
 			const question = typeof out.question === 'string' ? out.question : '';
@@ -217,7 +233,8 @@ export function toolPartToView(part: unknown): ToolStepView | null {
 	const phase = phaseFromState(state);
 	const toolCallId = typeof p.toolCallId === 'string' ? p.toolCallId : `tool-${toolName}`;
 	const title = toolTitleForName(toolName);
-	const { summary, detailJson, errorText } = summarizeTool(toolName, p, phase);
+	const { summary, detailJson, errorText, actionLabel, actionArtifactId, actionVersionNumber } =
+		summarizeTool(toolName, p, phase);
 
 	return {
 		id: toolCallId,
@@ -226,7 +243,10 @@ export function toolPartToView(part: unknown): ToolStepView | null {
 		phase,
 		summary,
 		detailJson,
-		errorText
+		errorText,
+		...(actionLabel ? { actionLabel } : {}),
+		...(actionArtifactId ? { actionArtifactId } : {}),
+		...(actionVersionNumber !== undefined ? { actionVersionNumber } : {})
 	};
 }
 

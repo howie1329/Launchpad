@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import {
-		deleteAccountMutation,
-		resetAccountMutation
-	} from '$lib/account-management';
+	import { deleteAccountMutation, resetAccountMutation } from '$lib/account-management';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import { listMyActivityEventsQuery } from '$lib/activity';
 	import { Button } from '$lib/components/ui/button';
@@ -166,12 +163,10 @@
 				return 'Promoted a thread into a project';
 			case 'artifact_created':
 				return artifactType ? `Created an artifact (${artifactType})` : 'Created an artifact';
-			case 'draft_proposed':
-				return 'Proposed changes';
-			case 'draft_applied':
-				return 'Applied changes';
-			case 'draft_discarded':
-				return 'Discarded changes';
+			case 'artifact_updated':
+				return 'Updated an artifact';
+			case 'artifact_restored':
+				return 'Restored an artifact version';
 			default:
 				return eventType;
 		}
@@ -423,10 +418,20 @@
 			<p class="text-xs text-destructive">{resetError}</p>
 		{/if}
 		<Dialog.Footer>
-			<Button type="button" variant="secondary" size="sm" disabled={isResetting} onclick={() => (resetDialogOpen = false)}
-				>Cancel</Button
+			<Button
+				type="button"
+				variant="secondary"
+				size="sm"
+				disabled={isResetting}
+				onclick={() => (resetDialogOpen = false)}>Cancel</Button
 			>
-			<Button type="button" variant="destructive" size="sm" disabled={isResetting} onclick={confirmReset}>
+			<Button
+				type="button"
+				variant="destructive"
+				size="sm"
+				disabled={isResetting}
+				onclick={confirmReset}
+			>
 				{isResetting ? 'Resetting…' : 'Confirm reset'}
 			</Button>
 		</Dialog.Footer>
@@ -438,8 +443,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Delete account</Dialog.Title>
 			<Dialog.Description>
-				This permanently deletes your workspace and your account, then signs you out. This cannot
-				be undone. You can register again with the same email.
+				This permanently deletes your workspace and your account, then signs you out. This cannot be
+				undone. You can register again with the same email.
 			</Dialog.Description>
 		</Dialog.Header>
 		{#if deleteError}
@@ -453,7 +458,13 @@
 				disabled={isDeleting}
 				onclick={() => (deleteDialogOpen = false)}>Cancel</Button
 			>
-			<Button type="button" variant="destructive" size="sm" disabled={isDeleting} onclick={confirmDelete}>
+			<Button
+				type="button"
+				variant="destructive"
+				size="sm"
+				disabled={isDeleting}
+				onclick={confirmDelete}
+			>
 				{isDeleting ? 'Deleting…' : 'Confirm delete'}
 			</Button>
 		</Dialog.Footer>

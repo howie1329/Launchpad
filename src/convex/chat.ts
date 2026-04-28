@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import { PLACEHOLDER_THREAD_TITLE } from '../lib/thread-title';
 import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
-import { logActivityEvent } from './activityHelpers'
+import { logActivityEvent } from './activityHelpers';
 import { mutation, query } from './_generated/server';
 import type { Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
@@ -76,7 +76,7 @@ export const createThread = mutation({
 				...(args.modelId ? { modelId: args.modelId } : {})
 			},
 			occurredAtMs: now
-		})
+		});
 
 		return { threadId };
 	}

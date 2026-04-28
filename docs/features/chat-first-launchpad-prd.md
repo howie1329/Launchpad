@@ -1,10 +1,13 @@
 # Product Positioning
+
 Launchpad is a chat-first workspace for builders who turn raw pain points into scoped software projects. Chat is the primary interface; structured artifacts are persistent workspace memory created and refined from the conversation.
 
 # Problem Statement
+
 Today’s workflow still feels tool-first: users pick “ideas” or “PRD tools” before they know what they’re building. That creates friction, fragmented context, and duplicate work.
 
 Why the old model fails:
+
 - It forces early structure before the idea is mature.
 - It treats artifacts as destinations instead of outputs of reasoning.
 - It mixes thread context and project memory in ways that make AI responses noisy.
@@ -13,9 +16,11 @@ Why the old model fails:
 The target user needs one continuous loop: think in chat, capture decisions as artifacts, promote when ready, and continue with stronger context.
 
 # Solution
+
 Launchpad will center the product on persistent chat sessions with linked, editable artifacts.
 
 Core model:
+
 - Users can start in a **general chat** with no project attached.
 - From chat, users can create a **Loose Idea** artifact.
 - From a loose idea or chat, users can generate a **PRD** (including MVP scope and test scenarios).
@@ -23,17 +28,20 @@ Core model:
 - Inside a project, chats are **project-scoped** and load project context by default.
 
 Artifacts are not passive files:
+
 - Artifacts are directly editable.
 - AI can create new artifacts from chat.
 - AI can suggest updates to existing artifacts, but saved content changes only through draft-then-apply.
 
 Thread UI stays focused:
+
 - A thread shows artifacts created or referenced in that thread.
 - It does not automatically dump every artifact from the project.
 - Project memory remains available through a project artifact sidebar.
 - Users explicitly bring project artifacts into thread context via actions like “Attach to chat” or “Import to context.”
 
 # Core UX Principles
+
 1. **Chat is primary**: every meaningful action starts from or returns to chat.
 2. **Memory is structured**: artifacts are durable workspace memory, not transient assistant output.
 3. **Context is explicit**: project-level memory exists globally, thread-level context is scoped intentionally.
@@ -41,7 +49,9 @@ Thread UI stays focused:
 5. **MVP is narrow**: optimize for one strong loop over broad feature coverage.
 
 # MVP Scope
+
 In scope for v1:
+
 - Persistent chat threads in two modes:
   - General (no project)
   - Project-scoped
@@ -70,10 +80,12 @@ In scope for v1:
 - Direct manual editing of artifacts.
 
 Not included in MVP scope definition:
+
 - Additional first-class artifact types beyond Loose Idea and PRD.
 - Any automation framework, web research, or workflow execution engine.
 
 # Primary User Flows
+
 1. **Start from a new chat**
    - User opens New Chat (general).
    - User describes a pain point.
@@ -106,6 +118,7 @@ Not included in MVP scope definition:
    - AI suggestions to existing artifacts appear as draft changes; user applies or discards.
 
 # User Stories
+
 1. As a builder, I can start with an unstructured pain point in chat so I can think before organizing.
 2. As a builder, I can save promising threads as loose ideas without creating a project too early.
 3. As a builder, I can generate an editable PRD from chat so I can move from exploration to execution quickly.
@@ -114,6 +127,7 @@ Not included in MVP scope definition:
 6. As a builder, I can accept or reject AI-proposed edits so my saved docs do not change unexpectedly.
 
 # Data / Domain Model
+
 - **ChatThread**
   - `id`, `title`, `scopeType` (`general` | `project`), optional `projectId`, timestamps
 - **Message**
@@ -128,12 +142,14 @@ Not included in MVP scope definition:
   - `artifactId`, proposed patch/content, status (`pending` | `applied` | `discarded`), timestamps
 
 Relationship rules:
+
 - A loose idea is an artifact with no `projectId`.
 - Promoting creates a Project and links existing artifacts via `projectId` (no forced duplication).
 - Project chats have `scopeType=project` and a `projectId`.
 - Thread context is derived from ThreadArtifactLink + explicit imports.
 
 # Key Interaction Rules
+
 1. **Thread artifact visibility rule**
    - Show in a thread only artifacts that were:
      - created in that thread,
@@ -171,7 +187,9 @@ Relationship rules:
    - No live web research, autonomous workflows, or long-running background agents.
 
 # Testing Decisions
+
 Focus tests on product behavior:
+
 - Chat scope behavior:
   - General chat does not load project context.
   - Project chat loads baseline project context.
@@ -191,6 +209,7 @@ Focus tests on product behavior:
   - PRD creation includes all required sections.
 
 # Out of Scope
+
 - Live web browsing, competitor scraping, or automated external research.
 - Workflow SDK, background jobs, or long-running agent orchestration.
 - Multi-user collaboration, comments, permissions, or workspace admin.
@@ -199,5 +218,6 @@ Focus tests on product behavior:
 - Generic non-software project planning.
 
 # Open Questions
+
 1. Should project baseline context include full PRD text by default, or a compressed summary + on-demand section retrieval?
 2. Should one project have a single canonical PRD in v1, or allow multiple PRDs per project from day one?

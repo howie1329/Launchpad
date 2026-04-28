@@ -1,7 +1,7 @@
 <script lang="ts">
-	import * as Command from "$lib/components/ui/command/index.js";
-	import type { Command as CommandPrimitive } from "bits-ui";
-	import type { WithoutChildrenOrChild } from "$lib/utils.js";
+	import * as Command from '$lib/components/ui/command/index.js';
+	import type { Command as CommandPrimitive } from 'bits-ui';
+	import type { WithoutChildrenOrChild } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),

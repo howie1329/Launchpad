@@ -8,9 +8,9 @@
 
 	let tokensFormatted = $derived.by(() => {
 		return tokens === undefined
-			? "—"
-			: new Intl.NumberFormat("en-US", {
-					notation: "compact",
+			? '—'
+			: new Intl.NumberFormat('en-US', {
+					notation: 'compact'
 				}).format(tokens);
 	});
 </script>
@@ -18,6 +18,6 @@
 <span>
 	{tokensFormatted}
 	{#if costText}
-		<span class="text-muted-foreground ml-2">• {costText}</span>
+		<span class="ml-2 text-muted-foreground">• {costText}</span>
 	{/if}
 </span>

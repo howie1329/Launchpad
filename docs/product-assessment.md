@@ -12,20 +12,20 @@ Launchpad is a chat-first workspace for solo builders to turn rough ideas into s
 
 ## What's Built — Core ✓
 
-| Feature | Status |
-|---------|--------|
-| Threads + chat | Core ✓ |
-| Artifacts (markdown) | Core ✓ |
-| Projects (org) | Core ✓ |
-| AI spend cap | Core ✓ |
-| Supermemory | Core — user modeling over time |
-| Full-page editor | Core ✓ (manual write, AI assists via chat) |
+| Feature              | Status                                     |
+| -------------------- | ------------------------------------------ |
+| Threads + chat       | Core ✓                                     |
+| Artifacts (markdown) | Core ✓                                     |
+| Projects (org)       | Core ✓                                     |
+| AI spend cap         | Core ✓                                     |
+| Supermemory          | Core — user modeling over time             |
+| Full-page editor     | Core ✓ (manual write, AI assists via chat) |
 
 ---
 
 ## What's Over-Built — Remove
 
-- **`artifactDraftChanges` table**: Schema has diff tracking, draft approval. You said C (direct edit) — remove this table.
+- **Split artifact editing model**: If artifacts still use separate draft-review concepts, consolidate them into direct writes plus version history.
 - **`threadArtifactLinks.reason` field**: Tracks "created, referenced, imported" — this is noise. Just link artifact to thread.
 
 ---
@@ -41,6 +41,6 @@ Launchpad is a chat-first workspace for solo builders to turn rough ideas into s
 ## Summary
 
 - **Core identity**: Matches your vision ✓
-- **Remove**: artifactDraftChanges table, threadArtifactLinks.reason
+- **Remove**: leftover draft-review plumbing, threadArtifactLinks.reason
 - **Add**: export, templates, version history
 - **You're closer to done than you think** — gap is polish/export, not big picture

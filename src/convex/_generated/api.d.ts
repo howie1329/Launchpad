@@ -11,7 +11,6 @@
 import type * as accountManagement from "../accountManagement.js";
 import type * as activity from "../activity.js";
 import type * as activityHelpers from "../activityHelpers.js";
-import type * as artifactDiffs from "../artifactDiffs.js";
 import type * as artifacts from "../artifacts.js";
 import type * as auth from "../auth.js";
 import type * as authHelpers from "../authHelpers.js";
@@ -35,7 +34,6 @@ declare const fullApi: ApiFromModules<{
   accountManagement: typeof accountManagement;
   activity: typeof activity;
   activityHelpers: typeof activityHelpers;
-  artifactDiffs: typeof artifactDiffs;
   artifacts: typeof artifacts;
   auth: typeof auth;
   authHelpers: typeof authHelpers;

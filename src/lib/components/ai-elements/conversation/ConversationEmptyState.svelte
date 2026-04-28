@@ -1,7 +1,7 @@
 <script lang="ts" module>
-	import { cn, type WithElementRef } from "$lib/utils";
-	import type { HTMLAttributes } from "svelte/elements";
-	import type { Snippet } from "svelte";
+	import { cn, type WithElementRef } from '$lib/utils';
+	import type { HTMLAttributes } from 'svelte/elements';
+	import type { Snippet } from 'svelte';
 
 	export interface ConversationEmptyStateProps extends WithElementRef<
 		HTMLAttributes<HTMLDivElement>
@@ -16,8 +16,8 @@
 <script lang="ts">
 	let {
 		class: className,
-		title = "No messages yet",
-		description = "Start a conversation to see messages here",
+		title = 'No messages yet',
+		description = 'Start a conversation to see messages here',
 		icon,
 		children,
 		ref = $bindable(null),
@@ -27,10 +27,7 @@
 
 <div
 	bind:this={ref}
-	class={cn(
-		"flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
-		className
-	)}
+	class={cn('flex size-full flex-col items-center justify-center gap-3 p-8 text-center', className)}
 	{...restProps}
 >
 	{#if children}
@@ -44,7 +41,7 @@
 		<div class="space-y-1">
 			<h3 class="text-sm font-medium">{title}</h3>
 			{#if description}
-				<p class="text-muted-foreground text-sm">{description}</p>
+				<p class="text-sm text-muted-foreground">{description}</p>
 			{/if}
 		</div>
 	{/if}

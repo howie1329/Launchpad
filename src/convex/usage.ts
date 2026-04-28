@@ -1,11 +1,11 @@
-import { v } from 'convex/values'
-import { ideaAiModels } from '../lib/idea-ai-models'
-import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers'
-import { dateKeyForMs } from './dateKey'
-import { getUserTimeZone } from './activityHelpers'
-import { mutation, query } from './_generated/server'
+import { v } from 'convex/values';
+import { ideaAiModels } from '../lib/idea-ai-models';
+import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
+import { dateKeyForMs } from './dateKey';
+import { getUserTimeZone } from './activityHelpers';
+import { mutation, query } from './_generated/server';
 
-const DEFAULT_DAILY_AI_CAP_USD = 0.5
+const DEFAULT_DAILY_AI_CAP_USD = 0.5;
 
 const modelCostsPerMillionTokens = Object.fromEntries(
 	ideaAiModels.map((model) => [
@@ -15,28 +15,28 @@ const modelCostsPerMillionTokens = Object.fromEntries(
 			output: model.outputCostPerMillionTokens
 		}
 	])
-)
+);
 
 function estimateCostUsd(params: {
-	modelId: string
-	inputTokens?: number
-	outputTokens?: number
-	reasoningTokens?: number
-	cachedInputTokens?: number
+	modelId: string;
+	inputTokens?: number;
+	outputTokens?: number;
+	reasoningTokens?: number;
+	cachedInputTokens?: number;
 }) {
-	const cost = modelCostsPerMillionTokens[params.modelId]
-	if (!cost) return 0
+	const cost = modelCostsPerMillionTokens[params.modelId];
+	if (!cost) return 0;
 
-	const inputTokens = params.inputTokens ?? 0
-	const outputTokens = params.outputTokens ?? 0
-	const reasoningTokens = params.reasoningTokens ?? 0
-	const cachedInputTokens = params.cachedInputTokens ?? 0
+	const inputTokens = params.inputTokens ?? 0;
+	const outputTokens = params.outputTokens ?? 0;
+	const reasoningTokens = params.reasoningTokens ?? 0;
+	const cachedInputTokens = params.cachedInputTokens ?? 0;
 
 	// Conservative: charge cache reads at input price and reasoning at output price.
-	const input = inputTokens + cachedInputTokens
-	const output = outputTokens + reasoningTokens
+	const input = inputTokens + cachedInputTokens;
+	const output = outputTokens + reasoningTokens;
 
-	return (input / 1_000_000) * cost.input + (output / 1_000_000) * cost.output
+	return (input / 1_000_000) * cost.input + (output / 1_000_000) * cost.output;
 }
 
 export const getAiBudgetStatus = query({
@@ -44,7 +44,7 @@ export const getAiBudgetStatus = query({
 		atMs: v.optional(v.number())
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
+		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) {
 			return {
 				dateKey: dateKeyForMs(Date.now(), 'UTC'),
@@ -52,25 +52,25 @@ export const getAiBudgetStatus = query({
 				spentUsd: 0,
 				remainingUsd: DEFAULT_DAILY_AI_CAP_USD,
 				isOverLimit: false
-			}
+			};
 		}
 
-		const now = args.atMs ?? Date.now()
-		const timeZone = await getUserTimeZone(ctx, ownerId)
-		const dateKey = dateKeyForMs(now, timeZone)
+		const now = args.atMs ?? Date.now();
+		const timeZone = await getUserTimeZone(ctx, ownerId);
+		const dateKey = dateKeyForMs(now, timeZone);
 
 		const settings = await ctx.db
 			.query('userSettings')
 			.withIndex('by_ownerId', (q) => q.eq('ownerId', ownerId))
-			.unique()
-		const capUsd = settings?.dailyAiCapUsd ?? DEFAULT_DAILY_AI_CAP_USD
+			.unique();
+		const capUsd = settings?.dailyAiCapUsd ?? DEFAULT_DAILY_AI_CAP_USD;
 		const daily = await ctx.db
 			.query('aiDailyUsage')
 			.withIndex('by_ownerId_and_dateKey', (q) => q.eq('ownerId', ownerId).eq('dateKey', dateKey))
-			.unique()
+			.unique();
 
-		const spentUsd = daily?.costUsd ?? 0
-		const remainingUsd = Math.max(0, capUsd - spentUsd)
+		const spentUsd = daily?.costUsd ?? 0;
+		const remainingUsd = Math.max(0, capUsd - spentUsd);
 
 		return {
 			dateKey,
@@ -78,9 +78,9 @@ export const getAiBudgetStatus = query({
 			spentUsd,
 			remainingUsd,
 			isOverLimit: spentUsd >= capUsd
-		}
+		};
 	}
-})
+});
 
 export const recordAiRun = mutation({
 	args: {
@@ -95,22 +95,22 @@ export const recordAiRun = mutation({
 		})
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
+		const ownerId = await requireAuthUserId(ctx);
 
-		const thread = await ctx.db.get(args.threadId)
+		const thread = await ctx.db.get(args.threadId);
 		if (!thread || thread.ownerId !== ownerId) {
-			throw new Error('Thread not found')
+			throw new Error('Thread not found');
 		}
 
-		const timeZone = await getUserTimeZone(ctx, ownerId)
-		const dateKey = dateKeyForMs(args.occurredAt, timeZone)
+		const timeZone = await getUserTimeZone(ctx, ownerId);
+		const dateKey = dateKeyForMs(args.occurredAt, timeZone);
 		const costUsd = estimateCostUsd({
 			modelId: args.modelId,
 			inputTokens: args.usage.inputTokens,
 			outputTokens: args.usage.outputTokens,
 			reasoningTokens: args.usage.reasoningTokens,
 			cachedInputTokens: args.usage.cachedInputTokens
-		})
+		});
 
 		await ctx.db.insert('aiUsageEvents', {
 			ownerId,
@@ -119,25 +119,27 @@ export const recordAiRun = mutation({
 			dateKey,
 			...(args.usage.inputTokens !== undefined ? { inputTokens: args.usage.inputTokens } : {}),
 			...(args.usage.outputTokens !== undefined ? { outputTokens: args.usage.outputTokens } : {}),
-			...(args.usage.reasoningTokens !== undefined ? { reasoningTokens: args.usage.reasoningTokens } : {}),
+			...(args.usage.reasoningTokens !== undefined
+				? { reasoningTokens: args.usage.reasoningTokens }
+				: {}),
 			...(args.usage.cachedInputTokens !== undefined
 				? { cachedInputTokens: args.usage.cachedInputTokens }
 				: {}),
 			costUsd,
 			createdAt: args.occurredAt
-		})
+		});
 
-		const inputTokens = args.usage.inputTokens ?? 0
-		const outputTokens = args.usage.outputTokens ?? 0
-		const reasoningTokens = args.usage.reasoningTokens ?? 0
-		const cachedInputTokens = args.usage.cachedInputTokens ?? 0
+		const inputTokens = args.usage.inputTokens ?? 0;
+		const outputTokens = args.usage.outputTokens ?? 0;
+		const reasoningTokens = args.usage.reasoningTokens ?? 0;
+		const cachedInputTokens = args.usage.cachedInputTokens ?? 0;
 
 		const existing = await ctx.db
 			.query('aiDailyUsage')
 			.withIndex('by_ownerId_and_dateKey', (q) => q.eq('ownerId', ownerId).eq('dateKey', dateKey))
-			.unique()
+			.unique();
 
-		const now = Date.now()
+		const now = Date.now();
 		if (existing) {
 			await ctx.db.patch(existing._id, {
 				inputTokens: existing.inputTokens + inputTokens,
@@ -146,7 +148,7 @@ export const recordAiRun = mutation({
 				cachedInputTokens: existing.cachedInputTokens + cachedInputTokens,
 				costUsd: existing.costUsd + costUsd,
 				updatedAt: now
-			})
+			});
 		} else {
 			await ctx.db.insert('aiDailyUsage', {
 				ownerId,
@@ -158,9 +160,9 @@ export const recordAiRun = mutation({
 				costUsd,
 				createdAt: now,
 				updatedAt: now
-			})
+			});
 		}
 
-		return { ok: true as const, costUsd }
+		return { ok: true as const, costUsd };
 	}
-})
+});
