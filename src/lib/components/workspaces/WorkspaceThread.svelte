@@ -85,7 +85,8 @@
 	import {
 		buildAssistantMessageCopyText,
 		buildUserMessageCopyText,
-		truncateMessagesAfterUserMessage
+		truncateMessagesAfterUserMessage,
+		uiMessageText
 	} from '$lib/workspace-chat-message-actions';
 	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
 	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
@@ -231,7 +232,7 @@
 		Boolean((composerText.trim() || mentionChips.length > 0) && chat && !isChatBusy)
 	);
 	const contextText = $derived(
-		`${chat?.messages.map(messageText).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
+		`${chat?.messages.map((message) => uiMessageText(message)).join('\n') ?? ''}\n${composerText}\n${mentionChips.map((c) => formatArtifactMentionToken(c.id)).join('\n')}`
 	);
 	const estimatedInputTokens = $derived(Math.ceil(contextText.trim().length / 4));
 	const artifactMentionPill =
@@ -313,7 +314,7 @@
 
 		startedThreadId = activeThreadId;
 		pendingAutoStartThreadId = '';
-		void startInitialChat(activeThreadId);
+		void startInitialChat();
 	});
 
 	const focusComposer = () => {
@@ -563,7 +564,7 @@
 		});
 	}
 
-	async function startInitialChat(threadId: string) {
+	async function startInitialChat() {
 		try {
 			await chat?.sendMessage();
 		} catch (error) {
@@ -699,14 +700,6 @@
 		}
 	}
 
-	function messageText(message: UIMessage) {
-		return message.parts
-			.filter((part) => part.type === 'text')
-			.map((part) => part.text)
-			.join('\n')
-			.trim();
-	}
-
 	function assistantAwaitingStreamContent(
 		message: UIMessage,
 		messageIndex: number,
@@ -839,7 +832,7 @@
 													<p class="text-xs text-muted-foreground">No response yet.</p>
 												{/if}
 											{:else}
-												{@const composed = parseComposedUserMessage(messageText(message))}
+												{@const composed = parseComposedUserMessage(uiMessageText(message))}
 												<div class="flex w-full min-w-0 flex-col gap-2">
 													{#if composed.artifactIds.length > 0}
 														<div class="flex flex-wrap gap-1.5" aria-label="Referenced artifacts">
@@ -1258,6 +1251,15 @@
 				</div>
 			{/snippet}
 
+			{#snippet chatColumn()}
+				<div class="flex min-h-0 min-w-0 flex-1 flex-col">
+					<div class="min-h-0 min-w-0 flex-1">
+						{@render threadConversation()}
+					</div>
+					{@render threadComposer()}
+				</div>
+			{/snippet}
+
 			<div
 				class="flex min-h-0 flex-1 flex-col"
 				in:fly|local={threadReadyIn}
@@ -1265,20 +1267,10 @@
 			>
 				{#if !contextPanelOpen || !mediaMinLg}
 					{#if !contextPanelOpen}
-						<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-							<div class="min-h-0 min-w-0 flex-1">
-								{@render threadConversation()}
-							</div>
-							{@render threadComposer()}
-						</div>
+						{@render chatColumn()}
 					{:else}
 						<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-							<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-								<div class="min-h-0 min-w-0 flex-1">
-									{@render threadConversation()}
-								</div>
-								{@render threadComposer()}
-							</div>
+							{@render chatColumn()}
 							{@render threadContextAside(
 								'max-h-[min(44vh,25rem)] w-full shrink-0 border-t border-border/50'
 							)}
@@ -1291,12 +1283,7 @@
 						class="min-h-0 w-full flex-1 overflow-hidden"
 					>
 						<Pane defaultSize={60} minSize={15} class="flex min-h-0 min-w-0 flex-col">
-							<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-								<div class="min-h-0 min-w-0 flex-1">
-									{@render threadConversation()}
-								</div>
-								{@render threadComposer()}
-							</div>
+							{@render chatColumn()}
 						</Pane>
 						<Handle withHandle />
 						<Pane defaultSize={40} minSize={15} maxSize={90} class="flex min-h-0 min-w-0 flex-col">

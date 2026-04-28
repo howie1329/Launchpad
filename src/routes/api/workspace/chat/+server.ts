@@ -15,6 +15,7 @@ import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
+import { uiMessageText } from '$lib/workspace-chat-message-actions';
 import {
 	GroqNotConfiguredError,
 	NIMNotConfiguredError,
@@ -703,20 +704,10 @@ async function getThreadArtifact(
 	};
 }
 
-function extractTextFromUIMessage(message: UIMessage): string {
-	return message.parts
-		.filter(
-			(p): p is { type: 'text'; text: string } =>
-				p.type === 'text' && typeof (p as { text?: string }).text === 'string'
-		)
-		.map((p) => p.text)
-		.join('');
-}
-
 function lastUserMessageText(messages: UIMessage[]): string {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		if (messages[i].role === 'user') {
-			return extractTextFromUIMessage(messages[i]);
+			return uiMessageText(messages[i], '');
 		}
 	}
 	return '';
