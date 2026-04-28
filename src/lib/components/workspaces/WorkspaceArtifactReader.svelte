@@ -11,9 +11,12 @@
 	import ArtifactReadSurface from '$lib/components/workspaces/ArtifactReadSurface.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
+	import { beforeNavigate } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { SaveIcon } from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { useQuery } from 'convex-svelte';
+	import { onMount } from 'svelte';
 	import type { Id } from '../../../convex/_generated/dataModel';
 
 	let {
@@ -81,6 +84,7 @@
 			artifact.revision > editorBaseRevision
 		)
 	);
+	const saveState = $derived(isSaving ? 'saving' : contentDirty ? 'dirty' : 'saved');
 
 	$effect(() => {
 		if (artifact === undefined || artifact === null) {
@@ -207,6 +211,38 @@
 			isSaving = false;
 		}
 	};
+
+	onMount(() => {
+		const onKeydown = (event: KeyboardEvent) => {
+			if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
+			if (surfaceMode !== 'read' || readMode !== 'editor') return;
+
+			event.preventDefault();
+			void saveChanges();
+		};
+
+		const onBeforeUnload = (event: BeforeUnloadEvent) => {
+			if (!contentDirty) return;
+			event.preventDefault();
+			event.returnValue = '';
+		};
+
+		window.addEventListener('keydown', onKeydown);
+		window.addEventListener('beforeunload', onBeforeUnload);
+
+		return () => {
+			window.removeEventListener('keydown', onKeydown);
+			window.removeEventListener('beforeunload', onBeforeUnload);
+		};
+	});
+
+	if (browser) {
+		beforeNavigate((navigation) => {
+			if (!contentDirty) return;
+			if (window.confirm('Discard unsaved artifact changes?')) return;
+			navigation.cancel();
+		});
+	}
 
 	const restoreVersion = async (artifactVersionId: Id<'artifactVersions'>) => {
 		if (!artifact || isRestoringVersionId) return;
@@ -379,10 +415,11 @@
 								value={editorValue}
 								{compact}
 								{readMode}
+								{saveState}
 								{saveError}
 								onChange={(nextValue) => {
 									editorValue = nextValue;
-									contentDirty = true;
+									contentDirty = nextValue !== (artifact?.contentMarkdown ?? '');
 								}}
 							/>
 						{/if}
