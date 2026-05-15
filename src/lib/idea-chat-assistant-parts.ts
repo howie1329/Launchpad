@@ -44,9 +44,9 @@ const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = 
 	},
 	createIdeaArtifact: { title: 'Save idea artifact', running: 'Saving idea artifact…' },
 	createPrdArtifact: { title: 'Save PRD artifact', running: 'Saving PRD artifact…' },
-	createProjectFromThread: {
-		title: 'Promote chat to project',
-		running: 'Promoting chat to project…'
+	prepareProjectPromotion: {
+		title: 'Prepare project promotion',
+		running: 'Reviewing project readiness…'
 	},
 	updateThreadArtifact: { title: 'Update artifact', running: 'Updating artifact…' },
 	requestUserChoice: { title: 'Choose next step', running: 'Preparing choices…' },
@@ -157,6 +157,7 @@ function summarizeWorkspaceTool(
 	const results = Array.isArray(out.results) ? out.results : null;
 	const artifactId = typeof out.artifactId === 'string' ? out.artifactId : '';
 	const versionNumber = typeof out.versionNumber === 'number' ? out.versionNumber : null;
+	const requiresUserConfirmation = out.requiresUserConfirmation === true;
 
 	switch (toolName) {
 		case 'tavilySearch':
@@ -192,14 +193,15 @@ function summarizeWorkspaceTool(
 				summary: title ? `Saved PRD artifact: ${title}` : 'Saved PRD artifact.',
 				detailJson
 			};
-		case 'createProjectFromThread': {
+		case 'prepareProjectPromotion': {
 			const linkedArtifactCount =
 				typeof out.linkedArtifactCount === 'number' ? out.linkedArtifactCount : 0;
 			return {
 				summary: name
-					? `Promoted this chat to ${name} with ${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}.`
-					: 'Promoted chat to project.',
-				detailJson
+					? `Ready to review ${name} with ${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}.`
+					: 'Ready for project review.',
+				detailJson,
+				...(requiresUserConfirmation ? { actionLabel: 'Review and create project' } : {})
 			};
 		}
 		case 'updateThreadArtifact':

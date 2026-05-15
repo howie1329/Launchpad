@@ -2,6 +2,7 @@
 	import { afterNavigate, goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import WorkspaceCommandPalette from '$lib/components/workspaces/WorkspaceCommandPalette.svelte';
 	import WorkspaceTabPicker from '$lib/components/workspaces/WorkspaceTabPicker.svelte';
@@ -26,7 +27,8 @@
 		createArtifactMutation,
 		linkArtifactToThreadMutation,
 		listArtifactsQuery,
-		listThreadArtifactsQuery
+		listThreadArtifactsQuery,
+		type ArtifactLinkReason
 	} from '$lib/artifacts';
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display';
 	import { listThreadsQuery } from '$lib/chat';
@@ -81,6 +83,12 @@
 	let promoteSummary = $state('');
 	let promoteError = $state('');
 	let isPromoting = $state(false);
+	let isLoadingReadiness = $state(false);
+	let readinessWarning = $state('');
+	let readinessStrengths = $state<string[]>([]);
+	let readinessMissingInformation = $state<string[]>([]);
+	let readinessKeyArtifacts = $state<string[]>([]);
+	let readinessIncludedArtifacts = $state<PromotionReadinessArtifact[]>([]);
 	let createArtifactDialogOpen = $state(false);
 	let artifactTitle = $state('');
 	let artifactTypePreset = $state('notes');
@@ -176,6 +184,12 @@
 
 	afterNavigate(syncWorkspaceTabsFromUrl);
 
+	onMount(() => {
+		window.addEventListener('launchpad:review-project-promotion', openPromoteDialog);
+		return () =>
+			window.removeEventListener('launchpad:review-project-promotion', openPromoteDialog);
+	});
+
 	const selectWorkspaceTab = async (target: WorkspaceTabTarget) => {
 		const href = resolve(hrefForWorkspaceTarget(target) as '/workspace');
 		const u = get(page).url;
@@ -233,6 +247,24 @@
 	};
 
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+	type PromotionReadinessArtifact = {
+		artifactId: string;
+		title: string;
+		type: string;
+		reason: ArtifactLinkReason;
+		preview?: string;
+	};
+
+	type PromotionReadinessResponse = {
+		suggestedName: string;
+		suggestedSummary: string;
+		strengths: string[];
+		missingInformation: string[];
+		keyArtifacts: string[];
+		includedArtifacts: PromotionReadinessArtifact[];
+		warning?: string;
+	};
+
 	const artifactTypePresets = [
 		{ value: 'idea', label: 'Idea' },
 		{ value: 'prd', label: 'PRD' },
@@ -259,6 +291,12 @@
 			? `AI usage today: ${money.format(budget.data.spentUsd)} / ${money.format(budget.data.capUsd)} · ${budget.data.dateKey}`
 			: 'Usage'
 	);
+	const readinessCreatedArtifacts = $derived(
+		readinessIncludedArtifacts.filter((artifact) => artifact.reason === 'created')
+	);
+	const readinessReferencedArtifacts = $derived(
+		readinessIncludedArtifacts.filter((artifact) => artifact.reason !== 'created')
+	);
 
 	const openPromoteDialog = () => {
 		if (!selectedThread || selectedThread.projectId) return;
@@ -269,15 +307,72 @@
 				: formatThreadTitleForDisplay(selectedThread.title ?? '');
 		promoteSummary = '';
 		promoteError = '';
+		readinessWarning = '';
+		readinessStrengths = [];
+		readinessMissingInformation = [];
+		readinessKeyArtifacts = [];
+		readinessIncludedArtifacts = [];
 		promoteDialogOpen = true;
+		void loadPromotionReadiness();
+	};
+
+	const loadPromotionReadiness = async () => {
+		if (!activeThreadId || !auth.token || isLoadingReadiness) return;
+
+		isLoadingReadiness = true;
+		readinessWarning = '';
+
+		try {
+			const response = await fetch('/api/workspace/promotion-readiness', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${auth.token}`
+				},
+				body: JSON.stringify({ threadId: activeThreadId })
+			});
+			const data = (await response.json()) as PromotionReadinessResponse & { error?: string };
+			if (!response.ok) throw new Error(data.error || 'Could not review project readiness.');
+
+			if (data.suggestedName?.trim()) promoteName = data.suggestedName.trim();
+			if (data.suggestedSummary?.trim()) promoteSummary = data.suggestedSummary.trim();
+			readinessStrengths = data.strengths ?? [];
+			readinessMissingInformation = data.missingInformation ?? [];
+			readinessKeyArtifacts = data.keyArtifacts ?? [];
+			readinessIncludedArtifacts = data.includedArtifacts ?? [];
+			readinessWarning = data.warning ?? '';
+		} catch (error) {
+			console.error(error);
+			readinessWarning =
+				error instanceof Error && error.message
+					? error.message
+					: 'AI readiness is unavailable. Review the included context before creating the project.';
+			readinessStrengths = ['This chat can be preserved as the starting project thread.'];
+			readinessMissingInformation = ['Review the name and summary before creating the project.'];
+			readinessIncludedArtifacts =
+				threadArtifacts.data?.map(({ link, artifact }) => ({
+					artifactId: artifact._id,
+					title: artifact.title,
+					type: artifact.type,
+					reason: link.reason,
+					preview: artifact.contentMarkdown.slice(0, 140)
+				})) ?? [];
+		} finally {
+			isLoadingReadiness = false;
+		}
 	};
 
 	const closePromoteDialog = () => {
-		if (isPromoting) return;
+		if (isPromoting || isLoadingReadiness) return;
 		promoteDialogOpen = false;
 		promoteName = '';
 		promoteSummary = '';
 		promoteError = '';
+		readinessWarning = '';
+		readinessStrengths = [];
+		readinessMissingInformation = [];
+		readinessKeyArtifacts = [];
+		readinessIncludedArtifacts = [];
 	};
 
 	const openCreateArtifactDialog = () => {
@@ -361,7 +456,7 @@
 
 		try {
 			const summary = promoteSummary.trim();
-			const result = await getConvexClient().mutation(createProjectFromThreadMutation, {
+			await getConvexClient().mutation(createProjectFromThreadMutation, {
 				threadId: activeThreadId as Id<'chatThreads'>,
 				name,
 				...(summary ? { summary } : {})
@@ -1359,9 +1454,7 @@
 			{activeThreadId}
 			{contextPanelOpen}
 			{canPromoteThreadToProject}
-			onRequestPromote={() => {
-				promoteDialogOpen = true;
-			}}
+			onRequestPromote={openPromoteDialog}
 			onRequestCreateArtifact={openCreateArtifactDialog}
 			onToggleThreadContext={toggleThreadContext}
 		/>
@@ -1443,7 +1536,7 @@
 		</Dialog.Root>
 
 		<Dialog.Root bind:open={promoteDialogOpen}>
-			<Dialog.Content class="sm:max-w-md">
+			<Dialog.Content class="sm:max-w-2xl" showCloseButton={!isPromoting && !isLoadingReadiness}>
 				<form
 					class="space-y-4"
 					onsubmit={(event) => {
@@ -1452,14 +1545,14 @@
 					}}
 				>
 					<Dialog.Header>
-						<Dialog.Title>Create project from this chat</Dialog.Title>
+						<Dialog.Title>Review project readiness</Dialog.Title>
 						<Dialog.Description>
-							Starts a named project and attaches this thread and its linked artifacts. You can keep
-							chatting in the same thread afterward.
+							Confirm what is strong, what is missing, and what will move before creating the
+							project.
 						</Dialog.Description>
 					</Dialog.Header>
 
-					<div class="space-y-3">
+					<div class="grid gap-3 sm:grid-cols-[1fr_1fr]">
 						<div class="space-y-1.5">
 							<Label for="promote-project-name">Project name</Label>
 							<Input
@@ -1470,18 +1563,120 @@
 								disabled={isPromoting}
 							/>
 						</div>
-						<div class="space-y-1.5">
+						<div class="space-y-1.5 sm:row-span-2">
 							<Label for="promote-project-summary">Summary</Label>
 							<Textarea
 								id="promote-project-summary"
 								bind:value={promoteSummary}
-								placeholder="Optional context for future chats in this project"
-								class="min-h-20"
+								placeholder="Context for future chats in this project"
+								class="min-h-28"
 								disabled={isPromoting}
 							/>
 						</div>
+						<div class="space-y-1.5 text-xs text-muted-foreground">
+							<p class="font-medium text-foreground">Included context</p>
+							<p>
+								This chat and {readinessIncludedArtifacts.length} linked artifact{readinessIncludedArtifacts.length ===
+								1
+									? ''
+									: 's'} will move into the project.
+							</p>
+						</div>
 					</div>
 
+					{#if isLoadingReadiness}
+						<p class="text-xs text-muted-foreground" role="status">Reviewing readiness…</p>
+					{/if}
+					{#if readinessWarning}
+						<p class="text-xs text-muted-foreground">{readinessWarning}</p>
+					{/if}
+
+					<div class="grid gap-4 sm:grid-cols-2">
+						<section class="space-y-2">
+							<h3 class="text-xs font-medium text-foreground">Strong signals</h3>
+							{#if readinessStrengths.length > 0}
+								<ul class="space-y-1.5 text-xs leading-snug text-muted-foreground">
+									{#each readinessStrengths as item (item)}
+										<li>• {item}</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="text-xs text-muted-foreground">No readiness signals yet.</p>
+							{/if}
+						</section>
+						<section class="space-y-2">
+							<h3 class="text-xs font-medium text-foreground">Missing information</h3>
+							{#if readinessMissingInformation.length > 0}
+								<ul class="space-y-1.5 text-xs leading-snug text-muted-foreground">
+									{#each readinessMissingInformation as item (item)}
+										<li>• {item}</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="text-xs text-muted-foreground">No major gaps found.</p>
+							{/if}
+						</section>
+					</div>
+
+					<section class="space-y-2">
+						<h3 class="text-xs font-medium text-foreground">Included artifacts</h3>
+						{#if readinessIncludedArtifacts.length === 0}
+							<p class="text-xs text-muted-foreground">
+								No linked artifacts will move with this chat.
+							</p>
+						{:else}
+							<div class="grid gap-3 sm:grid-cols-2">
+								<div class="space-y-1.5">
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Created in this chat
+									</p>
+									{#if readinessCreatedArtifacts.length > 0}
+										<ul class="space-y-1 text-xs text-muted-foreground">
+											{#each readinessCreatedArtifacts as artifact (artifact.artifactId)}
+												<li
+													class="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-accent/50"
+												>
+													<span class="min-w-0 truncate text-foreground">{artifact.title}</span>
+													<span class="shrink-0 text-[11px]"
+														>{artifactTypeLabel(artifact.type)}</span
+													>
+												</li>
+											{/each}
+										</ul>
+									{:else}
+										<p class="text-xs text-muted-foreground">None.</p>
+									{/if}
+								</div>
+								<div class="space-y-1.5">
+									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+										Referenced/imported
+									</p>
+									{#if readinessReferencedArtifacts.length > 0}
+										<ul class="space-y-1 text-xs text-muted-foreground">
+											{#each readinessReferencedArtifacts as artifact (artifact.artifactId)}
+												<li
+													class="flex items-center justify-between gap-2 rounded-md px-2 py-1 hover:bg-accent/50"
+												>
+													<span class="min-w-0 truncate text-foreground">{artifact.title}</span>
+													<span class="shrink-0 text-[11px]"
+														>{artifactTypeLabel(artifact.type)}</span
+													>
+												</li>
+											{/each}
+										</ul>
+									{:else}
+										<p class="text-xs text-muted-foreground">None.</p>
+									{/if}
+								</div>
+							</div>
+						{/if}
+					</section>
+
+					{#if readinessKeyArtifacts.length > 0}
+						<p class="text-[11px] leading-snug text-muted-foreground">
+							Key artifacts: {readinessKeyArtifacts.join(', ')}
+						</p>
+					{/if}
 					{#if promoteError}
 						<p class="text-xs text-destructive">{promoteError}</p>
 					{/if}
@@ -1490,7 +1685,7 @@
 						<Button
 							type="button"
 							variant="secondary"
-							disabled={isPromoting}
+							disabled={isPromoting || isLoadingReadiness}
 							onclick={closePromoteDialog}
 						>
 							Cancel
