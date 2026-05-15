@@ -1,11 +1,11 @@
 import { makeFunctionReference } from 'convex/server';
-import type { FileDiffMetadata } from '@pierre/diffs';
 import type { Id } from '../convex/_generated/dataModel';
 
 export type ArtifactContentFormat = 'markdown';
 export type ArtifactLinkReason = 'created' | 'referenced' | 'imported';
-export type ArtifactDraftChangeStatus = 'pending' | 'applied' | 'discarded';
 export type ArtifactMetadata = Record<string, unknown>;
+export type ArtifactVersionActor = 'user' | 'ai';
+export type ArtifactVersionSource = 'editor' | 'chat';
 
 export type SavedArtifact = {
 	_id: Id<'artifacts'>;
@@ -23,13 +23,19 @@ export type SavedArtifact = {
 	updatedAt: number;
 };
 
-export type ArtifactDraftPatch = FileDiffMetadata;
-
-export type ArtifactDraftReviewStats = {
-	hasTitleChange?: boolean;
-	changedSectionCount?: number;
-	additionCount?: number;
-	deletionCount?: number;
+export type ArtifactVersion = {
+	_id: Id<'artifactVersions'>;
+	_creationTime: number;
+	ownerId: Id<'users'>;
+	artifactId: Id<'artifacts'>;
+	versionNumber: number;
+	title: string;
+	contentMarkdown: string;
+	actor: ArtifactVersionActor;
+	source: ArtifactVersionSource;
+	summary?: string;
+	createdAt: number;
+	updatedAt: number;
 };
 
 export type ThreadArtifactLink = {
@@ -43,34 +49,6 @@ export type ThreadArtifactLink = {
 	updatedAt: number;
 };
 
-export type ArtifactDraftChange = {
-	_id: Id<'artifactDraftChanges'>;
-	_creationTime: number;
-	ownerId: Id<'users'>;
-	artifactId: Id<'artifacts'>;
-	threadId?: Id<'chatThreads'>;
-	proposedTitle: string;
-	proposedContentMarkdown: string;
-	summary?: string;
-	baseArtifactRevision?: number;
-	baseTitle?: string;
-	baseContentMarkdown?: string;
-	patch?: ArtifactDraftPatch;
-	changeSummary?: string;
-	hasTitleChange?: boolean;
-	changedSectionCount?: number;
-	additionCount?: number;
-	deletionCount?: number;
-	staleReason?: string;
-	isStale?: boolean;
-	needsHydration?: boolean;
-	status: ArtifactDraftChangeStatus;
-	createdAt: number;
-	updatedAt: number;
-	appliedAt?: number;
-	discardedAt?: number;
-};
-
 export type ThreadArtifact = {
 	link: ThreadArtifactLink;
 	artifact: SavedArtifact;
@@ -81,11 +59,6 @@ export type MentionableArtifact = {
 	linkedToThread: boolean;
 };
 
-export type ThreadDraftChange = {
-	draftChange: ArtifactDraftChange;
-	artifact: SavedArtifact;
-};
-
 export type CreateArtifactArgs = {
 	type: string;
 	title: string;
@@ -93,6 +66,9 @@ export type CreateArtifactArgs = {
 	metadata?: ArtifactMetadata;
 	projectId?: Id<'projects'>;
 	sourceThreadId?: Id<'chatThreads'>;
+	versionActor?: ArtifactVersionActor;
+	versionSource?: ArtifactVersionSource;
+	versionSummary?: string;
 };
 
 export type CreateArtifactResult = {
@@ -107,18 +83,18 @@ export type UpdateArtifactArgs = {
 	projectId?: Id<'projects'> | null;
 };
 
+export type UpdateThreadArtifactArgs = {
+	threadId: Id<'chatThreads'>;
+	artifactId: Id<'artifacts'>;
+	title: string;
+	contentMarkdown: string;
+	summary?: string;
+};
+
 export type LinkArtifactToThreadArgs = {
 	threadId: Id<'chatThreads'>;
 	artifactId: Id<'artifacts'>;
 	reason: Exclude<ArtifactLinkReason, 'created'>;
-};
-
-export type CreateArtifactDraftChangeArgs = {
-	artifactId: Id<'artifacts'>;
-	threadId?: Id<'chatThreads'>;
-	proposedTitle: string;
-	proposedContentMarkdown: string;
-	summary?: string;
 };
 
 export const createArtifactMutation = makeFunctionReference<
@@ -157,11 +133,35 @@ export const getArtifactQuery = makeFunctionReference<
 	SavedArtifact | null
 >('artifacts:getArtifact');
 
+export const listArtifactVersionsQuery = makeFunctionReference<
+	'query',
+	{ artifactId: Id<'artifacts'> },
+	ArtifactVersion[]
+>('artifacts:listArtifactVersions');
+
 export const updateArtifactMutation = makeFunctionReference<
 	'mutation',
 	UpdateArtifactArgs,
-	{ ok: true }
+	{ ok: true; versionCreated: boolean; versionNumber: number }
 >('artifacts:updateArtifact');
+
+export const updateThreadArtifactMutation = makeFunctionReference<
+	'mutation',
+	UpdateThreadArtifactArgs,
+	{
+		ok: true;
+		artifactId: Id<'artifacts'>;
+		title: string;
+		versionCreated: boolean;
+		versionNumber: number;
+	}
+>('artifacts:updateThreadArtifact');
+
+export const restoreArtifactVersionMutation = makeFunctionReference<
+	'mutation',
+	{ artifactVersionId: Id<'artifactVersions'> },
+	{ ok: true; restored: boolean; versionNumber: number }
+>('artifacts:restoreArtifactVersion');
 
 export const deleteArtifactMutation = makeFunctionReference<
 	'mutation',
@@ -174,39 +174,3 @@ export const linkArtifactToThreadMutation = makeFunctionReference<
 	LinkArtifactToThreadArgs,
 	{ ok: true }
 >('artifacts:linkArtifactToThread');
-
-export const createArtifactDraftChangeMutation = makeFunctionReference<
-	'mutation',
-	CreateArtifactDraftChangeArgs,
-	{ draftChangeId: Id<'artifactDraftChanges'> }
->('artifacts:createArtifactDraftChange');
-
-export const listArtifactDraftChangesQuery = makeFunctionReference<
-	'query',
-	{ artifactId: Id<'artifacts'> },
-	ArtifactDraftChange[]
->('artifacts:listArtifactDraftChanges');
-
-export const listThreadDraftChangesQuery = makeFunctionReference<
-	'query',
-	{ threadId: Id<'chatThreads'> },
-	ThreadDraftChange[]
->('artifacts:listThreadDraftChanges');
-
-export const applyArtifactDraftChangeMutation = makeFunctionReference<
-	'mutation',
-	{ draftChangeId: Id<'artifactDraftChanges'> },
-	{ ok: true }
->('artifacts:applyArtifactDraftChange');
-
-export const discardArtifactDraftChangeMutation = makeFunctionReference<
-	'mutation',
-	{ draftChangeId: Id<'artifactDraftChanges'> },
-	{ ok: true }
->('artifacts:discardArtifactDraftChange');
-
-export const hydrateArtifactDraftChangeReviewDataMutation = makeFunctionReference<
-	'mutation',
-	{ draftChangeId: Id<'artifactDraftChanges'> },
-	{ ok: true; hydrated: boolean; stale?: boolean }
->('artifacts:hydrateArtifactDraftChangeReviewData');

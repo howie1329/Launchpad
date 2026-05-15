@@ -2,11 +2,11 @@ import { env } from '$env/dynamic/private';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { getThreadQuery } from '$lib/chat';
 import {
-	createArtifactDraftChangeMutation,
 	createArtifactMutation,
 	linkArtifactToThreadMutation,
 	listProjectArtifactsQuery,
 	listThreadArtifactsQuery,
+	updateThreadArtifactMutation,
 	type SavedArtifact
 } from '$lib/artifacts';
 import { parseArtifactMentionIds } from '$lib/artifact-mention-tokens';
@@ -15,8 +15,10 @@ import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
+import { uiMessageText } from '$lib/workspace-chat-message-actions';
 import {
 	GroqNotConfiguredError,
+	NIMNotConfiguredError,
 	OpenRouterNotConfiguredError,
 	resolveWorkspaceLanguageModel
 } from '$lib/server/resolve-workspace-language-model';
@@ -70,8 +72,8 @@ Artifact behavior:
 - Suggest an artifact when the conversation has enough durable signal, but do not create one until the user explicitly asks or confirms.
 - When suggesting, explain briefly why saving it now would help.
 - Do not repeat the same artifact suggestion every turn after the user declines.
-- Never overwrite existing artifacts. When asked to revise an existing artifact, use proposeArtifactEdit so the user can apply or discard the draft.
-- Only propose edits for artifacts already linked to this thread.
+- Existing artifacts can be updated directly only when the user explicitly asks to revise that artifact.
+- Only update artifacts already linked to this thread.
 - PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.
 
 Choice card behavior:
@@ -210,7 +212,11 @@ export const POST: RequestHandler = async ({ request }) => {
 		try {
 			languageModel = resolveWorkspaceLanguageModel(body.modelId);
 		} catch (e) {
-			if (e instanceof OpenRouterNotConfiguredError || e instanceof GroqNotConfiguredError) {
+			if (
+				e instanceof OpenRouterNotConfiguredError ||
+				e instanceof GroqNotConfiguredError ||
+				e instanceof NIMNotConfiguredError
+			) {
 				return json({ error: e.message }, { status: 400 });
 			}
 			throw e;
@@ -467,7 +473,9 @@ function workspaceTools({
 					title,
 					contentMarkdown,
 					sourceThreadId: threadId,
-					metadata: { source: 'workspace-chat-tool' }
+					metadata: { source: 'workspace-chat-tool' },
+					versionActor: 'ai',
+					versionSource: 'chat'
 				});
 				await syncArtifactMemoryForTool(convex, result.artifactId);
 
@@ -499,7 +507,9 @@ function workspaceTools({
 					title: input.title,
 					contentMarkdown,
 					sourceThreadId: threadId,
-					metadata: { source: 'workspace-chat-tool' }
+					metadata: { source: 'workspace-chat-tool' },
+					versionActor: 'ai',
+					versionSource: 'chat'
 				});
 				await syncArtifactMemoryForTool(convex, result.artifactId);
 
@@ -540,31 +550,30 @@ function workspaceTools({
 				};
 			}
 		}),
-		proposeArtifactEdit: tool({
+		updateThreadArtifact: tool({
 			description:
-				'Create a pending draft change for a thread-linked artifact. Never use this for artifacts outside the active thread.',
+				'Update a thread-linked artifact directly after the user explicitly asks for that artifact to be revised.',
 			inputSchema: z.object({
 				artifactId: z.string(),
-				proposedTitle: z.string().min(1),
-				proposedContentMarkdown: z.string().min(1),
+				title: z.string().min(1),
+				contentMarkdown: z.string().min(1),
 				summary: z.string().optional()
 			}),
-			execute: async ({ artifactId, proposedTitle, proposedContentMarkdown, summary }) => {
+			execute: async ({ artifactId, title, contentMarkdown, summary }) => {
 				const { artifact } = await getThreadArtifact(convex, threadId, artifactId);
-				const result = await convex.mutation(createArtifactDraftChangeMutation, {
-					artifactId: artifact._id,
+				const result = await convex.mutation(updateThreadArtifactMutation, {
 					threadId,
-					proposedTitle,
-					proposedContentMarkdown,
+					artifactId: artifact._id,
+					title,
+					contentMarkdown,
 					...(summary?.trim() ? { summary: summary.trim() } : {})
 				});
 
 				return {
-					draftChangeId: result.draftChangeId,
 					artifactId: artifact._id,
-					artifactTitle: artifact.title,
-					proposedTitle,
-					summary: summary?.trim() || 'Created draft change.'
+					title,
+					versionNumber: result.versionNumber,
+					summary: summary?.trim() || 'Updated artifact.'
 				};
 			}
 		}),
@@ -695,20 +704,10 @@ async function getThreadArtifact(
 	};
 }
 
-function extractTextFromUIMessage(message: UIMessage): string {
-	return message.parts
-		.filter(
-			(p): p is { type: 'text'; text: string } =>
-				p.type === 'text' && typeof (p as { text?: string }).text === 'string'
-		)
-		.map((p) => p.text)
-		.join('');
-}
-
 function lastUserMessageText(messages: UIMessage[]): string {
 	for (let i = messages.length - 1; i >= 0; i--) {
 		if (messages[i].role === 'user') {
-			return extractTextFromUIMessage(messages[i]);
+			return uiMessageText(messages[i], '');
 		}
 	}
 	return '';

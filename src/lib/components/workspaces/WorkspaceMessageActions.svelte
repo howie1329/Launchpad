@@ -40,7 +40,7 @@
 	class={cn(
 		'flex flex-wrap items-center gap-0.5 pt-1',
 		role === 'user' ? 'justify-end' : 'justify-start',
-		'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100',
+		'opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100',
 		'transition-opacity duration-150 motion-reduce:transition-none'
 	)}
 	role="toolbar"
@@ -89,7 +89,7 @@
 							variant="ghost"
 							size="icon-lg"
 							class="text-muted-foreground hover:text-foreground"
-							disabled={disabled}
+							{disabled}
 							onclick={onRetry}
 							aria-label={disabled
 								? 'Regenerate unavailable while the assistant is replying'
@@ -115,7 +115,7 @@
 							variant="ghost"
 							size="icon-lg"
 							class="text-muted-foreground hover:text-foreground"
-							disabled={disabled}
+							{disabled}
 							onclick={onFork}
 							aria-label={disabled
 								? 'Fork thread after signing in'

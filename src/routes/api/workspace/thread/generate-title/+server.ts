@@ -2,10 +2,7 @@ import { AI_GATEWAY_API_KEY } from '$env/static/private';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { getThreadQuery, listMessagesQuery, setThreadGeneratedTitleMutation } from '$lib/chat';
 import { defaultIdeaAiModelId } from '$lib/idea-ai-models';
-import {
-	normalizeGeneratedThreadTitle,
-	PLACEHOLDER_THREAD_TITLE
-} from '$lib/thread-title';
+import { normalizeGeneratedThreadTitle, PLACEHOLDER_THREAD_TITLE } from '$lib/thread-title';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { ConvexHttpClient } from 'convex/browser';
 import { createGateway, generateText } from 'ai';

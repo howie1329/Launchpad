@@ -1,23 +1,23 @@
 <script lang="ts">
-	import { Button, type ButtonProps } from "$lib/components/ui/button/index.js";
-	import { cn } from "$lib/utils";
-	import type { Snippet } from "svelte";
+	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
+	import { cn } from '$lib/utils';
+	import type { Snippet } from 'svelte';
 
-	interface Props extends Omit<ButtonProps, "onclick"> {
+	interface Props extends Omit<ButtonProps, 'onclick'> {
 		suggestion: string;
 		onclick?: (suggestion: string) => void;
 		children?: Snippet;
 		class?: string;
-		variant?: ButtonProps["variant"];
-		size?: ButtonProps["size"];
+		variant?: ButtonProps['variant'];
+		size?: ButtonProps['size'];
 	}
 
 	let {
 		suggestion,
 		onclick,
 		class: className,
-		variant = "outline",
-		size = "sm",
+		variant = 'outline',
+		size = 'sm',
 		children,
 		...restProps
 	}: Props = $props();
@@ -28,7 +28,7 @@
 </script>
 
 <Button
-	class={cn("cursor-pointer px-4", className)}
+	class={cn('cursor-pointer px-4', className)}
 	onclick={handleClick}
 	{size}
 	type="button"

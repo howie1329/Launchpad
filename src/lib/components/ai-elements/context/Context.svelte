@@ -1,9 +1,9 @@
 <script lang="ts">
-	import * as HoverCard from "$lib/components/ui/hover-card/index.js";
-	import { ContextClass, setContextValue, type ContextSchema } from "./context-context.svelte";
+	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
+	import { ContextClass, setContextValue, type ContextSchema } from './context-context.svelte';
 
 	interface Props extends ContextSchema {
-		children?: import("svelte").Snippet;
+		children?: import('svelte').Snippet;
 		// HoverCard props
 		closeDelay?: number;
 		openDelay?: number;
@@ -25,7 +25,7 @@
 		usedTokens,
 		maxTokens,
 		usage,
-		modelId,
+		modelId
 	});
 
 	// Update context when props change

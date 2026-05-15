@@ -24,9 +24,7 @@
 		`${resolve('/auth')}?redirectTo=${encodeURIComponent(getSafePostAuthRedirect(redirectTo))}`
 	);
 
-	const workspaceHref = $derived(
-		resolve((signedInHref?.trim() || redirectTo) as '/workspace')
-	);
+	const workspaceHref = $derived(resolve((signedInHref?.trim() || redirectTo) as '/workspace'));
 
 	const handleSignOut = async () => {
 		isSigningOut = true;

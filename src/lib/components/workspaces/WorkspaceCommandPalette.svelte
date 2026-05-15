@@ -15,7 +15,7 @@
 		workspaceRootHref,
 		workspaceSettingsHref,
 		workspaceThreadHref
-	} from '$lib/workspace-nav';
+	} from '$lib/workspace-route-contract';
 	import {
 		ChatAdd01Icon,
 		Chat01Icon,

@@ -1,12 +1,12 @@
-import type { ArtifactLinkReason, SavedArtifact, ThreadArtifact } from '$lib/artifacts'
+import type { ArtifactLinkReason, SavedArtifact, ThreadArtifact } from '$lib/artifacts';
 
-export type ArtifactGroupKey = 'idea' | 'prd' | 'research' | 'markdown' | 'other'
+export type ArtifactGroupKey = 'idea' | 'prd' | 'research' | 'markdown' | 'other';
 
 export type ArtifactGroup<T> = {
-	key: ArtifactGroupKey
-	label: string
-	artifacts: T[]
-}
+	key: ArtifactGroupKey;
+	label: string;
+	artifacts: T[];
+};
 
 export const artifactGroupKeys: ArtifactGroupKey[] = [
 	'idea',
@@ -14,7 +14,7 @@ export const artifactGroupKeys: ArtifactGroupKey[] = [
 	'research',
 	'markdown',
 	'other'
-]
+];
 
 export const artifactGroupLabels: Record<ArtifactGroupKey, string> = {
 	idea: 'Ideas',
@@ -22,23 +22,23 @@ export const artifactGroupLabels: Record<ArtifactGroupKey, string> = {
 	research: 'Research',
 	markdown: 'Markdown',
 	other: 'Other'
-}
+};
 
 export function artifactGroupKey(type: string): ArtifactGroupKey {
-	const normalized = type.trim().toLowerCase()
+	const normalized = type.trim().toLowerCase();
 
-	if (normalized === 'idea') return 'idea'
-	if (normalized === 'prd') return 'prd'
-	if (normalized === 'research') return 'research'
-	if (normalized === 'markdown') return 'markdown'
-	return 'other'
+	if (normalized === 'idea') return 'idea';
+	if (normalized === 'prd') return 'prd';
+	if (normalized === 'research') return 'research';
+	if (normalized === 'markdown') return 'markdown';
+	return 'other';
 }
 
 export function artifactTypeLabel(type: string) {
-	const key = artifactGroupKey(type)
-	if (key === 'prd') return 'PRD'
-	if (key === 'other') return type.trim() || 'Artifact'
-	return artifactGroupLabels[key].replace(/s$/, '')
+	const key = artifactGroupKey(type);
+	if (key === 'prd') return 'PRD';
+	if (key === 'other') return type.trim() || 'Artifact';
+	return artifactGroupLabels[key].replace(/s$/, '');
 }
 
 export function groupArtifacts<T>(
@@ -49,28 +49,28 @@ export function groupArtifacts<T>(
 		key,
 		label: artifactGroupLabels[key],
 		artifacts: artifacts.filter((item) => artifactGroupKey(getArtifact(item).type) === key)
-	}))
+	}));
 }
 
 export function artifactPreview(contentMarkdown: string) {
 	const firstLine = contentMarkdown
 		.split('\n')
 		.map((line) => line.trim())
-		.find(Boolean)
+		.find(Boolean);
 
-	if (!firstLine) return 'No content yet.'
-	return firstLine.length > 140 ? `${firstLine.slice(0, 137)}...` : firstLine
+	if (!firstLine) return 'No content yet.';
+	return firstLine.length > 140 ? `${firstLine.slice(0, 137)}...` : firstLine;
 }
 
 export function draftPreview(contentMarkdown: string) {
-	const preview = artifactPreview(contentMarkdown)
-	return preview.length > 120 ? `${preview.slice(0, 117)}...` : preview
+	const preview = artifactPreview(contentMarkdown);
+	return preview.length > 120 ? `${preview.slice(0, 117)}...` : preview;
 }
 
 export function linkReasonLabel(reason: ArtifactLinkReason) {
-	if (reason === 'created') return 'Created in this thread'
-	if (reason === 'referenced') return 'Referenced here'
-	return 'Imported to this thread'
+	if (reason === 'created') return 'Created in this thread';
+	if (reason === 'referenced') return 'Referenced here';
+	return 'Imported to this thread';
 }
 
 export function formatArtifactUpdatedAt(updatedAt: number) {
@@ -78,13 +78,13 @@ export function formatArtifactUpdatedAt(updatedAt: number) {
 		month: 'short',
 		day: 'numeric',
 		year: 'numeric'
-	}).format(new Date(updatedAt))
+	}).format(new Date(updatedAt));
 }
 
 export function formatArtifactCreatedAt(createdAt: number) {
-	return formatArtifactUpdatedAt(createdAt)
+	return formatArtifactUpdatedAt(createdAt);
 }
 
 export function threadArtifactDoc(item: ThreadArtifact) {
-	return item.artifact
+	return item.artifact;
 }

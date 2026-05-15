@@ -6,7 +6,7 @@ This document describes **what exists in the repository today**. For a full **pr
 
 Launchpad is a **workspace-first** app for signed-in users. After [Convex Auth](https://docs.convex.dev/auth) at `/auth`, the main surface is **`/workspace`**: a shell with projects, chat threads (general or tied to a project), and **artifacts** stored as markdown (`contentMarkdown`) with a flexible string `type` (conventions include `idea`, `prd`, plus `research`, `markdown`, or other labels grouped in the UI).
 
-The assistant runs in **threads** and can create artifacts, link them to the thread, and **propose edits**; users apply or discard those proposals via **draft change** records—not silent overwrites.
+The assistant runs in **threads** and can create artifacts, link them to the thread, and **update linked artifacts directly** when the user explicitly asks. Every user save or AI write creates an immutable **artifact version**.
 
 The marketing page at **`/`** still frames a linear “idea → PRD → first week” story for visitors; the live product is the workspace, not a single-shot form.
 
@@ -19,7 +19,7 @@ The marketing page at **`/`** still frames a linear “idea → PRD → first we
 - `src/routes/workspace/+layout.svelte`, `+page.svelte` — `/workspace` (query params: `project`, `thread`, `context`, `start`, etc.)
 - `src/routes/workspace/settings/+page.svelte` — `/workspace/settings` — timezone, daily AI cap, usage, activity
 - `src/routes/workspace/artifacts/[artifactId]/+page.svelte` — full-page artifact reader
-- `src/routes/api/workspace/chat/+server.ts` — `POST /api/workspace/chat` — streams AI output; uses Vercel AI SDK + AI Gateway; reads and writes Convex via HTTP for threads, artifacts, and draft changes
+- `src/routes/api/workspace/chat/+server.ts` — `POST /api/workspace/chat` — streams AI output; uses Vercel AI SDK + AI Gateway; reads and writes Convex via HTTP for threads, artifacts, and artifact versions
 
 ### Convex data model
 
@@ -31,7 +31,7 @@ Defined in `src/convex/schema.ts`:
 - **`chatMessages`** — UIMessage-shaped payloads per thread
 - **`artifacts`** — `type` (string), `title`, `contentMarkdown`, optional `projectId` / `sourceThreadId`
 - **`threadArtifactLinks`** — which artifacts belong to which thread (`created` | `referenced` | `imported`)
-- **`artifactDraftChanges`** — proposed title/body; `pending` | `applied` | `discarded`
+- **`artifactVersions`** — immutable saved snapshots for manual saves and AI writes
 
 Ownership uses `ownerId` string from Convex Auth (`getAuthUserId` in app code—see `src/convex/authHelpers.ts`).
 
@@ -39,7 +39,7 @@ Ownership uses `ownerId` string from Convex Auth (`getAuthUserId` in app code—
 
 - Browser chat UI calls `POST /api/workspace/chat` with `threadId` and model id.
 - Server builds context from Convex (thread, messages, linked artifacts, optional project artifacts), runs a `ToolLoopAgent`, and streams the response.
-- Tools create/link artifacts, create draft changes for edits, and optionally search/read web sources through Tavily when `TAVILY_API_KEY` is configured; mutations go through Convex.
+- Tools create/link artifacts, directly update linked artifacts when explicitly requested, and optionally search/read web sources through Tavily when `TAVILY_API_KEY` is configured; mutations go through Convex.
 - **Durable / background workflows** (multi-step polish, promotion pipelines, scheduled jobs) are **not implemented** in the repo yet; see [durable-workflows-and-orchestration.md](durable-workflows-and-orchestration.md). Planned chat tools (artifact search, section reads, backlog helpers) live in [ai-chat-tools-and-vercel-workflows.md](ai-chat-tools-and-vercel-workflows.md).
 
 ## Auth
@@ -52,7 +52,7 @@ Aligned in spirit:
 
 - Chat-primary UX inside `/workspace`
 - Persistent threads (general and project-scoped)
-- Artifacts as durable markdown memory, with draft-then-apply for changes
+- Artifacts as durable markdown memory, with version history for direct user and AI changes
 - Projects with chats and artifact sidebars
 
 Expect gaps and iteration (non-exhaustive):
@@ -78,8 +78,9 @@ Treat the chat-first PRD as **direction**; this file is the **inventory**.
 | -------------------- | -------------------------------------------------------------------------- |
 | `PUBLIC_CONVEX_URL`  | Public Convex URL (client + server HTTP client)                            |
 | `AI_GATEWAY_API_KEY` | Private; Vercel AI Gateway for workspace chat                              |
-| `OPENROUTER_API_KEY` | Private; optional; OpenRouter when using OpenRouter catalog models       |
+| `OPENROUTER_API_KEY` | Private; optional; OpenRouter when using OpenRouter catalog models         |
 | `GROQ_API_KEY`       | Private; optional; Groq when using Groq catalog models                     |
+| `NIM_API_KEY`        | Private; optional; NVIDIA NIM when using NIM catalog models                |
 | `TAVILY_API_KEY`     | Private; optional Tavily web search and page extraction for workspace chat |
 
 See root [README.md](../README.md) for how to run the app and where to set variables.

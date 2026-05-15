@@ -48,13 +48,9 @@ An **artifact** is a **markdown document** with a **title**, a flexible string *
 Artifacts can be:
 
 - **Linked to a thread** with a reason: created in-thread, referenced, or imported from project memory.
-- **Opened in a full-page reader** for reading, editing (CodeMirror), preview (Streamdown), and **comparing** assistant-proposed drafts to the current body.
+- **Opened in a full-page reader** for reading, editing (CodeMirror), preview (Streamdown), and **reviewing version history** with diffs between saved versions.
 
-**Important behavior:** the assistant does not silently overwrite artifacts. Changes go through **draft changes** that you apply or discard.
-
-### Draft changes
-
-When the AI (or workflow) proposes edits to an artifact, Launchpad stores a **draft change** record: proposed title and markdown, optional summary, and status **pending**, **applied**, or **discarded**. The artifact reader is where you review diffs and commit or drop them.
+**Important behavior:** user saves and explicit AI edits write directly to the artifact and create immutable **artifact versions**. The reader is where you inspect history, compare versions, and restore an older version as a new latest version.
 
 ### Projects
 
@@ -69,7 +65,7 @@ Workspace chat calls a **SvelteKit API route** that streams responses using the 
 - List and read artifacts linked to the current thread.
 - List and import artifacts from the current project (when in a project chat).
 - Create **idea** and **PRD** artifacts (markdown) after user-aligned actions.
-- **Propose edits** to existing thread-linked artifacts (draft changes).
+- **Update thread-linked artifacts** directly after the user explicitly asks for that change.
 - **Create a project from the current thread** when the user wants to promote work.
 - Search the web and read source pages when Tavily is configured and current external context matters.
 
@@ -124,14 +120,14 @@ The chat UI shows tool activity in expandable steps with human-readable summarie
 
 High-level tables (see `src/convex/schema.ts` for the source of truth):
 
-| Area          | Tables                                                     |
-| ------------- | ---------------------------------------------------------- |
-| Auth          | Convex Auth tables                                         |
-| User prefs    | `userSettings` — timezone, daily AI cap                    |
-| Usage         | `aiUsageEvents`, `aiDailyUsage` — token and cost rollups   |
-| Workspace     | `projects`, `chatThreads`, `chatMessages`                  |
-| Content       | `artifacts`, `threadArtifactLinks`, `artifactDraftChanges` |
-| Observability | `activityEvents` — user-visible history                    |
+| Area          | Tables                                                   |
+| ------------- | -------------------------------------------------------- |
+| Auth          | Convex Auth tables                                       |
+| User prefs    | `userSettings` — timezone, daily AI cap                  |
+| Usage         | `aiUsageEvents`, `aiDailyUsage` — token and cost rollups |
+| Workspace     | `projects`, `chatThreads`, `chatMessages`                |
+| Content       | `artifacts`, `artifactVersions`, `threadArtifactLinks`   |
+| Observability | `activityEvents` — user-visible history                  |
 
 Ownership is consistently **`ownerId`** (Convex Auth user id); server code uses helpers in `src/convex/authHelpers.ts`.
 

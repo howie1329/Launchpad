@@ -12,11 +12,8 @@ const threadArtifactLinkReason = v.union(
 	v.literal('referenced'),
 	v.literal('imported')
 );
-const artifactDraftChangeStatus = v.union(
-	v.literal('pending'),
-	v.literal('applied'),
-	v.literal('discarded')
-);
+const artifactVersionActor = v.union(v.literal('user'), v.literal('ai'));
+const artifactVersionSource = v.union(v.literal('editor'), v.literal('chat'));
 const memorySyncStatus = v.union(v.literal('synced'), v.literal('blocked'), v.literal('failed'));
 
 export default defineSchema({
@@ -132,31 +129,19 @@ export default defineSchema({
 		.index('by_threadId_and_updatedAt', ['threadId', 'updatedAt'])
 		.index('by_artifactId_and_updatedAt', ['artifactId', 'updatedAt'])
 		.index('by_threadId_and_artifactId', ['threadId', 'artifactId']),
-	artifactDraftChanges: defineTable({
+	artifactVersions: defineTable({
 		ownerId: v.string(),
 		artifactId: v.id('artifacts'),
-		threadId: v.optional(v.id('chatThreads')),
-		proposedTitle: v.string(),
-		proposedContentMarkdown: v.string(),
+		versionNumber: v.number(),
+		title: v.string(),
+		contentMarkdown: v.string(),
+		actor: artifactVersionActor,
+		source: artifactVersionSource,
 		summary: v.optional(v.string()),
-		baseArtifactRevision: v.optional(v.number()),
-		baseTitle: v.optional(v.string()),
-		baseContentMarkdown: v.optional(v.string()),
-		patch: v.optional(v.any()),
-		changeSummary: v.optional(v.string()),
-		hasTitleChange: v.optional(v.boolean()),
-		changedSectionCount: v.optional(v.number()),
-		additionCount: v.optional(v.number()),
-		deletionCount: v.optional(v.number()),
-		staleReason: v.optional(v.string()),
-		status: artifactDraftChangeStatus,
 		createdAt: v.number(),
-		updatedAt: v.number(),
-		appliedAt: v.optional(v.number()),
-		discardedAt: v.optional(v.number())
+		updatedAt: v.number()
 	})
-		.index('by_artifactId_and_updatedAt', ['artifactId', 'updatedAt'])
-		.index('by_artifactId_and_status_and_updatedAt', ['artifactId', 'status', 'updatedAt'])
+		.index('by_artifactId_and_versionNumber', ['artifactId', 'versionNumber'])
 		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt']),
 	memorySyncs: defineTable({
 		ownerId: v.string(),

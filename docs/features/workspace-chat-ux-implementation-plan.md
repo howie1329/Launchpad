@@ -71,11 +71,11 @@ flowchart TB
 
 ## Risk register
 
-| Risk | Mitigation |
-|------|------------|
+| Risk                                               | Mitigation                                                              |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
 | `saveMessages` leaves orphaned rows after truncate | Add mutation to delete rows with `sequence > N` or replace-all strategy |
-| Regenerate API mismatch with Svelte `Chat` version | Spike in a branch; read AI SDK + `@ai-sdk/svelte` docs |
-| Fork + message IDs confuse `Chat` client | New thread gets fresh `Chat` id; load from Convex only |
+| Regenerate API mismatch with Svelte `Chat` version | Spike in a branch; read AI SDK + `@ai-sdk/svelte` docs                  |
+| Fork + message IDs confuse `Chat` client           | New thread gets fresh `Chat` id; load from Convex only                  |
 
 ## File touch list (expected)
 

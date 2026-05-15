@@ -10,8 +10,5 @@
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
-<ModeWatcher
-	defaultMode="system"
-	themeColors={{ light: '#ffffff', dark: '#141414' }}
-/>
+<ModeWatcher defaultMode="system" themeColors={{ light: '#ffffff', dark: '#141414' }} />
 {@render children()}

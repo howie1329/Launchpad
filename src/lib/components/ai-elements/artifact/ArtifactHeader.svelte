@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import type { HTMLAttributes } from "svelte/elements";
+	import { cn } from '$lib/utils';
+	import type { HTMLAttributes } from 'svelte/elements';
 
 	interface Props extends HTMLAttributes<HTMLDivElement> {
 		class?: string;
@@ -11,7 +11,7 @@
 </script>
 
 <div
-	class={cn("bg-muted/50 flex items-center justify-between border-b px-4 py-3", className)}
+	class={cn('flex items-center justify-between border-b bg-muted/50 px-4 py-3', className)}
 	{...restProps}
 >
 	{@render children?.()}

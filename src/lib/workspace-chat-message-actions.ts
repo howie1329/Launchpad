@@ -18,16 +18,20 @@ export function truncateMessagesAfterUserMessage(
 	return messages.slice(0, idx + 1);
 }
 
-export function buildUserMessageCopyText(message: UIMessage): string {
-	if (message.role !== 'user') return '';
+export function uiMessageText(message: UIMessage, separator = '\n'): string {
 	return message.parts
 		.filter(
 			(part): part is { type: 'text'; text: string } =>
 				part.type === 'text' && typeof (part as { text?: unknown }).text === 'string'
 		)
 		.map((part) => part.text)
-		.join('\n')
+		.join(separator)
 		.trim();
+}
+
+export function buildUserMessageCopyText(message: UIMessage): string {
+	if (message.role !== 'user') return '';
+	return uiMessageText(message);
 }
 
 /** Plain text for assistant copy: text segments only (no tool dumps / choice JSON). */

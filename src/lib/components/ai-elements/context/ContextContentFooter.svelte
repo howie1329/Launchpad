@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import { getContextValue, estimateCost } from "./context-context.svelte.js";
+	import { cn } from '$lib/utils';
+	import { getContextValue, estimateCost } from './context-context.svelte.js';
 
 	interface Props {
-		children?: import("svelte").Snippet;
+		children?: import('svelte').Snippet;
 		class?: string;
 		[key: string]: any;
 	}
@@ -18,20 +18,20 @@
 					modelId: context.modelId,
 					usage: {
 						input: context.usage?.inputTokens ?? 0,
-						output: context.usage?.outputTokens ?? 0,
-					},
+						output: context.usage?.outputTokens ?? 0
+					}
 				}).totalUSD
 			: undefined;
 
-		return new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency: "USD",
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD'
 		}).format(costUSD ?? 0);
 	});
 </script>
 
 <div
-	class={cn("bg-secondary flex w-full items-center justify-between gap-3 p-3 text-xs", className)}
+	class={cn('flex w-full items-center justify-between gap-3 bg-secondary p-3 text-xs', className)}
 	{...props}
 >
 	{#if children}

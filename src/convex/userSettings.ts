@@ -1,30 +1,30 @@
-import { v } from 'convex/values'
-import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers'
-import { mutation, query } from './_generated/server'
-import { safeTimeZone } from './dateKey'
+import { v } from 'convex/values';
+import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
+import { mutation, query } from './_generated/server';
+import { safeTimeZone } from './dateKey';
 
-const DEFAULT_DAILY_AI_CAP_USD = 0.5
-const MAX_AI_PREFERENCE_CHARS = 2000
+const DEFAULT_DAILY_AI_CAP_USD = 0.5;
+const MAX_AI_PREFERENCE_CHARS = 2000;
 
 export const getMine = query({
 	args: {},
 	handler: async (ctx) => {
-		const ownerId = await getOptionalAuthUserId(ctx)
-		if (!ownerId) return null
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return null;
 
 		return await ctx.db
 			.query('userSettings')
 			.withIndex('by_ownerId', (q) => q.eq('ownerId', ownerId))
-			.unique()
+			.unique();
 	}
-})
+});
 
 function normalizedAiPreference(value: string) {
-	const trimmed = value.trim()
+	const trimmed = value.trim();
 	if (trimmed.length > MAX_AI_PREFERENCE_CHARS) {
-		throw new Error(`Text must be at most ${MAX_AI_PREFERENCE_CHARS} characters.`)
+		throw new Error(`Text must be at most ${MAX_AI_PREFERENCE_CHARS} characters.`);
 	}
-	return trimmed
+	return trimmed;
 }
 
 export const upsertMine = mutation({
@@ -35,23 +35,25 @@ export const upsertMine = mutation({
 		aiBehaviorMarkdown: v.optional(v.string())
 	},
 	handler: async (ctx, args) => {
-		const ownerId = await requireAuthUserId(ctx)
-		const timeZone = safeTimeZone(args.timeZone.trim())
+		const ownerId = await requireAuthUserId(ctx);
+		const timeZone = safeTimeZone(args.timeZone.trim());
 		const dailyAiCapUsd =
-			args.dailyAiCapUsd === undefined ? undefined : Math.max(0, args.dailyAiCapUsd)
+			args.dailyAiCapUsd === undefined ? undefined : Math.max(0, args.dailyAiCapUsd);
 
 		const aiContextMarkdown =
-			args.aiContextMarkdown === undefined ? undefined : normalizedAiPreference(args.aiContextMarkdown)
+			args.aiContextMarkdown === undefined
+				? undefined
+				: normalizedAiPreference(args.aiContextMarkdown);
 		const aiBehaviorMarkdown =
 			args.aiBehaviorMarkdown === undefined
 				? undefined
-				: normalizedAiPreference(args.aiBehaviorMarkdown)
+				: normalizedAiPreference(args.aiBehaviorMarkdown);
 
-		const now = Date.now()
+		const now = Date.now();
 		const existing = await ctx.db
 			.query('userSettings')
 			.withIndex('by_ownerId', (q) => q.eq('ownerId', ownerId))
-			.unique()
+			.unique();
 
 		if (existing) {
 			await ctx.db.patch(existing._id, {
@@ -60,9 +62,9 @@ export const upsertMine = mutation({
 				...(aiContextMarkdown !== undefined ? { aiContextMarkdown } : {}),
 				...(aiBehaviorMarkdown !== undefined ? { aiBehaviorMarkdown } : {}),
 				updatedAt: now
-			})
+			});
 
-			return { ok: true as const }
+			return { ok: true as const };
 		}
 
 		await ctx.db.insert('userSettings', {
@@ -73,8 +75,8 @@ export const upsertMine = mutation({
 			...(aiBehaviorMarkdown !== undefined ? { aiBehaviorMarkdown } : {}),
 			createdAt: now,
 			updatedAt: now
-		})
+		});
 
-		return { ok: true as const }
+		return { ok: true as const };
 	}
-})
+});

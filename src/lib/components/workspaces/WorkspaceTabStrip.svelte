@@ -4,7 +4,7 @@
 	import { Cancel01Icon } from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import type { WorkspaceTabTarget } from '$lib/workspaceTabs';
-	import { getWorkspaceTabLabel, workspaceTargetsEqual } from '$lib/workspace-tab-target';
+	import { getWorkspaceTabLabel, workspaceTargetsEqual } from '$lib/workspace-route-contract';
 	import type { SavedArtifact } from '$lib/artifacts';
 	import type { SavedChatThread } from '$lib/chat';
 	import type { SavedProject } from '$lib/projects';

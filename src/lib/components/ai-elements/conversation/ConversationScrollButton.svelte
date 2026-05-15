@@ -1,17 +1,17 @@
 <script lang="ts" module>
-	import { cn } from "$lib/utils";
-	import type { ButtonProps } from "$lib/components/ui/button/index.js";
+	import { cn } from '$lib/utils';
+	import type { ButtonProps } from '$lib/components/ui/button/index.js';
 
 	export interface ConversationScrollButtonProps extends ButtonProps {}
 </script>
 
 <script lang="ts">
-	import { Button } from "$lib/components/ui/button";
-	import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
-	import { HugeiconsIcon } from "@hugeicons/svelte";
-	import { getStickToBottomContext } from "./stick-to-bottom-context.svelte.js";
-	import { fly } from "svelte/transition";
-	import { backOut } from "svelte/easing";
+	import { Button } from '$lib/components/ui/button';
+	import { ArrowDown01Icon } from '@hugeicons/core-free-icons';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import { getStickToBottomContext } from './stick-to-bottom-context.svelte.js';
+	import { fly } from 'svelte/transition';
+	import { backOut } from 'svelte/easing';
 
 	let { class: className, onclick, ...restProps }: ConversationScrollButtonProps = $props();
 
@@ -34,18 +34,18 @@
 		in:fly={{
 			duration: 300,
 			y: 10,
-			easing: backOut,
+			easing: backOut
 		}}
 		out:fly={{
 			duration: 200,
 			y: 10,
-			easing: backOut,
+			easing: backOut
 		}}
 		class="absolute bottom-4 left-[50%] translate-x-[-50%]"
 	>
 		<Button
 			class={cn(
-				"border-border/70 bg-background/80 hover:bg-background/90 backdrop-blur-sm",
+				'border-border/70 bg-background/80 backdrop-blur-sm hover:bg-background/90',
 				className
 			)}
 			onclick={handleScrollToBottom}

@@ -32,7 +32,7 @@ The workspace is the primary app surface; there is no separate dashboard or idea
 - **UI:** Tailwind CSS v4, [shadcn-svelte](https://www.shadcn-svelte.com/) (Bits UI primitives)
 - **Backend:** [Convex](https://convex.dev) — data, realtime queries, and Convex Auth (`@convex-dev/auth`)
 - **Client:** `convex-svelte`
-- **AI:** Vercel AI SDK (`ai`, `@ai-sdk/svelte`), models via [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) and optionally [OpenRouter](https://openrouter.ai/) (`@openrouter/ai-sdk-provider`); workspace streaming in `src/routes/api/workspace/chat/+server.ts` with routing in `src/lib/server/resolve-workspace-language-model.ts`
+- **AI:** Vercel AI SDK (`ai`, `@ai-sdk/svelte`), models via [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), [OpenRouter](https://openrouter.ai/) (`@openrouter/ai-sdk-provider`), and [NVIDIA NIM](https://build.nvidia.com/) (`@ai-sdk/openai-compatible`); workspace streaming in `src/routes/api/workspace/chat/+server.ts` with routing in `src/lib/server/resolve-workspace-language-model.ts`
 - **Artifacts:** CodeMirror (markdown / diff), Streamdown (preview)
 
 ---
@@ -91,6 +91,7 @@ Set variables in `.env.local` or your host environment (names must match what Sv
 - **`AI_GATEWAY_API_KEY`** — Private key for Vercel AI Gateway (required for workspace chat streaming; see `src/routes/api/workspace/chat/+server.ts`).
 - **`OPENROUTER_API_KEY`** — Private key for [OpenRouter](https://openrouter.ai/) (optional; required only when the user selects an OpenRouter catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
 - **`GROQ_API_KEY`** — Private key for [Groq](https://groq.com/) (optional; required only when the user selects a Groq catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
+- **`NIM_API_KEY`** — Private key for [NVIDIA NIM](https://build.nvidia.com/) (optional; required only when the user selects a NIM catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
 - **`TAVILY_API_KEY`** — Private Tavily key for optional workspace chat web search and page extraction.
 
 Configure the Convex project with `npx convex dev` and follow [Convex environment variables](https://docs.convex.dev/production/environment-variables) for deployment. For AI Gateway, see [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).

@@ -63,7 +63,7 @@
 						tooltipContent="Color theme"
 						class={variant === 'sidebar'
 							? 'justify-center px-0 md:size-8 md:p-0'
-							: 'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground'}
+							: 'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground [&>svg]:size-3'}
 					>
 						<HugeiconsIcon
 							icon={triggerIcon}

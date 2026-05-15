@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { cn } from "$lib/utils";
-	import { Button, type ButtonProps } from "$lib/components/ui/button/index.js";
+	import { cn } from '$lib/utils';
+	import { Button, type ButtonProps } from '$lib/components/ui/button/index.js';
 	import {
 		Tooltip,
 		TooltipContent,
 		TooltipProvider,
-		TooltipTrigger,
-	} from "$lib/components/ui/tooltip/index.js";
+		TooltipTrigger
+	} from '$lib/components/ui/tooltip/index.js';
 
 	export type ActionProps = ButtonProps & {
 		tooltip?: string;
@@ -18,13 +18,13 @@
 		children,
 		label,
 		class: className,
-		variant = "ghost",
-		size = "sm",
+		variant = 'ghost',
+		size = 'sm',
 		...restProps
 	}: ActionProps = $props();
 
 	let buttonClasses = $derived(
-		cn("text-muted-foreground hover:text-foreground relative size-9 p-1.5", className)
+		cn('text-muted-foreground hover:text-foreground relative size-9 p-1.5', className)
 	);
 </script>
 
