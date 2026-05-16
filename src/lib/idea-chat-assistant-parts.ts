@@ -29,10 +29,20 @@ export type ChoiceCardView = {
 	customPlaceholder: string;
 };
 
+export type PromotionProposalView = {
+	id: string;
+	name: string;
+	summary?: string;
+	strengths: string[];
+	missingInformation: string[];
+	linkedArtifactCount: number;
+};
+
 export type AssistantSegment =
 	| { kind: 'text'; text: string }
 	| { kind: 'tools'; tools: ToolStepView[] }
-	| { kind: 'choice'; choice: ChoiceCardView };
+	| { kind: 'choice'; choice: ChoiceCardView }
+	| { kind: 'promotionProposal'; proposal: PromotionProposalView };
 
 const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = {
 	listThreadArtifacts: { title: 'List thread artifacts', running: 'Checking thread artifacts…' },
@@ -44,9 +54,9 @@ const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = 
 	},
 	createIdeaArtifact: { title: 'Save idea artifact', running: 'Saving idea artifact…' },
 	createPrdArtifact: { title: 'Save PRD artifact', running: 'Saving PRD artifact…' },
-	createProjectFromThread: {
-		title: 'Promote chat to project',
-		running: 'Promoting chat to project…'
+	prepareProjectPromotion: {
+		title: 'Prepare project promotion',
+		running: 'Reviewing project readiness…'
 	},
 	updateThreadArtifact: { title: 'Update artifact', running: 'Updating artifact…' },
 	requestUserChoice: { title: 'Choose next step', running: 'Preparing choices…' },
@@ -157,6 +167,7 @@ function summarizeWorkspaceTool(
 	const results = Array.isArray(out.results) ? out.results : null;
 	const artifactId = typeof out.artifactId === 'string' ? out.artifactId : '';
 	const versionNumber = typeof out.versionNumber === 'number' ? out.versionNumber : null;
+	const requiresUserConfirmation = out.requiresUserConfirmation === true;
 
 	switch (toolName) {
 		case 'tavilySearch':
@@ -192,14 +203,15 @@ function summarizeWorkspaceTool(
 				summary: title ? `Saved PRD artifact: ${title}` : 'Saved PRD artifact.',
 				detailJson
 			};
-		case 'createProjectFromThread': {
+		case 'prepareProjectPromotion': {
 			const linkedArtifactCount =
 				typeof out.linkedArtifactCount === 'number' ? out.linkedArtifactCount : 0;
 			return {
 				summary: name
-					? `Promoted this chat to ${name} with ${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}.`
-					: 'Promoted chat to project.',
-				detailJson
+					? `Ready to review ${name} with ${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}.`
+					: 'Ready for project review.',
+				detailJson,
+				...(requiresUserConfirmation ? { actionLabel: 'Review and create project' } : {})
 			};
 		}
 		case 'updateThreadArtifact':
@@ -297,6 +309,45 @@ export function toolPartToChoiceCard(part: unknown): ChoiceCardView | null {
 	};
 }
 
+export function toolPartToPromotionProposal(part: unknown): PromotionProposalView | null {
+	if (!part || typeof part !== 'object') return null;
+	const p = part as Record<string, unknown>;
+	const toolName = parseToolName(p);
+	if (toolName !== 'prepareProjectPromotion') return null;
+	if (p.state !== 'output-available') return null;
+
+	const output =
+		p.output && typeof p.output === 'object' ? (p.output as Record<string, unknown>) : {};
+	if (output.requiresUserConfirmation !== true) return null;
+
+	const name = typeof output.name === 'string' ? output.name.trim() : '';
+	if (!name) return null;
+
+	const summary = typeof output.summary === 'string' ? output.summary.trim() : '';
+	const strengths = Array.isArray(output.strengths)
+		? output.strengths
+				.map((item) => (typeof item === 'string' ? item.trim() : ''))
+				.filter(Boolean)
+		: [];
+	const missingInformation = Array.isArray(output.missingInformation)
+		? output.missingInformation
+				.map((item) => (typeof item === 'string' ? item.trim() : ''))
+				.filter(Boolean)
+		: [];
+	const linkedArtifactCount =
+		typeof output.linkedArtifactCount === 'number' ? output.linkedArtifactCount : 0;
+	const toolCallId = typeof p.toolCallId === 'string' ? p.toolCallId : `promotion-${name}`;
+
+	return {
+		id: toolCallId,
+		name,
+		...(summary ? { summary } : {}),
+		strengths,
+		missingInformation,
+		linkedArtifactCount
+	};
+}
+
 function isToolLikePart(part: { type?: unknown }): boolean {
 	const t = part.type;
 	if (typeof t !== 'string') return false;
@@ -346,6 +397,12 @@ export function buildAssistantSegments(message: UIMessage): AssistantSegment[] {
 				out.push({ kind: 'choice', choice });
 				continue;
 			}
+			const promotionProposal = toolPartToPromotionProposal(part);
+			if (promotionProposal) {
+				out.push({ kind: 'promotionProposal', proposal: promotionProposal });
+			}
+			// Promotion proposals intentionally render both a prominent card and the
+			// collapsed technical tool row, so keep falling through to toolPartToView.
 			const view = toolPartToView(part);
 			if (view) appendTool(view);
 			continue;
@@ -363,6 +420,7 @@ export function assistantSegmentsHaveContent(segments: AssistantSegment[]): bool
 		if (seg.kind === 'text' && seg.text.trim()) return true;
 		if (seg.kind === 'tools' && seg.tools.length > 0) return true;
 		if (seg.kind === 'choice') return true;
+		if (seg.kind === 'promotionProposal') return true;
 	}
 	return false;
 }

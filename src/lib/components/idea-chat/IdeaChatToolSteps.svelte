@@ -21,6 +21,10 @@
 		tools.length === 1 ? (tools[0]?.title ?? 'Tool activity') : `Tool activity (${tools.length})`
 	);
 
+	function reviewProjectPromotion() {
+		window.dispatchEvent(new CustomEvent('launchpad:review-project-promotion'));
+	}
+
 	function statusIcon(phase: ToolStepView['phase']): IconSvgElement {
 		switch (phase) {
 			case 'done':
@@ -100,7 +104,15 @@
 							{#if tool.errorText && tool.phase === 'error'}
 								<p class="text-[11px] leading-relaxed text-destructive">{tool.errorText}</p>
 							{/if}
-							{#if tool.actionLabel && tool.actionArtifactId && tool.actionVersionNumber !== undefined}
+							{#if tool.actionLabel && tool.toolName === 'prepareProjectPromotion'}
+								<button
+									type="button"
+									class="inline-flex w-fit rounded-sm text-[11px] font-medium text-foreground underline underline-offset-2 hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+									onclick={reviewProjectPromotion}
+								>
+									{tool.actionLabel}
+								</button>
+							{:else if tool.actionLabel && tool.actionArtifactId && tool.actionVersionNumber !== undefined}
 								{@const actionArtifactId = tool.actionArtifactId}
 								<button
 									type="button"

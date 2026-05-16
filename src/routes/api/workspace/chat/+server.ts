@@ -12,7 +12,7 @@ import {
 import { parseArtifactMentionIds } from '$lib/artifact-mention-tokens';
 import { artifactPreview } from '$lib/artifact-display';
 import { isIdeaAiModelId } from '$lib/idea-ai-models';
-import { createProjectFromThreadMutation, getProjectQuery } from '$lib/projects';
+import { getProjectQuery } from '$lib/projects';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
@@ -95,7 +95,7 @@ Choice card examples:
 
 Project behavior:
 - A project is a focused container for related threads and artifacts.
-- Create a project from the active chat only after the user explicitly asks or confirms.
+- Never create a project directly from chat. When the user asks to turn this chat into a project, use prepareProjectPromotion so the user can review readiness and confirm in the UI.
 - Future artifacts created after project promotion belong to that project automatically through the active thread.
 - Read or import project artifacts when the user asks, uses @artifact references, or clearly needs project memory.
 
@@ -522,31 +522,34 @@ function workspaceTools({
 				};
 			}
 		}),
-		createProjectFromThread: tool({
+		prepareProjectPromotion: tool({
 			description:
-				'Create a project from the active chat after the user asks or confirms. Promotes this thread and assigns its linked artifacts to the new project.',
+				'Prepare a non-mutating project promotion proposal for the active chat. Use when the user asks to turn this chat into a project; the user must review and confirm in the UI before creation.',
 			inputSchema: z.object({
 				name: z.string().min(1),
-				summary: z.string().optional()
+				summary: z.string().optional(),
+				strengths: z.array(z.string()).default([]),
+				missingInformation: z.array(z.string()).default([])
 			}),
-			execute: async ({ name, summary }) => {
+			execute: async ({ name, summary, strengths, missingInformation }) => {
 				if (project) {
 					throw new Error('This thread already belongs to a project.');
 				}
 
-				const cleanName = name.trim();
-				const cleanSummary = summary?.trim();
-				const result = await convex.mutation(createProjectFromThreadMutation, {
-					threadId,
-					name: cleanName,
-					...(cleanSummary ? { summary: cleanSummary } : {})
-				});
-
+				const rows = await convex.query(listThreadArtifactsQuery, { threadId });
 				return {
-					projectId: result.projectId,
-					name: cleanName,
-					...(cleanSummary ? { summary: cleanSummary } : {}),
-					linkedArtifactCount: result.linkedArtifactCount
+					name: name.trim(),
+					...(summary?.trim() ? { summary: summary.trim() } : {}),
+					strengths: strengths
+						.map((item) => item.trim())
+						.filter(Boolean)
+						.slice(0, 5),
+					missingInformation: missingInformation
+						.map((item) => item.trim())
+						.filter(Boolean)
+						.slice(0, 5),
+					linkedArtifactCount: rows.length,
+					requiresUserConfirmation: true
 				};
 			}
 		}),
