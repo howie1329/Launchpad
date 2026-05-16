@@ -265,6 +265,14 @@
 		warning?: string;
 	};
 
+	type PromotionProposalDetail = {
+		name?: string;
+		summary?: string;
+		strengths?: string[];
+		missingInformation?: string[];
+		linkedArtifactCount?: number;
+	};
+
 	const artifactTypePresets = [
 		{ value: 'idea', label: 'Idea' },
 		{ value: 'prd', label: 'PRD' },
@@ -298,18 +306,24 @@
 		readinessIncludedArtifacts.filter((artifact) => artifact.reason !== 'created')
 	);
 
-	const openPromoteDialog = () => {
+	const openPromoteDialog = (event?: Event) => {
 		if (!selectedThread || selectedThread.projectId) return;
+		const detail = event instanceof CustomEvent ? (event.detail as PromotionProposalDetail) : null;
 		const rawTitle = selectedThread.title?.trim() ?? '';
-		promoteName =
-			!rawTitle || rawTitle === PLACEHOLDER_THREAD_TITLE
+		const proposalName = typeof detail?.name === 'string' ? detail.name.trim() : '';
+		const proposalSummary = typeof detail?.summary === 'string' ? detail.summary.trim() : '';
+		promoteName = proposalName
+			? proposalName
+			: !rawTitle || rawTitle === PLACEHOLDER_THREAD_TITLE
 				? 'New project'
 				: formatThreadTitleForDisplay(selectedThread.title ?? '');
-		promoteSummary = '';
+		promoteSummary = proposalSummary;
 		promoteError = '';
 		readinessWarning = '';
-		readinessStrengths = [];
-		readinessMissingInformation = [];
+		readinessStrengths = Array.isArray(detail?.strengths) ? detail.strengths : [];
+		readinessMissingInformation = Array.isArray(detail?.missingInformation)
+			? detail.missingInformation
+			: [];
 		readinessKeyArtifacts = [];
 		readinessIncludedArtifacts = [];
 		promoteDialogOpen = true;

@@ -23,6 +23,7 @@
 		saveMessagesMutation
 	} from '$lib/chat';
 	import IdeaChatChoiceCard from '$lib/components/idea-chat/IdeaChatChoiceCard.svelte';
+	import IdeaChatPromotionCard from '$lib/components/idea-chat/IdeaChatPromotionCard.svelte';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
 	import {
@@ -812,12 +813,14 @@
 																<div class="border-l border-border/40 pl-4 sm:pl-5">
 																	{#if segment.kind === 'tools'}
 																		<IdeaChatToolSteps tools={segment.tools} />
-																	{:else}
+																	{:else if segment.kind === 'choice'}
 																		<IdeaChatChoiceCard
 																			choice={segment.choice}
 																			disabled={isChatBusy}
 																			onAnswer={submitChoiceAnswer}
 																		/>
+																	{:else}
+																		<IdeaChatPromotionCard proposal={segment.proposal} />
 																	{/if}
 																</div>
 															{/if}
