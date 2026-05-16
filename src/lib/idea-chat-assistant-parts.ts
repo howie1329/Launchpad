@@ -401,6 +401,8 @@ export function buildAssistantSegments(message: UIMessage): AssistantSegment[] {
 			if (promotionProposal) {
 				out.push({ kind: 'promotionProposal', proposal: promotionProposal });
 			}
+			// Promotion proposals intentionally render both a prominent card and the
+			// collapsed technical tool row, so keep falling through to toolPartToView.
 			const view = toolPartToView(part);
 			if (view) appendTool(view);
 			continue;

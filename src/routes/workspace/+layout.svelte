@@ -82,6 +82,7 @@
 	let promoteName = $state('');
 	let promoteSummary = $state('');
 	let promoteError = $state('');
+	let hasPromotionProposalPrefill = $state(false);
 	let isPromoting = $state(false);
 	let isLoadingReadiness = $state(false);
 	let readinessWarning = $state('');
@@ -312,6 +313,7 @@
 		const rawTitle = selectedThread.title?.trim() ?? '';
 		const proposalName = typeof detail?.name === 'string' ? detail.name.trim() : '';
 		const proposalSummary = typeof detail?.summary === 'string' ? detail.summary.trim() : '';
+		hasPromotionProposalPrefill = Boolean(proposalName || proposalSummary);
 		promoteName = proposalName
 			? proposalName
 			: !rawTitle || rawTitle === PLACEHOLDER_THREAD_TITLE
@@ -348,8 +350,12 @@
 			const data = (await response.json()) as PromotionReadinessResponse & { error?: string };
 			if (!response.ok) throw new Error(data.error || 'Could not review project readiness.');
 
-			if (data.suggestedName?.trim()) promoteName = data.suggestedName.trim();
-			if (data.suggestedSummary?.trim()) promoteSummary = data.suggestedSummary.trim();
+			if (!hasPromotionProposalPrefill && data.suggestedName?.trim()) {
+				promoteName = data.suggestedName.trim();
+			}
+			if (!hasPromotionProposalPrefill && data.suggestedSummary?.trim()) {
+				promoteSummary = data.suggestedSummary.trim();
+			}
 			readinessStrengths = data.strengths ?? [];
 			readinessMissingInformation = data.missingInformation ?? [];
 			readinessKeyArtifacts = data.keyArtifacts ?? [];
@@ -382,6 +388,7 @@
 		promoteName = '';
 		promoteSummary = '';
 		promoteError = '';
+		hasPromotionProposalPrefill = false;
 		readinessWarning = '';
 		readinessStrengths = [];
 		readinessMissingInformation = [];
@@ -478,6 +485,7 @@
 			promoteDialogOpen = false;
 			promoteName = '';
 			promoteSummary = '';
+			hasPromotionProposalPrefill = false;
 			workspaceNotice = 'Project created. This chat and its artifacts now live in the project.';
 			await goto(
 				resolve(
@@ -1704,7 +1712,7 @@
 						>
 							Cancel
 						</Button>
-						<Button type="submit" disabled={isPromoting || !promoteName.trim()}>
+						<Button type="submit" disabled={isPromoting || isLoadingReadiness || !promoteName.trim()}>
 							{isPromoting ? 'Creating…' : 'Create project'}
 						</Button>
 					</Dialog.Footer>
