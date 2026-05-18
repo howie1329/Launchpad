@@ -187,8 +187,11 @@
 
 	onMount(() => {
 		window.addEventListener('launchpad:review-project-promotion', openPromoteDialog);
-		return () =>
+		window.addEventListener('launchpad:create-artifact', openCreateArtifactDialog);
+		return () => {
 			window.removeEventListener('launchpad:review-project-promotion', openPromoteDialog);
+			window.removeEventListener('launchpad:create-artifact', openCreateArtifactDialog);
+		};
 	});
 
 	const selectWorkspaceTab = async (target: WorkspaceTabTarget) => {
@@ -1712,7 +1715,10 @@
 						>
 							Cancel
 						</Button>
-						<Button type="submit" disabled={isPromoting || isLoadingReadiness || !promoteName.trim()}>
+						<Button
+							type="submit"
+							disabled={isPromoting || isLoadingReadiness || !promoteName.trim()}
+						>
 							{isPromoting ? 'Creating…' : 'Create project'}
 						</Button>
 					</Dialog.Footer>
