@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { auth } from '$lib/auth.svelte';
-	import WorkspaceStartPage from '$lib/components/workspaces/WorkspaceStartPage.svelte';
+	import ProjectOverviewPage from '$lib/components/workspaces/ProjectOverviewPage.svelte';
 	import { getProjectQuery } from '$lib/projects';
 	import { page } from '$app/stores';
 	import { useQuery } from 'convex-svelte';
@@ -39,6 +39,6 @@
 			</p>
 		</div>
 	</div>
-{:else}
-	<WorkspaceStartPage projectId={activeProjectId} projectName={project.data?.name ?? ''} />
+{:else if project.data}
+	<ProjectOverviewPage projectId={activeProjectId} project={project.data} />
 {/if}
