@@ -117,7 +117,12 @@ export default defineSchema({
 		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt'])
 		.index('by_projectId_and_updatedAt', ['projectId', 'updatedAt'])
 		.index('by_sourceThreadId_and_updatedAt', ['sourceThreadId', 'updatedAt'])
-		.index('by_ownerId_and_type_and_updatedAt', ['ownerId', 'type', 'updatedAt']),
+		.index('by_ownerId_and_type_and_updatedAt', ['ownerId', 'type', 'updatedAt'])
+		.searchIndex('search_title', { searchField: 'title', filterFields: ['ownerId'] })
+		.searchIndex('search_contentMarkdown', {
+			searchField: 'contentMarkdown',
+			filterFields: ['ownerId']
+		}),
 	threadArtifactLinks: defineTable({
 		ownerId: v.string(),
 		threadId: v.id('chatThreads'),

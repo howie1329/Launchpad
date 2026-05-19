@@ -59,6 +59,17 @@ export type MentionableArtifact = {
 	linkedToThread: boolean;
 };
 
+export type ArtifactProjectScope = 'all' | 'none' | 'project';
+
+export type ArtifactSearchArgs = {
+	query?: string;
+	type?: string | null;
+	projectScope?: ArtifactProjectScope;
+	projectId?: Id<'projects'> | null;
+	updatedAfter?: number | null;
+	limit?: number;
+};
+
 export type CreateArtifactArgs = {
 	type: string;
 	title: string;
@@ -108,6 +119,12 @@ export const listArtifactsQuery = makeFunctionReference<
 	Record<string, never>,
 	SavedArtifact[]
 >('artifacts:listArtifacts');
+
+export const searchArtifactsQuery = makeFunctionReference<
+	'query',
+	ArtifactSearchArgs,
+	SavedArtifact[]
+>('artifacts:searchArtifacts');
 
 export const listProjectArtifactsQuery = makeFunctionReference<
 	'query',
