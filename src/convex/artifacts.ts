@@ -12,6 +12,15 @@ const artifactVersionSourceValue = v.union(v.literal('editor'), v.literal('chat'
 
 type ArtifactVersionActor = 'user' | 'ai';
 type ArtifactVersionSource = 'editor' | 'chat';
+type ArtifactProjectScope = 'all' | 'none' | 'project';
+
+const artifactProjectScopeValue = v.union(
+	v.literal('all'),
+	v.literal('none'),
+	v.literal('project')
+);
+const artifactSearchLimitMax = 50;
+const artifactSearchCandidateLimit = 100;
 
 export const createArtifact = mutation({
 	args: {
@@ -100,6 +109,84 @@ export const listArtifacts = query({
 			.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
 			.order('desc')
 			.take(200);
+	}
+});
+
+export const searchArtifacts = query({
+	args: {
+		query: v.optional(v.string()),
+		type: v.optional(v.union(v.string(), v.null())),
+		projectScope: v.optional(artifactProjectScopeValue),
+		projectId: v.optional(v.union(v.id('projects'), v.null())),
+		updatedAfter: v.optional(v.union(v.number(), v.null())),
+		limit: v.optional(v.number())
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return [];
+
+		const queryText = args.query?.trim() ?? '';
+		const type = args.type?.trim() ?? '';
+		const projectScope: ArtifactProjectScope = args.projectScope ?? 'all';
+		const projectId = projectScope === 'project' ? args.projectId : null;
+		const limit = Math.min(Math.max(Math.floor(args.limit ?? 25), 1), artifactSearchLimitMax);
+		const updatedAfter = args.updatedAfter ?? null;
+
+		if (projectScope === 'project') {
+			if (!projectId) return [];
+			await getOwnedProject(ctx, projectId, ownerId);
+		}
+
+		const matchesFilters = (artifact: Doc<'artifacts'>) => {
+			if (artifact.ownerId !== ownerId) return false;
+			if (type && artifact.type !== type) return false;
+			if (updatedAfter !== null && artifact.updatedAt < updatedAfter) return false;
+			if (projectScope === 'none' && artifact.projectId) return false;
+			if (projectScope === 'project' && artifact.projectId !== projectId) return false;
+			return true;
+		};
+
+		if (!queryText) {
+			const baseQuery =
+				projectScope === 'project' && projectId
+					? ctx.db
+							.query('artifacts')
+							.withIndex('by_projectId_and_updatedAt', (q) => q.eq('projectId', projectId))
+					: type
+						? ctx.db
+								.query('artifacts')
+								.withIndex('by_ownerId_and_type_and_updatedAt', (q) =>
+									q.eq('ownerId', ownerId).eq('type', type)
+								)
+						: ctx.db
+								.query('artifacts')
+								.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId));
+
+			const candidates = await baseQuery.order('desc').take(artifactSearchCandidateLimit);
+			return candidates.filter(matchesFilters).slice(0, limit);
+		}
+
+		const titleMatches = await ctx.db
+			.query('artifacts')
+			.withSearchIndex('search_title', (q) => q.search('title', queryText).eq('ownerId', ownerId))
+			.take(artifactSearchCandidateLimit);
+		const contentMatches = await ctx.db
+			.query('artifacts')
+			.withSearchIndex('search_contentMarkdown', (q) =>
+				q.search('contentMarkdown', queryText).eq('ownerId', ownerId)
+			)
+			.take(artifactSearchCandidateLimit);
+
+		const seen = new Set<Id<'artifacts'>>();
+		const rows: Doc<'artifacts'>[] = [];
+		for (const artifact of [...titleMatches, ...contentMatches]) {
+			if (seen.has(artifact._id) || !matchesFilters(artifact)) continue;
+			seen.add(artifact._id);
+			rows.push(artifact);
+			if (rows.length >= limit) break;
+		}
+
+		return rows;
 	}
 });
 

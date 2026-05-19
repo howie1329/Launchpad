@@ -3,9 +3,21 @@
 	import { resolve } from '$app/paths';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Kbd from '$lib/components/ui/kbd/index.js';
+	import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar';
-	import { artifactTypeLabel } from '$lib/artifact-display';
-	import type { SavedArtifact } from '$lib/artifacts';
+	import {
+		artifactPreview,
+		artifactTypeLabel,
+		formatArtifactUpdatedAt
+	} from '$lib/artifact-display';
+	import {
+		searchArtifactsQuery,
+		type ArtifactProjectScope,
+		type SavedArtifact
+	} from '$lib/artifacts';
+	import type { Id } from '../../../convex/_generated/dataModel';
+	import { useQuery } from 'convex-svelte';
 	import type { SavedProject } from '$lib/projects';
 	import type { SavedChatThread } from '$lib/chat';
 	import { formatThreadTitleForDisplay } from '$lib/thread-title';
@@ -38,10 +50,12 @@
 		threads,
 		artifacts,
 		activeThreadId = '',
+		activeThreadArtifactIds = new Set<Id<'artifacts'>>(),
 		contextPanelOpen = false,
 		canPromoteThreadToProject = false,
 		onRequestPromote,
 		onRequestCreateArtifact,
+		onUseArtifactInThread,
 		onToggleThreadContext
 	}: {
 		open?: boolean;
@@ -49,17 +63,52 @@
 		threads: SavedChatThread[] | undefined;
 		artifacts: SavedArtifact[] | undefined;
 		activeThreadId?: string;
+		activeThreadArtifactIds?: Set<Id<'artifacts'>>;
 		contextPanelOpen?: boolean;
 		canPromoteThreadToProject?: boolean;
 		onRequestPromote: () => void;
 		onRequestCreateArtifact: () => void;
+		onUseArtifactInThread: (artifactId: Id<'artifacts'>) => void | Promise<void>;
 		onToggleThreadContext: () => void | Promise<void>;
 	} = $props();
 
 	const sidebar = useSidebar();
 
+	let searchValue = $state('');
+	let typeFilter = $state('');
+	let projectFilter = $state('all');
+	let recencyFilter = $state('any');
+
+	const typeOptions = $derived(
+		Array.from(new Set((artifacts ?? []).map((artifact) => artifact.type).filter(Boolean))).sort(
+			(a, b) => artifactTypeLabel(a).localeCompare(artifactTypeLabel(b))
+		)
+	);
+	const projectScope = $derived<ArtifactProjectScope>(
+		projectFilter === 'none' ? 'none' : projectFilter === 'all' ? 'all' : 'project'
+	);
+	const selectedProjectId = $derived(
+		projectScope === 'project' ? (projectFilter as Id<'projects'>) : null
+	);
+	const updatedAfter = $derived.by(() => {
+		if (recencyFilter === 'any') return null;
+		const days = recencyFilter === '7' ? 7 : recencyFilter === '30' ? 30 : 90;
+		return Date.now() - days * 24 * 60 * 60 * 1000;
+	});
+	const artifactSearch = useQuery(searchArtifactsQuery, () => ({
+		query: searchValue,
+		type: typeFilter || null,
+		projectScope,
+		projectId: selectedProjectId,
+		updatedAfter,
+		limit: 25
+	}));
+	const artifactResults = $derived(artifactSearch.data ?? artifacts ?? []);
 	const loading = $derived(
-		projects === undefined || threads === undefined || artifacts === undefined
+		projects === undefined ||
+			threads === undefined ||
+			artifacts === undefined ||
+			artifactSearch.data === undefined
 	);
 
 	function close() {
@@ -86,7 +135,16 @@
 
 	const projectsCap = 50;
 	const threadsCap = 50;
-	const artifactsCap = 200;
+	const artifactsCap = 25;
+
+	function projectLabel(projectId: string | undefined) {
+		if (!projectId) return 'No project';
+		return projects?.find((project) => project._id === projectId)?.name ?? 'Project';
+	}
+
+	function useInThread(artifactId: Id<'artifacts'>) {
+		return () => void runAction(() => onUseArtifactInThread(artifactId));
+	}
 
 	/**
 	 * List row pattern (docs/design-system.md §6): `text-xs`, 12px icons, `accent` selection pill,
@@ -106,7 +164,10 @@
 	description="Search projects, chats, and artifacts, or run a quick action."
 	class="sm:max-w-lg"
 >
-	<Command.Input placeholder="Search threads, projects, artifacts, actions…" />
+	<Command.Input
+		bind:value={searchValue}
+		placeholder="Search threads, projects, artifacts, actions…"
+	/>
 	<Command.List class="max-h-[min(24rem,60vh)] px-1">
 		<Command.Empty class="px-2 py-6 text-center text-xs text-muted-foreground">
 			{#if loading}
@@ -283,31 +344,87 @@
 			</Command.Group>
 		{/if}
 
-		{#if artifacts && artifacts.length > 0}
-			<Command.Separator class="-mx-1 h-px bg-border" />
-			<Command.Group heading="Artifacts" value="artifacts" headingClass={paletteGroupHeadingClass}>
-				{#each artifacts as artifact (artifact._id)}
-					<Command.Item
-						class={paletteItemClass}
-						value="artifact {artifact._id} {artifact.title} {artifact.type}"
-						keywords={[
-							artifact.title,
-							artifactTypeLabel(artifact.type),
-							artifact.type,
-							'document',
-							'doc'
-						]}
-						onSelect={nav(workspaceArtifactHref(artifact._id))}
+		<Command.Separator class="-mx-1 h-px bg-border" />
+		<Command.Group heading="Artifacts" value="artifacts" headingClass={paletteGroupHeadingClass}>
+			<div class="grid gap-1.5 px-2 py-1.5 sm:grid-cols-3">
+				<NativeSelect.Root bind:value={typeFilter} size="sm" aria-label="Filter artifacts by type">
+					<option value="">All types</option>
+					{#each typeOptions as type (type)}
+						<option value={type}>{artifactTypeLabel(type)}</option>
+					{/each}
+				</NativeSelect.Root>
+				<NativeSelect.Root
+					bind:value={projectFilter}
+					size="sm"
+					aria-label="Filter artifacts by project"
+				>
+					<option value="all">All projects</option>
+					<option value="none">No project</option>
+					{#each projects ?? [] as project (project._id)}
+						<option value={project._id}>{project.name}</option>
+					{/each}
+				</NativeSelect.Root>
+				<NativeSelect.Root
+					bind:value={recencyFilter}
+					size="sm"
+					aria-label="Filter artifacts by recency"
+				>
+					<option value="any">Any time</option>
+					<option value="7">Last 7 days</option>
+					<option value="30">Last 30 days</option>
+					<option value="90">Last 90 days</option>
+				</NativeSelect.Root>
+			</div>
+
+			{#if artifactResults.length === 0 && !loading}
+				<p class="px-2 py-3 text-xs text-muted-foreground">No artifact matches.</p>
+			{/if}
+
+			{#each artifactResults as artifact (artifact._id)}
+				{@const canUseArtifact =
+					Boolean(activeThreadId) && !activeThreadArtifactIds.has(artifact._id)}
+				<Command.Item
+					class={paletteItemClass}
+					value="artifact {artifact._id} {artifact.title} {artifact.type} {artifactPreview(
+						artifact.contentMarkdown
+					)}"
+					keywords={[
+						artifact.title,
+						artifactTypeLabel(artifact.type),
+						artifact.type,
+						artifactPreview(artifact.contentMarkdown),
+						projectLabel(artifact.projectId),
+						'document',
+						'doc'
+					]}
+					onSelect={nav(workspaceArtifactHref(artifact._id))}
+				>
+					<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+					<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+						<span class="truncate">{artifact.title}</span>
+						<span class="truncate text-[11px] font-normal text-muted-foreground">
+							{artifactPreview(artifact.contentMarkdown)}
+						</span>
+					</span>
+					<span
+						class="ml-auto flex shrink-0 items-center gap-1 pl-1 text-right text-[11px] text-muted-foreground"
 					>
-						<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
-						<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
-						<span class="ml-auto shrink-0 pl-1 text-right text-[11px] text-muted-foreground"
-							>{artifactTypeLabel(artifact.type)}</span
-						>
-					</Command.Item>
-				{/each}
-			</Command.Group>
-		{/if}
+						<span>{artifactTypeLabel(artifact.type)}</span>
+						<span aria-hidden="true">·</span>
+						<span>{projectLabel(artifact.projectId)}</span>
+						<span aria-hidden="true">·</span>
+						<span>{formatArtifactUpdatedAt(artifact.updatedAt)}</span>
+					</span>
+				</Command.Item>
+				{#if canUseArtifact}
+					<div class="px-8 pb-1">
+						<Button variant="ghost" size="xs" onclick={useInThread(artifact._id)}>
+							Use in this chat
+						</Button>
+					</div>
+				{/if}
+			{/each}
+		</Command.Group>
 	</Command.List>
 
 	<div class="border-t border-border/50 px-2.5 py-2" data-workspace-command-footer>

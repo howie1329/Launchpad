@@ -1477,10 +1477,12 @@
 			threads={threads.data}
 			artifacts={artifacts.data}
 			{activeThreadId}
+			{activeThreadArtifactIds}
 			{contextPanelOpen}
 			{canPromoteThreadToProject}
 			onRequestPromote={openPromoteDialog}
 			onRequestCreateArtifact={openCreateArtifactDialog}
+			onUseArtifactInThread={useArtifactInThread}
 			onToggleThreadContext={toggleThreadContext}
 		/>
 
