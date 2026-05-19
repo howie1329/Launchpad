@@ -104,6 +104,9 @@
 		limit: 25
 	}));
 	const artifactResults = $derived(artifactSearch.data ?? artifacts ?? []);
+	const hasArtifactFilters = $derived(
+		Boolean(typeFilter) || projectFilter !== 'all' || recencyFilter !== 'any'
+	);
 	const loading = $derived(
 		projects === undefined ||
 			threads === undefined ||
@@ -144,6 +147,12 @@
 
 	function useInThread(artifactId: Id<'artifacts'>) {
 		return () => void runAction(() => onUseArtifactInThread(artifactId));
+	}
+
+	function resetArtifactFilters() {
+		typeFilter = '';
+		projectFilter = 'all';
+		recencyFilter = 'any';
 	}
 
 	/**
@@ -346,7 +355,7 @@
 
 		<Command.Separator class="-mx-1 h-px bg-border" />
 		<Command.Group heading="Artifacts" value="artifacts" headingClass={paletteGroupHeadingClass}>
-			<div class="grid gap-1.5 px-2 py-1.5 sm:grid-cols-3">
+			<div class="grid gap-1.5 px-2 py-1.5 sm:grid-cols-[1fr_1fr_1fr_auto]">
 				<NativeSelect.Root bind:value={typeFilter} size="sm" aria-label="Filter artifacts by type">
 					<option value="">All types</option>
 					{#each typeOptions as type (type)}
@@ -374,6 +383,16 @@
 					<option value="30">Last 30 days</option>
 					<option value="90">Last 90 days</option>
 				</NativeSelect.Root>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					class="h-8 px-2 text-xs"
+					disabled={!hasArtifactFilters}
+					onclick={resetArtifactFilters}
+				>
+					Reset
+				</Button>
 			</div>
 
 			{#if artifactResults.length === 0 && !loading}
