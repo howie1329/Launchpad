@@ -170,6 +170,10 @@ export const searchArtifacts = query({
 			.query('artifacts')
 			.withSearchIndex('search_title', (q) => q.search('title', queryText).eq('ownerId', ownerId))
 			.take(artifactSearchCandidateLimit);
+		const typeMatches = await ctx.db
+			.query('artifacts')
+			.withSearchIndex('search_type', (q) => q.search('type', queryText).eq('ownerId', ownerId))
+			.take(artifactSearchCandidateLimit);
 		const contentMatches = await ctx.db
 			.query('artifacts')
 			.withSearchIndex('search_contentMarkdown', (q) =>
@@ -179,14 +183,13 @@ export const searchArtifacts = query({
 
 		const seen = new Set<Id<'artifacts'>>();
 		const rows: Doc<'artifacts'>[] = [];
-		for (const artifact of [...titleMatches, ...contentMatches]) {
+		for (const artifact of [...titleMatches, ...typeMatches, ...contentMatches]) {
 			if (seen.has(artifact._id) || !matchesFilters(artifact)) continue;
 			seen.add(artifact._id);
 			rows.push(artifact);
-			if (rows.length >= limit) break;
 		}
 
-		return rows;
+		return rows.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, limit);
 	}
 });
 
