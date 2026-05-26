@@ -76,7 +76,7 @@
 
 	let { children } = $props();
 
-	let sidebarOpen = $state(true);
+	let sidebarOpen = $state(false);
 	let isSigningOut = $state(false);
 	let promoteDialogOpen = $state(false);
 	let promoteName = $state('');
@@ -101,9 +101,9 @@
 	let artifactActionError = $state('');
 	let workspaceNotice = $state('');
 	let openSections = $state({
-		Projects: true,
-		Chats: true,
-		Artifacts: true
+		Projects: false,
+		Chats: false,
+		Artifacts: false
 	});
 	let openProjectIds = $state<Record<string, boolean>>({});
 	let commandCenterOpen = $state(false);
@@ -245,7 +245,7 @@
 
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
-	const isProjectOpen = (projectId: string) => openProjectIds[projectId] ?? true;
+	const isProjectOpen = (projectId: string) => openProjectIds[projectId] ?? false;
 	const setProjectOpen = (projectId: string, open: boolean) => {
 		openProjectIds = { ...openProjectIds, [projectId]: open };
 	};
