@@ -48,6 +48,7 @@ const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = 
 	listThreadArtifacts: { title: 'List thread artifacts', running: 'Checking thread artifacts…' },
 	readThreadArtifact: { title: 'Read thread artifact', running: 'Reading artifact…' },
 	listProjectArtifacts: { title: 'List project artifacts', running: 'Checking project artifacts…' },
+	searchArtifacts: { title: 'Search artifacts', running: 'Searching artifacts…' },
 	importProjectArtifactToThread: {
 		title: 'Use project artifact',
 		running: 'Adding artifact to this chat…'
@@ -182,6 +183,7 @@ function summarizeWorkspaceTool(
 			};
 		case 'listThreadArtifacts':
 		case 'listProjectArtifacts':
+		case 'searchArtifacts':
 			return {
 				summary: `Found ${artifacts?.length ?? 0} artifact${artifacts?.length === 1 ? '' : 's'}.`,
 				detailJson
@@ -325,9 +327,7 @@ export function toolPartToPromotionProposal(part: unknown): PromotionProposalVie
 
 	const summary = typeof output.summary === 'string' ? output.summary.trim() : '';
 	const strengths = Array.isArray(output.strengths)
-		? output.strengths
-				.map((item) => (typeof item === 'string' ? item.trim() : ''))
-				.filter(Boolean)
+		? output.strengths.map((item) => (typeof item === 'string' ? item.trim() : '')).filter(Boolean)
 		: [];
 	const missingInformation = Array.isArray(output.missingInformation)
 		? output.missingInformation

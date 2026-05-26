@@ -6,7 +6,9 @@ import {
 	linkArtifactToThreadMutation,
 	listProjectArtifactsQuery,
 	listThreadArtifactsQuery,
+	searchArtifactsQuery,
 	updateThreadArtifactMutation,
+	type ArtifactSearchArgs,
 	type SavedArtifact
 } from '$lib/artifacts';
 import { parseArtifactMentionIds } from '$lib/artifact-mention-tokens';
@@ -437,6 +439,52 @@ function workspaceTools({
 
 				return {
 					artifacts: artifacts.map((artifact) => artifactSummary(artifact))
+				};
+			}
+		}),
+		searchArtifacts: tool({
+			description:
+				'Search workspace artifacts by title, type, or markdown content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
+			inputSchema: z.object({
+				query: z.string().optional().describe('Search text for artifact title, type, or content.'),
+				type: z.string().nullable().optional().describe('Optional exact artifact type filter.'),
+				projectScope: z
+					.enum(['all', 'none', 'project'])
+					.default('all')
+					.describe(
+						'Whether to search all artifacts, artifacts without a project, or current project artifacts.'
+					),
+				updatedAfter: z
+					.number()
+					.nullable()
+					.optional()
+					.describe(
+						'Optional Unix timestamp in milliseconds; only return artifacts updated at or after this time.'
+					),
+				limit: z.number().int().min(1).max(25).default(10)
+			}),
+			execute: async ({ query, type, projectScope, updatedAfter, limit }) => {
+				const resolvedProjectScope = projectScope ?? 'all';
+				if (resolvedProjectScope === 'project' && !project) {
+					throw new Error('Project-scoped artifact search is only available in project chats.');
+				}
+
+				const normalizedQuery = query?.trim() ?? '';
+				const searchArgs: ArtifactSearchArgs = {
+					type: type?.trim() || null,
+					projectScope: resolvedProjectScope,
+					projectId: resolvedProjectScope === 'project' && project ? project._id : null,
+					updatedAfter: updatedAfter ?? null,
+					limit: limit ?? 10
+				};
+				if (normalizedQuery) searchArgs.query = normalizedQuery;
+
+				const artifacts = await convex.query(searchArtifactsQuery, searchArgs);
+
+				return {
+					artifacts: artifacts.map((artifact) => artifactSummary(artifact)),
+					query: normalizedQuery,
+					projectScope: resolvedProjectScope
 				};
 			}
 		}),

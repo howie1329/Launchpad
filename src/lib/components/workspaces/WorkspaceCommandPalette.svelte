@@ -103,15 +103,18 @@
 		updatedAfter,
 		limit: 25
 	}));
-	const artifactResults = $derived(artifactSearch.data ?? artifacts ?? []);
+	const hasArtifactSearch = $derived(searchValue.trim().length > 0);
 	const hasArtifactFilters = $derived(
 		Boolean(typeFilter) || projectFilter !== 'all' || recencyFilter !== 'any'
 	);
-	const loading = $derived(
-		projects === undefined ||
-			threads === undefined ||
-			artifacts === undefined ||
-			artifactSearch.data === undefined
+	const workspaceLoading = $derived(
+		projects === undefined || threads === undefined || artifacts === undefined
+	);
+	const artifactSearchLoading = $derived(
+		artifactSearch.data === undefined && artifacts !== undefined
+	);
+	const artifactResults = $derived(
+		artifactSearch.data ?? (artifactSearchLoading ? [] : (artifacts ?? []))
 	);
 
 	function close() {
@@ -136,8 +139,6 @@
 		}
 	}
 
-	const projectsCap = 50;
-	const threadsCap = 50;
 	const artifactsCap = 25;
 
 	function projectLabel(projectId: string | undefined) {
@@ -179,10 +180,12 @@
 	/>
 	<Command.List class="max-h-[min(24rem,60vh)] px-1">
 		<Command.Empty class="px-2 py-6 text-center text-xs text-muted-foreground">
-			{#if loading}
+			{#if workspaceLoading}
 				Loading workspace…
+			{:else if artifactSearchLoading}
+				Searching artifacts…
 			{:else}
-				No matches.
+				No matching action, project, chat, or artifact.
 			{/if}
 		</Command.Empty>
 
@@ -395,8 +398,29 @@
 				</Button>
 			</div>
 
-			{#if artifactResults.length === 0 && !loading}
-				<p class="px-2 py-3 text-xs text-muted-foreground">No artifact matches.</p>
+			{#if artifactSearchLoading}
+				<p class="px-2 py-3 text-xs text-muted-foreground">Searching artifacts…</p>
+			{:else if artifactResults.length === 0 && !workspaceLoading}
+				<div class="flex flex-col gap-2 px-2 py-3 text-xs text-muted-foreground">
+					<p>
+						{hasArtifactSearch || hasArtifactFilters
+							? 'No artifact matches your search or filters.'
+							: 'No artifacts yet.'}
+					</p>
+					{#if hasArtifactFilters}
+						<div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="h-7 px-2 text-xs"
+								onclick={resetArtifactFilters}
+							>
+								Clear filters
+							</Button>
+						</div>
+					{/if}
+				</div>
 			{/if}
 
 			{#each artifactResults as artifact (artifact._id)}
@@ -462,8 +486,8 @@
 				</Kbd.Group>
 			</div>
 			<p class="m-0 text-pretty text-muted-foreground/85">
-				Lists show at most {projectsCap} projects, {threadsCap} chats, and {artifactsCap} documents (newest
-				first). Older items are not in this search until full workspace search exists.
+				Projects and chats show recent workspace items. Artifacts search by title, type, and
+				markdown content, then shows up to {artifactsCap} matching documents.
 			</p>
 		</div>
 	</div>
