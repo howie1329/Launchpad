@@ -43,12 +43,11 @@
 	);
 
 	const itemClass =
-		'flex min-h-0 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-xs ' +
-		'outline-none hover:bg-accent/50 focus:bg-accent ' +
+		'flex min-h-0 w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-xs ' +
+		'outline-none hover:bg-accent/50 focus:bg-accent focus:text-accent-foreground ' +
 		'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground';
 
-	const headingClass =
-		'px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground';
+	const headingClass = 'px-2 pt-2 pb-1 text-[11px] font-medium text-muted-foreground';
 
 	const projectsCap = 50;
 	const threadsCap = 50;
@@ -73,21 +72,24 @@
 		</Button>
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content
-		class="w-[min(100vw-2rem,20rem)] rounded-lg border-border/70 bg-popover p-0"
+		class="w-[min(100vw-2rem,18rem)] rounded-lg border-border/70 bg-popover p-0"
 		align="start"
 		sideOffset={6}
 	>
-		<ScrollArea class="h-[min(22rem,60vh)]">
+		<div class="border-b border-border/50 px-3 py-2">
+			<p class="text-xs font-medium text-popover-foreground">Open workspace tab</p>
+			<p class="mt-0.5 text-[11px] text-muted-foreground">Create a tab or jump to recent work.</p>
+		</div>
+		<ScrollArea class="max-h-[min(22rem,60vh)]">
 			<div class="p-1">
 				{#if loading}
 					<p class="px-2 py-4 text-center text-xs text-muted-foreground">Loading workspace…</p>
 				{:else}
-					<div class={headingClass}>Open</div>
 					<DropdownMenu.Item class={itemClass} onSelect={navTo(workspaceRootHref())}>
 						<HugeiconsIcon
 							icon={ChatAdd01Icon}
 							strokeWidth={2}
-							class="size-3 text-muted-foreground"
+							class="size-3.5 text-muted-foreground"
 						/>
 						<span class="min-w-0 flex-1 truncate">New chat</span>
 					</DropdownMenu.Item>
@@ -95,7 +97,7 @@
 						<HugeiconsIcon
 							icon={Settings01Icon}
 							strokeWidth={2}
-							class="size-3 text-muted-foreground"
+							class="size-3.5 text-muted-foreground"
 						/>
 						<span class="min-w-0 flex-1 truncate">Settings</span>
 					</DropdownMenu.Item>
@@ -110,7 +112,7 @@
 								<HugeiconsIcon
 									icon={Folder01Icon}
 									strokeWidth={2}
-									class="size-3 text-muted-foreground"
+									class="size-3.5 text-muted-foreground"
 								/>
 								<span class="min-w-0 flex-1 truncate">{project.name}</span>
 							</DropdownMenu.Item>
@@ -124,7 +126,7 @@
 								<HugeiconsIcon
 									icon={Chat01Icon}
 									strokeWidth={2}
-									class="size-3 text-muted-foreground"
+									class="size-3.5 text-muted-foreground"
 								/>
 								<span class="min-w-0 flex-1 truncate"
 									>{formatThreadTitleForDisplay(thread.title)}</span
@@ -143,7 +145,7 @@
 								<HugeiconsIcon
 									icon={File01Icon}
 									strokeWidth={2}
-									class="size-3 text-muted-foreground"
+									class="size-3.5 text-muted-foreground"
 								/>
 								<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
 								<span class="shrink-0 pl-1 text-[11px] text-muted-foreground"
@@ -152,12 +154,6 @@
 							</DropdownMenu.Item>
 						{/each}
 					{/if}
-					<div
-						class="border-t border-border/50 p-2 text-[10px] leading-relaxed text-muted-foreground"
-					>
-						Lists show at most {projectsCap} projects, {threadsCap} chats, and {artifactsCap} documents
-						(newest first).
-					</div>
 				{/if}
 			</div>
 		</ScrollArea>
