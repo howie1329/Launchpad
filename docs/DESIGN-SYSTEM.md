@@ -1,11 +1,11 @@
 <!-- agentkit:start design-system -->
-# Launchpad Design System - Linear-Inspired Foundations
+# [Project Name] Design System - Linear-Inspired Foundations
 
-This design system codifies the visual and interaction principles for Launchpad.
+This design system codifies the visual and interaction principles for [Project Name].
 
 It is the default source of truth for app shell layout, navigation, lists, controls, and page chrome in this repository.
 
-All colors, typography families, and radii must be consumed through semantic tokens in `src/routes/layout.css` or local theme utilities derived from it. Components must not hardcode literal color values or font family names.
+All colors, typography families, and radii must be consumed through semantic tokens in `[theme stylesheet path, e.g. src/styles.css]` or a dedicated theme stylesheet imported there. Components must not hardcode literal color values or font family names.
 
 ## 1) Surface And Color
 
@@ -203,9 +203,9 @@ Density guidelines:
 
 ### Where Values Live
 
-- Theme tokens and base layer: `src/routes/layout.css`.
-- App shell composition: `src/routes/workspace/+layout.svelte`.
-- Reusable UI primitives: `src/lib/components/ui`.
+- Theme tokens and base layer: `[theme stylesheet path, e.g. src/styles.css]`.
+- App shell composition: `[route/layout path, e.g. src/routes or app]`.
+- Reusable UI primitives: `[components path, e.g. src/components/ui]`.
 
 ### New Component Checklist
 
