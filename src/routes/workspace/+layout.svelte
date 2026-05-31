@@ -323,13 +323,17 @@
 		{ value: 'custom', label: 'Custom' }
 	] as const;
 
-	/** Design-system-aligned nav rows: dense, 12px icons */
+	/** Sidebar row vocabulary: compact, distinct roles, no new tokens. */
 	const navPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/72 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70';
+	const actionPill =
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/82 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground';
 	const sectionTrigger =
-		'group/section flex h-7 w-full items-center gap-1 rounded-full px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
+		'group/section flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px] font-semibold text-sidebar-foreground/62 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
 	const subNavPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70';
+	const footerPill =
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
 
 	const usageBarPct = $derived(
 		budget.data && budget.data.capUsd > 0
@@ -1077,10 +1081,13 @@ Important rules:
 	>
 		<Sidebar.Root class="overflow-hidden" collapsible="icon">
 			<nav id="workspace-sidebar-nav" class="flex min-h-0 flex-1 flex-col" aria-label="Workspace">
-				<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
+				<Sidebar.Header class="border-b border-sidebar-border/60 px-2 py-2">
 					<Sidebar.Menu class="flex flex-row items-center gap-1">
 						<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
-							<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
+							<Sidebar.MenuButton
+								size="sm"
+								class="h-9 min-w-0 gap-2 rounded-md px-1.5 text-sidebar-foreground group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground"
+							>
 								{#snippet child({ props })}
 									<a
 										href={resolve(workspaceRootHref() as '/workspace')}
@@ -1090,14 +1097,20 @@ Important rules:
 										{...props}
 									>
 										<div
-											class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
+											class="flex aspect-square size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
 										>
 											<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
 										</div>
-										<span
-											class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
-											>{sidebarHomeDisplayLabel}</span
-										>
+										<span class="min-w-0 flex-1 group-data-[collapsible=icon]:sr-only">
+											<span
+												class="block text-[10px] leading-3 font-medium text-sidebar-foreground/60"
+											>
+												Current
+											</span>
+											<span class="block truncate text-xs leading-4 font-semibold">
+												{sidebarHomeDisplayLabel}
+											</span>
+										</span>
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>
@@ -1105,7 +1118,7 @@ Important rules:
 					</Sidebar.Menu>
 				</Sidebar.Header>
 
-				<Sidebar.Content>
+				<Sidebar.Content class="gap-1 py-1.5">
 					{#if workspaceListError}
 						<div
 							class="border-b border-destructive/25 bg-destructive/10 px-3 py-2.5 text-[11px] text-destructive"
@@ -1126,13 +1139,15 @@ Important rules:
 							</Button>
 						</div>
 					{/if}
-					<Sidebar.Group class="border-0 shadow-none ring-0">
-						<Sidebar.Menu>
+					<Sidebar.Group class="px-2 py-1 group-data-[collapsible=icon]:px-2">
+						<Sidebar.Menu
+							class="gap-1 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/25 p-1 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0"
+						>
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									size="sm"
 									isActive={isNewChatActive}
-									class={cn(navPill, 'min-w-0')}
+									class={cn(actionPill, 'min-w-0')}
 									tooltipContent="New chat"
 								>
 									{#snippet child({ props })}
@@ -1153,7 +1168,7 @@ Important rules:
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									size="sm"
-									class={cn(navPill, 'min-w-0')}
+									class={cn(actionPill, 'min-w-0')}
 									tooltipContent="Create artifact"
 									onclick={openCreateArtifactDialog}
 								>
@@ -1175,6 +1190,11 @@ Important rules:
 									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 								/>
 								<span class="min-w-0 truncate">Projects</span>
+								{#if projects.data && projects.data.length > 0}
+									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+										{projects.data.length}
+									</span>
+								{/if}
 							</Collapsible.Trigger>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
@@ -1190,8 +1210,8 @@ Important rules:
 										{:else if projects.data.length === 0}
 											<Sidebar.MenuItem>
 												<div class="space-y-2 px-2 py-1.5">
-													<p class="text-[11px] leading-snug text-sidebar-foreground/60">
-														Promote a useful chat when the idea is ready for focused work.
+													<p class="text-[11px] leading-snug text-sidebar-foreground/65">
+														Promoted chats land here when an idea becomes focused work.
 													</p>
 												</div>
 											</Sidebar.MenuItem>
@@ -1230,7 +1250,7 @@ Important rules:
 																<DropdownMenu.Root>
 																	<DropdownMenu.Trigger
 																		type="button"
-																		class="inline-flex size-7 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																		class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																		onclick={(e) => e.stopPropagation()}
 																		onpointerdown={(e) => e.stopPropagation()}
 																		aria-label={`Project actions: ${project.name}`}
@@ -1253,7 +1273,7 @@ Important rules:
 																<a
 																	href={resolve(workspaceProjectHref(project._id) as '/workspace')}
 																	data-workspace-nav-item
-																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																	aria-label={`New chat in ${project.name}`}
 																>
 																	<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
@@ -1282,7 +1302,7 @@ Important rules:
 																					data-workspace-nav-item
 																					{...props}
 																				>
-																					<span class="text-sidebar-foreground/60">Start chat</span>
+																					<span class="text-sidebar-foreground/65">Start chat</span>
 																				</a>
 																			{/snippet}
 																		</Sidebar.MenuSubButton>
@@ -1316,7 +1336,7 @@ Important rules:
 																				<DropdownMenu.Root>
 																					<DropdownMenu.Trigger
 																						type="button"
-																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																						onclick={(e) => e.stopPropagation()}
 																						onpointerdown={(e) => e.stopPropagation()}
 																						aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -1365,6 +1385,11 @@ Important rules:
 									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 								/>
 								<span class="min-w-0 truncate">Inbox</span>
+								{#if threads.data && generalThreads.length > 0}
+									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+										{generalThreads.length}
+									</span>
+								{/if}
 							</Collapsible.Trigger>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
@@ -1380,8 +1405,8 @@ Important rules:
 										{:else if generalThreads.length === 0}
 											<Sidebar.MenuItem>
 												<div class="space-y-2 px-2 py-1.5">
-													<p class="text-[11px] leading-snug text-sidebar-foreground/60">
-														Start with a messy note. Launchpad will help turn it into a project.
+													<p class="text-[11px] leading-snug text-sidebar-foreground/65">
+														Start with a messy note, then promote it when it has shape.
 													</p>
 													<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 														{#snippet child({ props })}
@@ -1422,7 +1447,7 @@ Important rules:
 														<DropdownMenu.Root>
 															<DropdownMenu.Trigger
 																type="button"
-																class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																onclick={(e) => e.stopPropagation()}
 																onpointerdown={(e) => e.stopPropagation()}
 																aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -1458,6 +1483,11 @@ Important rules:
 									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 								/>
 								<span class="min-w-0 truncate">Artifacts</span>
+								{#if artifacts.data && artifacts.data.length > 0}
+									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+										{artifacts.data.length}
+									</span>
+								{/if}
 							</Collapsible.Trigger>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
@@ -1472,17 +1502,15 @@ Important rules:
 											</Sidebar.MenuItem>
 										{:else if artifacts.data.length === 0}
 											<Sidebar.MenuItem>
-												<p class="px-2 py-1.5 text-[11px] leading-snug text-sidebar-foreground/60">
-													Artifacts appear when a chat saves an idea, PRD, or draftable document.
+												<p class="px-2 py-1.5 text-[11px] leading-snug text-sidebar-foreground/65">
+													Saved ideas, PRDs, notes, and research appear here.
 												</p>
 											</Sidebar.MenuItem>
 										{:else}
 											{#each artifactGroups as group (group.key)}
 												{#if group.artifacts.length > 0}
 													<li class="list-none px-2 pt-2 pb-0.5 first:pt-0" role="presentation">
-														<p
-															class="text-[11px] font-medium tracking-wide text-sidebar-foreground/55 uppercase"
-														>
+														<p class="text-[10px] font-semibold text-sidebar-foreground/55">
 															{group.label}
 														</p>
 													</li>
@@ -1543,20 +1571,20 @@ Important rules:
 							<a
 								href={resolve(workspaceSettingsHref() as '/workspace/settings')}
 								data-workspace-nav-item
-								class="mb-2 block rounded-full px-2.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+								class="mb-2 block rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 px-2.5 py-2 transition-colors outline-none hover:bg-sidebar-accent/40 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 								aria-label={usageTooltip}
 							>
 								<div
-									class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/60"
+									class="mb-1.5 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/65"
 								>
-									<span class="font-medium tracking-wide uppercase">AI today</span>
+									<span class="font-semibold">AI today</span>
 									<span class="text-sidebar-foreground/75 tabular-nums">
 										{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
 									</span>
 								</div>
-								<div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+								<div class="h-1 w-full overflow-hidden rounded-full bg-sidebar-border/70">
 									<div
-										class="h-full rounded-full bg-primary transition-[width]"
+										class="h-full rounded-full bg-sidebar-foreground/75 transition-[width]"
 										style="width: {usageBarPct}%"
 									></div>
 								</div>
@@ -1577,7 +1605,7 @@ Important rules:
 								</Button>
 							</div>
 						{:else}
-							<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/50">Loading usage…</p>
+							<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/60">Loading usage…</p>
 						{/if}
 					</div>
 
@@ -1611,7 +1639,7 @@ Important rules:
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									size="sm"
-									class={navPill}
+									class={footerPill}
 									tooltipContent={collapsedUsageTooltip}
 									tooltipContentProps={{
 										class:
@@ -1633,13 +1661,13 @@ Important rules:
 						</Sidebar.Menu>
 					</div>
 
-					<Sidebar.Menu class="gap-0.5">
+					<Sidebar.Menu class="gap-0.5 border-t border-sidebar-border/45 pt-1.5">
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								size="sm"
 								isActive={isSettingsActive}
 								tooltipContent="Settings"
-								class={cn(navPill, 'min-w-0')}
+								class={cn(footerPill, 'min-w-0')}
 							>
 								{#snippet child({ props })}
 									<a
@@ -1661,7 +1689,7 @@ Important rules:
 							<Sidebar.MenuButton
 								size="sm"
 								tooltipContent="Sign out"
-								class={cn(navPill, 'min-w-0')}
+								class={cn(footerPill, 'min-w-0')}
 								aria-disabled={isSigningOut}
 								onclick={handleSignOut}
 							>
