@@ -15,6 +15,45 @@ const threadArtifactLinkReason = v.union(
 const artifactVersionActor = v.union(v.literal('user'), v.literal('ai'));
 const artifactVersionSource = v.union(v.literal('editor'), v.literal('chat'));
 const memorySyncStatus = v.union(v.literal('synced'), v.literal('blocked'), v.literal('failed'));
+const aiUsageSourceKind = v.union(v.literal('chatThread'), v.literal('externalContextImportDraft'));
+const notificationType = v.union(
+	v.literal('external_context_import'),
+	v.literal('ai_chat_activity')
+);
+const notificationState = v.union(
+	v.literal('activity'),
+	v.literal('success'),
+	v.literal('failed'),
+	v.literal('in_progress')
+);
+const notificationStatus = v.union(
+	v.literal('unread'),
+	v.literal('read'),
+	v.literal('dismissed'),
+	v.literal('deleted')
+);
+const notificationTargetKind = v.union(
+	v.literal('externalContextImportDraft'),
+	v.literal('chatThread'),
+	v.literal('artifact'),
+	v.literal('project')
+);
+const notificationMetadata = v.record(v.string(), v.any());
+const externalContextImportDraftStatus = v.union(
+	v.literal('pending'),
+	v.literal('processing'),
+	v.literal('ready'),
+	v.literal('failed'),
+	v.literal('created'),
+	v.literal('abandoned')
+);
+const externalContextImportSourceKind = v.literal('external_ai_context');
+const externalContextImportSourceToolHint = v.union(
+	v.literal('chatgpt'),
+	v.literal('claude'),
+	v.literal('other'),
+	v.literal('unknown')
+);
 
 export default defineSchema({
 	...authTables,
@@ -36,7 +75,9 @@ export default defineSchema({
 	}).index('by_ownerId', ['ownerId']),
 	aiUsageEvents: defineTable({
 		ownerId: v.string(),
-		threadId: v.id('chatThreads'),
+		threadId: v.optional(v.id('chatThreads')),
+		sourceKind: v.optional(aiUsageSourceKind),
+		sourceId: v.optional(v.string()),
 		modelId: v.string(),
 		dateKey: v.string(),
 		inputTokens: v.optional(v.number()),
@@ -66,6 +107,44 @@ export default defineSchema({
 		metadata: v.optional(v.record(v.string(), v.any())),
 		createdAt: v.number()
 	}).index('by_ownerId_and_createdAt', ['ownerId', 'createdAt']),
+	notifications: defineTable({
+		ownerId: v.string(),
+		type: notificationType,
+		state: notificationState,
+		status: notificationStatus,
+		title: v.string(),
+		body: v.optional(v.string()),
+		targetKind: notificationTargetKind,
+		targetId: v.string(),
+		metadata: v.optional(notificationMetadata),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		readAt: v.optional(v.number()),
+		dismissedAt: v.optional(v.number()),
+		deletedAt: v.optional(v.number())
+	})
+		.index('by_ownerId_and_createdAt', ['ownerId', 'createdAt'])
+		.index('by_ownerId_and_status_and_createdAt', ['ownerId', 'status', 'createdAt'])
+		.index('by_ownerId_and_targetKind_and_targetId', ['ownerId', 'targetKind', 'targetId']),
+	externalContextImportDrafts: defineTable({
+		ownerId: v.string(),
+		sourceMarkdown: v.string(),
+		status: externalContextImportDraftStatus,
+		sourceKind: externalContextImportSourceKind,
+		sourceToolHint: externalContextImportSourceToolHint,
+		generatedProjectName: v.optional(v.string()),
+		generatedProjectSummary: v.optional(v.string()),
+		generatedProjectBriefMarkdown: v.optional(v.string()),
+		errorMessage: v.optional(v.string()),
+		createdProjectId: v.optional(v.id('projects')),
+		modelUsed: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		completedAt: v.optional(v.number()),
+		projectCreatedAt: v.optional(v.number())
+	})
+		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt'])
+		.index('by_ownerId_and_status_and_updatedAt', ['ownerId', 'status', 'updatedAt']),
 	projects: defineTable({
 		ownerId: v.string(),
 		name: v.string(),

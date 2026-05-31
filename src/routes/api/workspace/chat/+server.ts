@@ -17,6 +17,7 @@ import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { getProjectQuery } from '$lib/projects';
 import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
+import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
 import {
 	GroqNotConfiguredError,
@@ -239,6 +240,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		};
 		let hasUsage = false;
 		let didRecordUsage = false;
+		let didCreateChatNotification = false;
 
 		return await createAgentUIStreamResponse({
 			agent,
@@ -268,15 +270,22 @@ export const POST: RequestHandler = async ({ request }) => {
 				}
 
 				const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7;
-				if (!isFinalStep || didRecordUsage || !hasUsage) return;
+				if (!isFinalStep) return;
 
-				didRecordUsage = true;
-				await convex.mutation(recordAiRunMutation, {
-					threadId: thread._id,
-					modelId: body.modelId,
-					occurredAt: Date.now(),
-					usage: accumulatedUsage
-				});
+				if (!didRecordUsage && hasUsage) {
+					didRecordUsage = true;
+					await convex.mutation(recordAiRunMutation, {
+						threadId: thread._id,
+						modelId: body.modelId,
+						occurredAt: Date.now(),
+						usage: accumulatedUsage
+					});
+				}
+
+				if (!didCreateChatNotification) {
+					didCreateChatNotification = true;
+					await createChatCompletionNotification(convex, thread._id);
+				}
 			}
 		});
 	} catch (error) {
@@ -723,6 +732,24 @@ async function syncArtifactMemoryForTool(convex: ConvexHttpClient, artifactId: I
 	const result = await syncArtifactMemory(convex, artifactId);
 	if (result && result.status !== 'synced' && result.status !== 'disabled') {
 		console.info('Artifact memory sync skipped', result);
+	}
+}
+
+async function createChatCompletionNotification(
+	convex: ConvexHttpClient,
+	threadId: Id<'chatThreads'>
+) {
+	try {
+		await convex.mutation(createNotificationMutation, {
+			type: 'ai_chat_activity',
+			state: 'activity',
+			title: 'AI response completed',
+			body: 'Open the chat to continue from the latest response.',
+			targetKind: 'chatThread',
+			targetId: threadId
+		});
+	} catch (error) {
+		console.info('Chat notification skipped', error);
 	}
 }
 

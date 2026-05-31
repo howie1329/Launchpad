@@ -20,8 +20,6 @@ Agents and contributors should optimize for code that is simple, readable, testa
 
 ## Review Severity
 
-Use clear severity when reviewing or explaining issues:
-
 - **Blocker**: likely bug, data loss, security issue, broken build, failing tests, or unmet requirement.
 - **Concern**: maintainability, test gap, confusing behavior, or risk that should be addressed soon.
 - **Suggestion**: optional improvement that does not block shipping.
@@ -44,17 +42,15 @@ Use clear severity when reviewing or explaining issues:
 
 Run the narrowest useful checks first, then broaden verification for larger changes.
 
-Document project commands here:
+Common project checks:
 
-```bash
-npm test
+```sh
+npm run check
 npm run lint
 npm run build
 ```
 
-Remove commands that do not apply.
-
-For deeper testing guidance, use `TESTING.md` when present.
+Docs-only changes should use a Markdown link check and placeholder search.
 
 ## Dependency Policy
 
@@ -89,5 +85,5 @@ Every completed change should include:
 - Known risks or limitations.
 - Follow-up work, if any.
 
-Use `CHANGE-EXPLANATION.md` when present for the final developer-facing handoff.
+Use `docs/CHANGE-EXPLANATION.md` when relevant for the final developer-facing handoff.
 <!-- agentkit:end code-quality -->

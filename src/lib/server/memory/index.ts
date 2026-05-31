@@ -1,6 +1,7 @@
 export {
 	syncArtifactToSupermemory,
 	deleteSupermemoryDocument,
+	deleteSupermemoryAccountData,
 	addUserMemoryDocument,
 	assertDocumentForgettable
 } from './ingestion';

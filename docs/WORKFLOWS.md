@@ -5,19 +5,15 @@
 
 This document defines lightweight workflows for research, planning, implementation, review, and release.
 
-Keep this file practical. Delete sections that do not apply to the project.
-
 ## Choose The Right Document
 
 | Situation | Use |
 | --- | --- |
 | Tiny obvious fix | No formal planning doc required |
-| User-facing feature or product uncertainty | `PRD-TEMPLATE.md` |
-| Known engineering work with multiple files or risks | `IMPLEMENTATION-BRIEF-TEMPLATE.md` |
-| UI, styling, layout, navigation, components | `DESIGN-SYSTEM.md` |
-| Security-sensitive change | `SECURITY-CHECKLIST.md` |
-| Test strategy or test implementation | `TESTING.md` |
-| Final handoff or PR explanation | `CHANGE-EXPLANATION.md` |
+| Product, architecture, routes, data, AI, memory | `docs/architecture.md` |
+| UI, styling, layout, navigation, components | `docs/DESIGN-SYSTEM.md` |
+| SvelteKit routes, load functions, server routes, rendering, data loading | `docs/STACK.md` |
+| Final handoff or PR explanation | `docs/CHANGE-EXPLANATION.md` |
 
 ## Research-Only Workflow
 
@@ -32,31 +28,26 @@ Use this when the task asks for investigation, options, or recommendations witho
 
 ## Planning Workflow
 
-Use a PRD for product or user-facing work that needs intent, requirements, and acceptance criteria.
-
-Use an implementation brief for engineering work that is already understood but needs a clear execution plan.
+Use a concise implementation plan for non-trivial work with multiple files, user-facing behavior, schema changes, security/privacy implications, or unclear acceptance criteria.
 
 Tiny fixes can skip formal planning when the change is obvious and low risk.
 
 ## Branch Workflow
 
 - Prefer an issue-linked branch when available.
-- Use short, descriptive branch names:
-  - `feature/[short-name]`
-  - `fix/[short-name]`
-  - `chore/[short-name]`
+- Use short, descriptive branch names.
 - Keep each branch focused on one coherent change.
 
 ## Implementation Workflow
 
-1. Read the issue, PRD, or implementation brief.
+1. Read the issue, plan, or request.
 2. Inspect existing patterns and nearby tests.
 3. Read relevant companion guidance from `AGENTS.md`.
 4. Make the smallest complete change.
 5. Add or update tests where behavior changes.
 6. Run relevant checks.
 7. Review the diff before handoff.
-8. Explain the change using `CHANGE-EXPLANATION.md` when present.
+8. Explain the change using `docs/CHANGE-EXPLANATION.md` when relevant.
 
 ## Pause And Ask Triggers
 
@@ -65,8 +56,8 @@ Pause and ask before:
 - expanding scope beyond the request
 - adding dependencies
 - changing schemas or migrations
-- changing auth, permissions, privacy, billing, or data retention behavior
-- running destructive commands
+- changing auth, permissions, privacy, billing, data retention, or memory-sync behavior
+- running destructive commands unless explicitly requested
 - changing design tokens, themes, or foundational layout rules
 - performing broad refactors or formatting-only rewrites
 - removing tests or weakening validation
@@ -89,10 +80,9 @@ Call out:
 
 Before release:
 
-- Confirm tests and build pass.
+- Confirm relevant checks pass.
 - Confirm docs match behavior.
-- Confirm environment variables and migrations are documented.
+- Confirm environment variables and schema changes are documented.
 - Confirm no secrets or local-only files are included.
-- Confirm changelog or release notes are updated when the project expects them.
 - Confirm rollback or mitigation steps for risky changes.
 <!-- agentkit:end workflows -->

@@ -1,57 +1,73 @@
 # Launchpad
 
-Launchpad helps solo developers and indie hackers turn rough ideas into scoped work **before** over-building. It is a **chat-first workspace**: you think in **threads**, persist decisions as **artifacts** (markdown ideas, PRDs, and more), organize under **projects** when work matures, and use an **AI assistant** that reads and writes workspace data through tools—not a disconnected chat window.
+Launchpad is a chat-first workspace for solo builders and indie hackers who want to turn rough ideas into scoped, buildable work before they over-invest in code.
 
-**Full product breakdown (what it is now, features, routes, data model):** [docs/product-overview.md](docs/product-overview.md)
+The product centers on one loop: think in conversation, preserve decisions as artifacts, organize serious work into projects, and use an AI assistant that can read and write the workspace instead of acting like a disconnected chat box.
 
-**Maintainer snapshot (architecture, schema, env):** [docs/current-state.md](docs/current-state.md)
+## Product
 
-**Product direction (north star):** [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md)
+Launchpad is built for people who want the useful parts of product planning without heavyweight process. It helps a builder:
 
-**AI chat tools (implemented + planned):** [docs/ai-chat-tools-and-vercel-workflows.md](docs/ai-chat-tools-and-vercel-workflows.md)
+- start with a general chat thread for messy thinking
+- save durable markdown artifacts such as ideas, PRDs, research notes, and project briefs
+- promote mature work into a project with its own threads and artifacts
+- review artifact history and restore older versions when needed
+- import external AI context into a project brief
+- keep AI usage bounded with daily spend caps
+- continue work with memory from artifacts, project context, and optional Supermemory recall
 
-**Durable workflows (design / not shipped):** [docs/durable-workflows-and-orchestration.md](docs/durable-workflows-and-orchestration.md)
+Launchpad is currently an active product build, not a static prototype. The main app surface is the signed-in workspace at `/workspace`.
 
----
+## Core Experience
+
+| Area | What it does |
+| --- | --- |
+| Workspace | Signed-in shell for chats, projects, artifacts, settings, command palette, tabs, and notifications |
+| Threads | General or project-scoped conversations with persisted AI SDK-style messages |
+| Projects | Containers for related threads, artifacts, summaries, and imported context |
+| Artifacts | Markdown documents with version history, CodeMirror editing, Streamdown preview, and diff review |
+| External context imports | Review flow for turning pasted AI context into project material |
+| AI assistant | Streams through the Vercel AI SDK and can use workspace tools for artifacts, projects, memory, and search |
+| Memory | Convex artifacts remain canonical; Supermemory can add derived recall when configured |
+| Usage controls | Per-user daily AI cap, token/cost accounting, and workspace activity history |
 
 ## Routes
 
-- **`/`** — Marketing home (chat-first workspace positioning; links into the app).
-- **`/auth`** — Sign in and sign up (Convex Auth).
-- **`/workspace`** — Signed-in shell: sidebar (projects, chats, artifacts), new-chat landing or active thread, optional **context** panel for thread-linked artifacts. Query params include `project`, `thread`, `context`, and `start` (auto-send after creating a thread).
-- **`/workspace/settings`** — Timezone, daily AI spend cap, usage vs cap, and workspace activity history.
-- **`/workspace/artifacts/[artifactId]`** — Full-page artifact reader (edit, preview, draft compare).
+| Route | Purpose |
+| --- | --- |
+| `/` | Public marketing home |
+| `/auth` | Sign in and sign up with Convex Auth |
+| `/workspace` | Main workspace start surface |
+| `/workspace/thread/[threadId]` | Active chat thread |
+| `/workspace/project/[projectId]` | Project overview |
+| `/workspace/artifacts/[artifactId]` | Full-page artifact reader/editor/history |
+| `/workspace/imports/external-context/[draftId]` | External context import review |
+| `/workspace/settings` | User settings, AI preferences, daily cap, usage, and activity |
+| `/privacy`, `/terms`, `/support` | Public support and policy pages |
 
-The workspace is the primary app surface; there is no separate dashboard or ideas-only area outside this shell.
-
----
+Workspace APIs live under `/api/workspace/*` for chat streaming, promotion readiness, generated titles, artifact memory sync, and artifact deletion.
 
 ## Stack
 
-- **App:** SvelteKit, Svelte 5, TypeScript
-- **UI:** Tailwind CSS v4, [shadcn-svelte](https://www.shadcn-svelte.com/) (Bits UI primitives)
-- **Backend:** [Convex](https://convex.dev) — data, realtime queries, and Convex Auth (`@convex-dev/auth`)
-- **Client:** `convex-svelte`
-- **AI:** Vercel AI SDK (`ai`, `@ai-sdk/svelte`), models via [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), [OpenRouter](https://openrouter.ai/) (`@openrouter/ai-sdk-provider`), and [NVIDIA NIM](https://build.nvidia.com/) (`@ai-sdk/openai-compatible`); workspace streaming in `src/routes/api/workspace/chat/+server.ts` with routing in `src/lib/server/resolve-workspace-language-model.ts`
-- **Artifacts:** CodeMirror (markdown / diff), Streamdown (preview)
-
----
+| Layer | Technology |
+| --- | --- |
+| App | SvelteKit, Svelte 5, TypeScript |
+| UI | Tailwind CSS v4, shadcn-svelte/Bits UI primitives, Hugeicons |
+| Backend | Convex queries, mutations, realtime data, and Convex Auth |
+| Client data | `convex-svelte` |
+| AI | Vercel AI SDK with Vercel AI Gateway, OpenRouter, Groq, and NVIDIA NIM catalog entries |
+| Search | Tavily for optional web search/page extraction |
+| Memory | Supermemory for optional derived recall |
+| Artifacts | CodeMirror, Streamdown, `@pierre/diffs` |
 
 ## Documentation
 
-| Doc                                                                                        | Purpose                                                                                      |
-| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| [docs/product-overview.md](docs/product-overview.md)                                       | **Product breakdown:** audience, concepts, features, routes, AI, settings, stack, data model |
-| [docs/current-state.md](docs/current-state.md)                                             | Maintainer snapshot: architecture, data model, env vars, PRD gaps                            |
-| [docs/chat-first-launchpad-prd.md](docs/chat-first-launchpad-prd.md)                       | Product vision and MVP scope                                                                 |
-| [docs/ai-chat-tools-and-vercel-workflows.md](docs/ai-chat-tools-and-vercel-workflows.md)   | Workspace chat tools (implemented + planned) and in-chat orchestration patterns              |
-| [docs/durable-workflows-and-orchestration.md](docs/durable-workflows-and-orchestration.md) | Durable background workflows, runtime options, catalog, guardrails                           |
-| [docs/design-system.md](docs/design-system.md)                                             | Visual and interaction principles (tokens live in `src/routes/layout.css`)                   |
-| [docs/shadcn-svelte.md](docs/shadcn-svelte.md)                                             | Index of shadcn-svelte docs                                                                  |
-| [docs/artifact-schema-plan.md](docs/artifact-schema-plan.md)                               | Rationale for artifact fields and markdown-first storage                                     |
-| [docs/tech-debt-followup.md](docs/tech-debt-followup.md)                                   | Optional cleanup notes                                                                       |
-
----
+- [Product summary](docs/product-summary.md) — investor/user-facing product snapshot
+- [Docs index](docs/index.md) — current documentation map
+- [Architecture](docs/architecture.md) — maintainer snapshot of routes, data, AI, memory, and env vars
+- [Design system](docs/DESIGN-SYSTEM.md) — UI rules for app shell, navigation, controls, motion, and accessibility
+- [Stack guidance](docs/STACK.md) — SvelteKit-specific implementation guidance
+- [Code quality](docs/CODE-QUALITY.md), [workflows](docs/WORKFLOWS.md), and [handoff guide](docs/CHANGE-EXPLANATION.md) — contributor and agent operating docs
 
 ## Developing
 
@@ -61,65 +77,43 @@ Install dependencies:
 npm install
 ```
 
-Run the Vite dev server (frontend only):
+Run the frontend:
 
 ```sh
 npm run dev
 ```
 
-Open the app (optional):
-
-```sh
-npm run dev -- --open
-```
-
-When you need Convex (auth, data, workspace):
+Run frontend and Convex together:
 
 ```sh
 npm run dev:all
 ```
 
-That runs Vite and `convex dev` together. You can also run `npx convex dev` in a second terminal alongside `npm run dev`.
-
----
-
-## Environment
-
-Set variables in `.env.local` or your host environment (names must match what SvelteKit and Convex expect):
-
-- **`PUBLIC_CONVEX_URL`** — Convex deployment URL (required for auth and client queries; see `src/lib/auth.svelte.ts`).
-- **`AI_GATEWAY_API_KEY`** — Private key for Vercel AI Gateway (required for workspace chat streaming; see `src/routes/api/workspace/chat/+server.ts`).
-- **`OPENROUTER_API_KEY`** — Private key for [OpenRouter](https://openrouter.ai/) (optional; required only when the user selects an OpenRouter catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
-- **`GROQ_API_KEY`** — Private key for [Groq](https://groq.com/) (optional; required only when the user selects a Groq catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
-- **`NIM_API_KEY`** — Private key for [NVIDIA NIM](https://build.nvidia.com/) (optional; required only when the user selects a NIM catalog model; see `src/lib/server/resolve-workspace-language-model.ts`).
-- **`TAVILY_API_KEY`** — Private Tavily key for optional workspace chat web search and page extraction.
-
-Configure the Convex project with `npx convex dev` and follow [Convex environment variables](https://docs.convex.dev/production/environment-variables) for deployment. For AI Gateway, see [Vercel AI Gateway](https://vercel.com/docs/ai-gateway).
-
----
-
-## Building
+Useful checks:
 
 ```sh
+npm run check
+npm run lint
 npm run build
 ```
 
-Preview the production build:
+## Environment
 
-```sh
-npm run preview
-```
+Set local values in `.env.local` or the deployment environment.
 
-Use a SvelteKit adapter suited to your host (for example the [Vercel adapter](https://svelte.dev/docs/kit/adapters) on Vercel).
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `PUBLIC_CONVEX_URL` | Yes | Convex deployment URL for browser and server HTTP clients |
+| `AI_GATEWAY_API_KEY` | Yes | Vercel AI Gateway key for default workspace chat, title generation, and promotion readiness |
+| `OPENROUTER_API_KEY` | Optional | Enables OpenRouter catalog models |
+| `GROQ_API_KEY` | Optional | Enables Groq catalog models |
+| `NIM_API_KEY` | Optional | Enables NVIDIA NIM catalog models |
+| `TAVILY_API_KEY` | Optional | Enables workspace chat web search and page extraction |
+| `SUPERMEMORY_API_KEY` | Optional | Enables Supermemory retrieval, profile context, and artifact memory sync |
+| `CONVEX_SITE_URL` | Deployment | Convex Auth site URL for deployed auth configuration |
 
----
+Convex deployment configuration follows the Convex environment variable model. Never commit API keys, private `.env` files, or local tokens.
 
-## Project tooling
+## Status
 
-Bootstrapped with [`sv`](https://github.com/sveltejs/cli). Quality checks:
-
-```sh
-npm run check    # svelte-check + sync
-npm run lint     # prettier + eslint
-npm run format   # prettier --write
-```
+Launchpad is under active development. The codebase is the source of truth for shipped behavior; the docs in this repository are kept intentionally small so product positioning, setup, and maintainer context stay easy to trust.

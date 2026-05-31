@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { deleteAccountMutation, resetAccountMutation } from '$lib/account-management';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import { listMyActivityEventsQuery } from '$lib/activity';
 	import { Button } from '$lib/components/ui/button';
@@ -45,7 +44,7 @@
 		resetError = '';
 		isResetting = true;
 		try {
-			await getConvexClient().mutation(resetAccountMutation, {});
+			await runAccountAction('/api/workspace/account/reset');
 			resetDialogOpen = false;
 			void invalidateAll();
 		} catch (error) {
@@ -64,7 +63,7 @@
 		deleteError = '';
 		isDeleting = true;
 		try {
-			await getConvexClient().mutation(deleteAccountMutation, {});
+			await runAccountAction('/api/workspace/account/delete');
 			deleteDialogOpen = false;
 			await signOut();
 			goto(resolve('/'));
@@ -78,6 +77,27 @@
 			isDeleting = false;
 		}
 	};
+
+	async function runAccountAction(path: string) {
+		if (!auth.token) {
+			throw new Error('Authentication is required.');
+		}
+
+		const response = await fetch(path, {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${auth.token}`
+			}
+		});
+		const result = (await response.json().catch(() => null)) as {
+			ok?: boolean;
+			error?: string;
+		} | null;
+
+		if (!response.ok || !result?.ok) {
+			throw new Error(result?.error || 'Account action failed. Please try again.');
+		}
+	}
 
 	$effect(() => {
 		if (!settings.data) return;
