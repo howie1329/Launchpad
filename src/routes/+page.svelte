@@ -1,167 +1,198 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { LaunchpadLogo } from '$lib/components/brand';
-	import AuthControls from '$lib/components/AuthControls.svelte';
-	import ThemeMenu from '$lib/components/ThemeMenu.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import PublicFooter from '$lib/components/PublicFooter.svelte';
+	import PublicHeader from '$lib/components/PublicHeader.svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 
-	const bullets = [
-		'Chat-first workspace — think in threads, not forms.',
-		'Artifacts stay as markdown memory: ideas, PRDs, and more.',
-		'Projects when you are ready to group work and context.'
+	const loop = [
+		{ label: 'Start with a thread', detail: 'Work through the messy product question in chat.' },
+		{
+			label: 'Save the useful parts',
+			detail: 'Turn decisions, notes, and PRDs into markdown artifacts.'
+		},
+		{
+			label: 'Promote when it is real',
+			detail: 'Group the thread and artifacts into a project only when scope is clear.'
+		}
 	];
 
-	const signInHref = `${resolve('/auth')}?redirectTo=${encodeURIComponent('/workspace')}`;
+	const artifactNotes = [
+		'First user: solo dev with a half-shaped idea',
+		'MVP: one workflow, one artifact type'
+	];
 </script>
 
 <svelte:head>
-	<title>Launchpad | Chat-first workspace for scoped builds</title>
+	<title>Launchpad | A workbench for scoped builds</title>
 	<meta
 		name="description"
-		content="Launchpad is a chat-first workspace for solo builders: threads, saved artifacts, and projects—so you scope work before you over-build."
+		content="Launchpad is a chat-first workspace for solo builders who turn rough ideas into markdown artifacts, scoped projects, and reviewable AI-assisted work."
 	/>
-	<meta property="og:title" content="Launchpad | Chat-first workspace for scoped builds" />
+	<meta property="og:title" content="Launchpad | A workbench for scoped builds" />
 	<meta
 		property="og:description"
-		content="Turn rough ideas into scoped projects with chat, markdown artifacts, and explicit AI draft review."
+		content="Move from rough chat to durable artifacts and scoped projects without adopting heavyweight planning."
 	/>
 	<meta property="og:type" content="website" />
 	<meta name="twitter:card" content="summary" />
-	<meta name="twitter:title" content="Launchpad | Chat-first workspace for scoped builds" />
+	<meta name="twitter:title" content="Launchpad | A workbench for scoped builds" />
 	<meta
 		name="twitter:description"
-		content="Turn rough ideas into scoped projects with chat, markdown artifacts, and explicit AI draft review."
+		content="Move from rough chat to durable artifacts and scoped projects without adopting heavyweight planning."
 	/>
 </svelte:head>
 
-<main
-	class="flex min-h-svh flex-col bg-background text-foreground lg:h-svh lg:max-h-svh lg:overflow-hidden"
->
-	<header class="flex h-14 shrink-0 items-center border-b border-border/50 px-5 sm:px-8">
-		<div class="mx-auto flex w-full max-w-7xl items-center justify-between">
-			<a href={resolve('/')} aria-label="Launchpad home" class="shrink-0">
-				<LaunchpadLogo />
-			</a>
-			<div class="flex min-w-0 items-center gap-1">
-				<ThemeMenu variant="icon" />
-				<AuthControls signedInMode="goToWorkspace" signedInCta="Go to Launchpad" />
-			</div>
-		</div>
-	</header>
+<main class="flex min-h-svh flex-col bg-background text-foreground">
+	<PublicHeader />
 
-	<div
-		class="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-10 px-5 py-10 sm:px-8 lg:flex-row lg:items-center lg:gap-12 lg:py-6 xl:gap-14"
+	<section
+		class="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-5 py-8 sm:px-8 sm:py-10 lg:min-h-0 lg:grid-cols-[0.88fr_1.12fr] lg:items-center lg:gap-10 lg:py-6"
 	>
-		<div class="hero-copy flex min-h-0 max-w-xl flex-col justify-center lg:max-w-[min(28rem,42vw)]">
-			<Badge variant="secondary" class="mb-4 w-fit text-[11px] font-medium tracking-wide uppercase">
-				Solo developers and indie hackers
+		<div class="hero-copy max-w-2xl lg:max-w-[31rem]">
+			<Badge variant="secondary" class="mb-5 w-fit text-[11px] font-medium">
+				For solo builders using AI heavily
 			</Badge>
 			<h1
-				class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl lg:text-3xl xl:text-4xl"
+				class="max-w-2xl text-4xl leading-[1.04] font-semibold tracking-[-0.03em] text-balance sm:text-5xl lg:text-[3.35rem]"
 			>
-				Scope the next build in a workspace that thinks with you.
+				Turn a rough thread into work you can actually build.
 			</h1>
-			<p class="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
-				Use chat to clarify the problem, save decisions as artifacts, and graduate to a project when
-				the idea is real—without turning planning into the product.
+			<p class="mt-5 max-w-xl text-sm leading-7 text-pretty text-muted-foreground sm:text-base">
+				Launchpad keeps the conversation, the decisions, and the project context in one quiet
+				workspace, so planning stays close to shipping.
 			</p>
-			<ul class="mt-6 space-y-2.5 text-xs leading-snug text-muted-foreground">
-				{#each bullets as line (line)}
-					<li class="flex gap-2">
-						<span class="mt-1.5 size-1 shrink-0 rounded-full bg-primary" aria-hidden="true"></span>
-						<span>{line}</span>
-					</li>
+
+			<div class="mt-7 flex flex-wrap items-center gap-3">
+				<Button href={resolve('/workspace')} size="lg">Open workspace</Button>
+				<Button href={resolve('/support')} variant="outline" size="lg">Read support notes</Button>
+			</div>
+
+			<div class="mt-9 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+				{#each loop as item (item.label)}
+					<div class="rounded-lg border border-border/70 bg-card p-3">
+						<p class="text-xs font-semibold text-foreground">{item.label}</p>
+						<p class="mt-1.5 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+					</div>
 				{/each}
-			</ul>
-			<div class="mt-8 flex flex-wrap items-center gap-3">
-				<Button href={signInHref} size="lg">Sign in</Button>
 			</div>
-			<nav class="mt-8 flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-muted-foreground">
-				<a class="hover:text-foreground" href={resolve('/privacy')}>Privacy</a>
-				<a class="hover:text-foreground" href={resolve('/terms')}>Terms</a>
-				<a class="hover:text-foreground" href={resolve('/support')}>Support</a>
-			</nav>
 		</div>
 
-		<div
-			class="product-surface relative mx-auto w-full max-w-lg min-w-0 flex-1 lg:max-h-[min(420px,calc(100svh-5.5rem))] lg:max-w-none lg:flex-[1.1]"
-			aria-hidden="true"
-		>
-			<div
-				class="flex h-full max-h-[min(26rem,50svh)] flex-col overflow-hidden rounded-lg border border-border/70 bg-card lg:max-h-full"
-			>
-				<div class="flex h-10 shrink-0 items-center justify-between border-b border-border/60 px-3">
+		<div class="product-demo min-w-0" aria-hidden="true">
+			<div class="overflow-hidden rounded-xl border border-border/70 bg-card">
+				<div class="flex h-11 items-center justify-between border-b border-border/60 px-3">
 					<div class="min-w-0">
-						<p class="truncate text-[11px] font-medium text-foreground">Workspace</p>
-						<p class="truncate text-[10px] text-muted-foreground">
-							Thread · Drafts apply, not overwrite
-						</p>
+						<p class="truncate text-xs font-semibold">Workspace</p>
+						<p class="truncate text-[10px] text-muted-foreground">Drafts apply only after review</p>
 					</div>
-					<span class="size-2 shrink-0 rounded-full bg-primary"></span>
+					<div class="flex items-center gap-1.5">
+						<span class="size-2 rounded-full bg-muted-foreground/35"></span>
+						<span class="size-2 rounded-full bg-muted-foreground/20"></span>
+					</div>
 				</div>
 
-				<div class="flex min-h-0 flex-1">
-					<div class="hidden w-[42%] shrink-0 border-r border-border/60 bg-sidebar/50 p-3 sm:block">
-						<p class="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-							Memory
-						</p>
-						<div class="space-y-2">
-							<div
-								class="rounded-md border border-border/50 bg-accent/40 px-2 py-1.5 text-[11px] text-foreground"
-							>
-								Idea · Narrow the first user
-							</div>
-							<div
-								class="rounded-md border border-border/50 bg-accent/30 px-2 py-1.5 text-[11px] text-foreground"
-							>
-								PRD · MVP scope & out of scope
-							</div>
+				<div
+					class="grid min-h-[28rem] grid-cols-1 sm:grid-cols-[10rem_minmax(0,1fr)] lg:min-h-[31rem]"
+				>
+					<aside class="hidden border-r border-border/60 bg-sidebar/60 p-3 sm:block">
+						<p class="mb-3 text-[11px] font-medium text-muted-foreground">Launchpad</p>
+						<div class="space-y-1.5 text-[11px]">
+							<p class="rounded-md bg-background px-2 py-1.5 font-medium text-foreground">
+								New thread
+							</p>
+							<p class="rounded-md px-2 py-1.5 text-muted-foreground">Projects</p>
+							<p class="rounded-md px-2 py-1.5 text-muted-foreground">Artifacts</p>
+							<p class="rounded-md px-2 py-1.5 text-muted-foreground">Imports</p>
 						</div>
-					</div>
 
-					<div class="flex min-w-0 flex-1 flex-col p-3">
-						<p class="mb-2 text-[11px] font-medium text-muted-foreground">Today</p>
-						<div class="space-y-2">
-							<div
-								class="rounded-md bg-accent/45 px-2.5 py-2 text-[11px] leading-relaxed text-foreground"
-							>
-								What’s the smallest thing we can ship to learn if this pain is worth solving?
-							</div>
-							<div
-								class="rounded-md border border-border/40 bg-background/80 px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground"
-							>
-								Start with one persona and one workflow. We can capture that as an artifact when you
-								are ready.
+						<div class="mt-8 space-y-2">
+							<p class="text-[10px] font-medium text-muted-foreground">Active project</p>
+							<div class="rounded-lg border border-border/60 bg-background p-2">
+								<p class="text-[11px] font-medium">MVP scope</p>
+								<p class="mt-1 text-[10px] leading-4 text-muted-foreground">
+									2 artifacts, 1 thread
+								</p>
 							</div>
 						</div>
-						<div class="mt-auto flex flex-wrap gap-1.5 pt-3">
-							<span
-								class="rounded-full bg-secondary/80 px-2 py-0.5 text-[10px] text-secondary-foreground"
+					</aside>
+
+					<div class="grid min-w-0 grid-rows-[1fr_auto]">
+						<div class="grid min-h-0 gap-0 lg:grid-cols-[minmax(0,1fr)_15rem]">
+							<section class="min-w-0 p-3 sm:p-4">
+								<p class="mb-3 text-[11px] font-medium text-muted-foreground">Thread</p>
+								<div class="space-y-3">
+									<div class="max-w-[86%] rounded-lg bg-accent px-3 py-2 text-xs leading-5">
+										I have three ideas, but I need the smallest version worth testing.
+									</div>
+									<div
+										class="ml-auto max-w-[88%] rounded-lg border border-border/60 bg-background px-3 py-2 text-xs leading-5 text-muted-foreground"
+									>
+										Start by choosing one user and one painful moment. Then save the decision as an
+										artifact before we talk implementation.
+									</div>
+									<div class="rounded-lg bg-accent/70 px-3 py-2 text-xs leading-5">
+										Let’s make the first user a solo dev validating a narrow workflow.
+									</div>
+								</div>
+							</section>
+
+							<section
+								class="border-t border-border/60 bg-sidebar/40 p-3 sm:p-4 lg:border-t-0 lg:border-l"
 							>
-								idea
-							</span>
-							<span
-								class="rounded-full bg-secondary/80 px-2 py-0.5 text-[10px] text-secondary-foreground"
+								<p class="mb-3 text-[11px] font-medium text-muted-foreground">Artifact draft</p>
+								<div class="rounded-lg border border-border/60 bg-background p-3">
+									<p class="text-xs font-semibold">Idea brief</p>
+									<ul class="mt-3 space-y-2 text-[11px] leading-4 text-muted-foreground">
+										{#each artifactNotes as note (note)}
+											<li class="flex gap-2">
+												<span class="mt-1.5 size-1 rounded-full bg-foreground"></span>
+												<span>{note}</span>
+											</li>
+										{/each}
+									</ul>
+									<div class="mt-4 flex flex-wrap gap-1.5">
+										<span class="rounded-full bg-secondary px-2 py-0.5 text-[10px]">review</span>
+										<span class="rounded-full bg-secondary px-2 py-0.5 text-[10px]">markdown</span>
+									</div>
+								</div>
+							</section>
+						</div>
+
+						<div class="border-t border-border/60 bg-background p-3 sm:p-4">
+							<div
+								class="flex flex-col gap-3 rounded-lg border border-border/70 bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
 							>
-								prd
-							</span>
+								<div>
+									<p class="text-xs font-semibold">Ready to promote?</p>
+									<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+										Review included artifacts before this becomes a project.
+									</p>
+								</div>
+								<div class="flex shrink-0 gap-2">
+									<span class="rounded-md bg-secondary px-2 py-1 text-[11px]">Edit draft</span>
+									<span class="rounded-md bg-primary px-2 py-1 text-[11px] text-primary-foreground">
+										Promote
+									</span>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-	</div>
+	</section>
+
+	<PublicFooter />
 </main>
 
 <style>
 	.hero-copy,
-	.product-surface {
-		animation: rise-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	.product-demo {
+		animation: rise-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 	}
 
-	.product-surface {
-		animation-delay: 90ms;
+	.product-demo {
+		animation-delay: 70ms;
 	}
 
 	@keyframes rise-in {
@@ -178,7 +209,7 @@
 
 	@media (prefers-reduced-motion: reduce) {
 		.hero-copy,
-		.product-surface {
+		.product-demo {
 			animation: none;
 		}
 	}
