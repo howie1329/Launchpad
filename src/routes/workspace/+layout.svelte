@@ -1081,12 +1081,12 @@ Important rules:
 	>
 		<Sidebar.Root class="overflow-hidden" collapsible="icon">
 			<nav id="workspace-sidebar-nav" class="flex min-h-0 flex-1 flex-col" aria-label="Workspace">
-				<Sidebar.Header class="border-b border-sidebar-border/60 px-2 py-2">
+				<Sidebar.Header class="flex h-10 items-center border-b border-sidebar-border/60 px-2 py-1">
 					<Sidebar.Menu class="flex flex-row items-center gap-1">
 						<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 							<Sidebar.MenuButton
 								size="sm"
-								class="h-9 min-w-0 gap-2 rounded-md px-1.5 text-sidebar-foreground group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground"
+								class="h-8 min-w-0 gap-2 rounded-md px-1.5 text-sidebar-foreground group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground"
 							>
 								{#snippet child({ props })}
 									<a
@@ -1097,7 +1097,7 @@ Important rules:
 										{...props}
 									>
 										<div
-											class="flex aspect-square size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
+											class="flex aspect-square size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground group-data-[collapsible=icon]:size-8"
 										>
 											<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
 										</div>
