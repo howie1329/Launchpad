@@ -78,6 +78,6 @@
 		"runed": "^0.37.1",
 		"supermemory": "^4.21.1",
 		"svelte-streamdown": "^3.0.1",
-		"thomas-agentkit": "^0.7.0"
+		"thomas-agentkit": "^0.8.0"
 	}
 }
