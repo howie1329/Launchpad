@@ -30,3 +30,13 @@ export const isAccountDeletableQuery = makeFunctionReference<
 	Record<string, never>,
 	{ deletable: boolean }
 >('accountManagement:isAccountDeletable');
+
+export const getAccountResetCleanupTargetsQuery = makeFunctionReference<
+	'query',
+	Record<string, never>,
+	{
+		ownerId: Id<'users'>;
+		projectIds: Id<'projects'>[];
+		supermemoryDocumentIds: string[];
+	} | null
+>('accountManagement:getAccountResetCleanupTargets');

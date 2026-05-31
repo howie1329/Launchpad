@@ -15,6 +15,7 @@ import {
 import { errorMessage, withTimeout } from './fallback';
 
 const DELETE_TIMEOUT_MS = 5_000;
+const BULK_DELETE_TIMEOUT_MS = 30_000;
 const ADD_TIMEOUT_MS = 30_000;
 
 type MemoryMetadata = Record<string, string | number | boolean | Array<string>>;
@@ -89,6 +90,63 @@ export async function deleteSupermemoryDocument(
 			'warn'
 		);
 		return { ok: false, error: msg };
+	}
+}
+
+export async function deleteSupermemoryAccountData(args: {
+	ownerId: Id<'users'>;
+	projectIds: Id<'projects'>[];
+	documentIds?: string[];
+}): Promise<
+	{ status: 'disabled' | 'deleted'; deletedCount: number } | { status: 'failed'; error: string }
+> {
+	const sm = getSupermemoryClient();
+	if (!sm) return { status: 'disabled', deletedCount: 0 };
+
+	const containerTags = [
+		userMemoryContainerTag(args.ownerId),
+		...args.projectIds.map((projectId) => projectMemoryContainerTag(projectId))
+	];
+
+	try {
+		let deletedCount = 0;
+		const documentIds = [...new Set(args.documentIds ?? [])];
+		for (let index = 0; index < documentIds.length; index += 100) {
+			const ids = documentIds.slice(index, index + 100);
+			if (ids.length === 0) continue;
+			const result = await withTimeout(sm.documents.deleteBulk({ ids }), BULK_DELETE_TIMEOUT_MS);
+			if (!result.success) {
+				const detail = result.errors?.map((item) => `${item.id}: ${item.error}`).join('; ');
+				return {
+					status: 'failed',
+					error: detail
+						? `Supermemory document deletion failed: ${detail}`
+						: 'Supermemory document deletion failed.'
+				};
+			}
+			deletedCount += result.deletedCount;
+		}
+
+		const result = await withTimeout(
+			sm.documents.deleteBulk({ containerTags }),
+			BULK_DELETE_TIMEOUT_MS
+		);
+		if (!result.success) {
+			return { status: 'failed', error: 'Supermemory account memory deletion failed.' };
+		}
+
+		deletedCount += result.deletedCount;
+		memoryLog('supermemory.account_data_deleted', {
+			containerTagCount: containerTags.length,
+			documentIdCount: documentIds.length,
+			deletedCount
+		});
+
+		return { status: 'deleted', deletedCount };
+	} catch (error) {
+		const msg = errorMessage(error);
+		memoryLog('supermemory.account_data_delete_failed', { error: msg }, 'warn');
+		return { status: 'failed', error: msg };
 	}
 }
 

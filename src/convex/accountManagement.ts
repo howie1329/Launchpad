@@ -241,6 +241,22 @@ async function wipeAllAppDataForUser(ctx: MutationCtx, ownerId: Id<'users'>) {
 	for (const l of anyLinks) {
 		await ctx.db.delete(l._id);
 	}
+
+	const notifications = await ctx.db
+		.query('notifications')
+		.withIndex('by_ownerId_and_createdAt', (q) => q.eq('ownerId', ownerId))
+		.collect();
+	for (const notification of notifications) {
+		await ctx.db.delete(notification._id);
+	}
+
+	const importDrafts = await ctx.db
+		.query('externalContextImportDrafts')
+		.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
+		.collect();
+	for (const draft of importDrafts) {
+		await ctx.db.delete(draft._id);
+	}
 }
 
 async function deleteAuthIdentityForUser(ctx: MutationCtx, userId: Id<'users'>) {
@@ -374,5 +390,30 @@ export const isAccountDeletable = query({
 		const ownerId = await getOptionalAuthUserId(ctx);
 		if (!ownerId) return { deletable: false as const };
 		return { deletable: true as const };
+	}
+});
+
+export const getAccountResetCleanupTargets = query({
+	args: {},
+	handler: async (ctx) => {
+		const ownerId = await getOptionalAuthUserId(ctx);
+		if (!ownerId) return null;
+
+		const projects = await ctx.db
+			.query('projects')
+			.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
+			.collect();
+		const memorySyncs = await ctx.db
+			.query('memorySyncs')
+			.withIndex('by_ownerId_and_updatedAt', (q) => q.eq('ownerId', ownerId))
+			.collect();
+
+		return {
+			ownerId,
+			projectIds: projects.map((project) => project._id),
+			supermemoryDocumentIds: memorySyncs
+				.map((sync) => sync.supermemoryDocumentId)
+				.filter((id): id is string => typeof id === 'string' && id.length > 0)
+		};
 	}
 });
