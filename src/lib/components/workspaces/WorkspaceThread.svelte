@@ -92,9 +92,11 @@
 	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
 	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
 	import {
+		Add01Icon,
 		ArrowDown01Icon,
 		ArrowUp01Icon,
 		Cancel01Icon,
+		File01Icon,
 		GlobeIcon,
 		Loading03Icon
 	} from '@hugeicons/core-free-icons';
@@ -191,6 +193,13 @@
 
 		return rows;
 	});
+	const linkedArtifactCount = $derived(threadArtifacts.data?.length ?? 0);
+	const availableProjectArtifactCount = $derived(
+		(mentionableArtifacts.data ?? []).filter((item) => !item.linkedToThread).length
+	);
+	const contextHasFilters = $derived(
+		Boolean(contextSearch.trim()) || contextTypeFilter !== 'all' || contextDateSort !== 'newest'
+	);
 	const mentionListboxId = $derived(
 		activeThreadId
 			? `workspace-thread-mention-listbox-${activeThreadId}`
@@ -381,6 +390,30 @@
 
 	function removeMentionChip(artifactId: string) {
 		mentionChips = mentionChips.filter((c) => c.id !== artifactId);
+	}
+
+	function clearContextFilters() {
+		contextSearch = '';
+		contextTypeFilter = 'all';
+		contextDateSort = 'newest';
+	}
+
+	function requestCreateArtifact() {
+		if (!browser) return;
+		window.dispatchEvent(new CustomEvent('launchpad:create-artifact'));
+	}
+
+	function citeArtifact(artifactId: string, title: string) {
+		if (!mentionChips.some((chip) => chip.id === artifactId)) {
+			mentionChips = [...mentionChips, { id: artifactId, title }];
+		}
+		focusComposer();
+	}
+
+	function linkReasonLabel(reason: string) {
+		if (reason === 'created') return 'Created here';
+		if (reason === 'imported') return 'Imported';
+		return 'Referenced';
 	}
 
 	async function pickArtifactMention(item: MentionableArtifact) {
@@ -907,40 +940,93 @@
 						/>
 					{:else}
 						<div class="flex min-h-0 flex-1 flex-col">
-							<div class="shrink-0 space-y-2 border-b border-border/50 px-3 py-3">
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										Chat context
-									</p>
-									<p class="mt-1 text-[11px] text-muted-foreground">
-										Artifacts linked to this thread.
-									</p>
+							<div class="shrink-0 border-b border-border/50">
+								<div class="space-y-3 px-3 py-3">
+									<div class="flex items-start justify-between gap-3">
+										<div class="min-w-0">
+											<p class="text-sm font-semibold tracking-tight">Thread context</p>
+											<p class="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+												Durable artifacts and project context available to this chat.
+											</p>
+										</div>
+										<div class="shrink-0 rounded-md border border-border/60 bg-muted/35 px-2 py-1 text-right">
+											<p class="text-[11px] leading-none font-semibold">{linkedArtifactCount}</p>
+											<p class="mt-0.5 text-[10px] leading-none text-muted-foreground">linked</p>
+										</div>
+									</div>
+
+									<div class="grid grid-cols-2 gap-2">
+										<div class="rounded-md border border-border/60 bg-muted/25 px-2 py-2">
+											<p class="text-[10px] leading-none font-medium text-muted-foreground">
+												Thread artifacts
+											</p>
+											<p class="mt-1 text-sm leading-none font-semibold">{linkedArtifactCount}</p>
+										</div>
+										<div class="rounded-md border border-border/60 bg-muted/25 px-2 py-2">
+											<p class="text-[10px] leading-none font-medium text-muted-foreground">
+												Project context
+											</p>
+											<p class="mt-1 text-sm leading-none font-semibold">
+												{availableProjectArtifactCount}
+											</p>
+										</div>
+									</div>
+
+									<div class="flex flex-wrap gap-2">
+										<Button
+											type="button"
+											variant="secondary"
+											size="sm"
+											class="h-7 gap-1.5 px-2 text-xs"
+											onclick={requestCreateArtifact}
+										>
+											<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
+											Create artifact
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											class="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+											onclick={focusComposer}
+										>
+											<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3" />
+											Cite with @
+										</Button>
+									</div>
 								</div>
-								<Input
-									bind:value={contextSearch}
-									type="search"
-									placeholder="Search title or type"
-									class="h-7 text-xs"
-								/>
-								<div class="grid grid-cols-2 gap-2">
-									<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
-										<NativeSelectOption value="all">All types</NativeSelectOption>
-										{#each contextArtifactTypes as type (type)}
-											<NativeSelectOption value={type}>{artifactTypeLabel(type)}</NativeSelectOption
-											>
-										{/each}
-									</NativeSelect>
-									<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
-										<NativeSelectOption value="newest">Newest first</NativeSelectOption>
-										<NativeSelectOption value="oldest">Oldest first</NativeSelectOption>
-									</NativeSelect>
+
+								<div class="space-y-2 border-t border-border/40 px-3 py-3">
+									<Input
+										bind:value={contextSearch}
+										type="search"
+										placeholder="Search title or type"
+										class="h-7 text-xs"
+									/>
+									<div class="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
+										<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
+											<NativeSelectOption value="all">All types</NativeSelectOption>
+											{#each contextArtifactTypes as type (type)}
+												<NativeSelectOption value={type}
+													>{artifactTypeLabel(type)}</NativeSelectOption
+												>
+											{/each}
+										</NativeSelect>
+										<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
+											<NativeSelectOption value="newest">Newest first</NativeSelectOption>
+											<NativeSelectOption value="oldest">Oldest first</NativeSelectOption>
+										</NativeSelect>
+									</div>
 								</div>
 							</div>
 
 							<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 								{#if threadArtifacts.error}
-									<div class="space-y-2 px-2 py-2">
-										<p class="text-xs text-destructive">{threadArtifacts.error.message}</p>
+									<div class="space-y-2 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-3">
+										<p class="text-xs font-medium text-destructive">Could not load context</p>
+										<p class="text-[11px] leading-4 text-muted-foreground">
+											The artifacts linked to this thread are unavailable right now.
+										</p>
 										<Button
 											type="button"
 											variant="secondary"
@@ -954,39 +1040,87 @@
 										</Button>
 									</div>
 								{:else if threadArtifacts.data === undefined}
-									<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
+									<div class="space-y-1.5 px-1 py-1" aria-label="Loading thread context">
+										<div class="h-12 rounded-md bg-muted/60"></div>
+										<div class="h-12 rounded-md bg-muted/45"></div>
+										<div class="h-12 rounded-md bg-muted/35"></div>
+									</div>
 								{:else}
 									<div class="space-y-3">
 										{#if threadArtifacts.data.length === 0}
-											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-												No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
-												when the shape is clear.
-											</p>
+											<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+												<p class="text-xs font-medium">No saved context yet</p>
+												<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+													Saved ideas, PRDs, notes, and decisions from this chat will appear here.
+												</p>
+												<Button
+													type="button"
+													variant="secondary"
+													size="sm"
+													class="mt-3 h-7 gap-1.5 px-2 text-xs"
+													onclick={requestCreateArtifact}
+												>
+													<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
+													Create artifact
+												</Button>
+											</div>
 										{:else if filteredContextArtifacts.length === 0}
-											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-												No artifacts match those filters.
-											</p>
+											<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+												<p class="text-xs font-medium">No matching artifacts</p>
+												<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+													Try another title, type, or sort order.
+												</p>
+												{#if contextHasFilters}
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														class="mt-3 h-7 px-2 text-xs"
+														onclick={clearContextFilters}
+													>
+														Clear filters
+													</Button>
+												{/if}
+											</div>
 										{:else}
 											<div class="space-y-1">
 												{#each filteredContextArtifacts as item (item.link._id)}
-													<button
-														type="button"
-														class="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-														onclick={() => openThreadArtifact(item.artifact._id)}
+													<div
+														class="group/context-row flex min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-accent/45 focus-within:bg-accent/45"
 													>
-														<span class="size-1.5 shrink-0 rounded-full bg-primary/70"></span>
-														<span
-															class="min-w-0 flex-1 truncate text-xs font-medium tracking-tight"
+														<button
+															type="button"
+															class="flex min-w-0 flex-1 items-start gap-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+															onclick={() => openThreadArtifact(item.artifact._id)}
 														>
-															{item.artifact.title}
-														</span>
-														<span class="shrink-0 text-[10px] text-muted-foreground">
-															{artifactTypeLabel(item.artifact.type)}
-														</span>
-														<span class="shrink-0 text-[10px] text-muted-foreground">
-															{formatArtifactCreatedAt(item.artifact.createdAt)}
-														</span>
-													</button>
+															<span
+																class="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/70"
+																aria-hidden="true"
+															></span>
+															<span class="min-w-0 flex-1">
+																<span class="block truncate text-xs font-medium tracking-tight">
+																	{item.artifact.title}
+																</span>
+																<span
+																	class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] leading-3 text-muted-foreground"
+																>
+																	<span>{artifactTypeLabel(item.artifact.type)}</span>
+																	<span>{linkReasonLabel(item.link.reason)}</span>
+																	<span>{formatArtifactCreatedAt(item.artifact.createdAt)}</span>
+																</span>
+															</span>
+														</button>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover/context-row:opacity-100 sm:group-focus-within/context-row:opacity-100"
+															aria-label={`Cite ${item.artifact.title}`}
+															onclick={() => citeArtifact(item.artifact._id, item.artifact.title)}
+														>
+															Cite
+														</Button>
+													</div>
 												{/each}
 											</div>
 										{/if}
