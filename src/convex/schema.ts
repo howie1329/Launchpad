@@ -15,6 +15,29 @@ const threadArtifactLinkReason = v.union(
 const artifactVersionActor = v.union(v.literal('user'), v.literal('ai'));
 const artifactVersionSource = v.union(v.literal('editor'), v.literal('chat'));
 const memorySyncStatus = v.union(v.literal('synced'), v.literal('blocked'), v.literal('failed'));
+const notificationType = v.union(
+	v.literal('external_context_import'),
+	v.literal('ai_chat_activity')
+);
+const notificationState = v.union(
+	v.literal('activity'),
+	v.literal('success'),
+	v.literal('failed'),
+	v.literal('in_progress')
+);
+const notificationStatus = v.union(
+	v.literal('unread'),
+	v.literal('read'),
+	v.literal('dismissed'),
+	v.literal('deleted')
+);
+const notificationTargetKind = v.union(
+	v.literal('externalContextImportDraft'),
+	v.literal('chatThread'),
+	v.literal('artifact'),
+	v.literal('project')
+);
+const notificationMetadata = v.record(v.string(), v.any());
 
 export default defineSchema({
 	...authTables,
@@ -66,6 +89,24 @@ export default defineSchema({
 		metadata: v.optional(v.record(v.string(), v.any())),
 		createdAt: v.number()
 	}).index('by_ownerId_and_createdAt', ['ownerId', 'createdAt']),
+	notifications: defineTable({
+		ownerId: v.string(),
+		type: notificationType,
+		state: notificationState,
+		status: notificationStatus,
+		title: v.string(),
+		body: v.optional(v.string()),
+		targetKind: notificationTargetKind,
+		targetId: v.string(),
+		metadata: v.optional(notificationMetadata),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		readAt: v.optional(v.number()),
+		dismissedAt: v.optional(v.number()),
+		deletedAt: v.optional(v.number())
+	})
+		.index('by_ownerId_and_createdAt', ['ownerId', 'createdAt'])
+		.index('by_ownerId_and_status_and_createdAt', ['ownerId', 'status', 'createdAt']),
 	projects: defineTable({
 		ownerId: v.string(),
 		name: v.string(),

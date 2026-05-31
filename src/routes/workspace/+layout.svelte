@@ -34,6 +34,16 @@
 	import { listThreadsQuery } from '$lib/chat';
 	import { formatThreadTitleForDisplay, PLACEHOLDER_THREAD_TITLE } from '$lib/thread-title';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
+	import {
+		countUnreadNotificationsQuery,
+		deleteNotificationMutation,
+		dismissNotificationMutation,
+		listNotificationsQuery,
+		markAllNotificationsReadMutation,
+		markNotificationReadMutation,
+		type NotificationState,
+		type SavedNotification
+	} from '$lib/notifications';
 	import { LaunchpadMarkOutline } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
@@ -58,10 +68,15 @@
 	import {
 		ArrowLeft01Icon,
 		ArrowRight01Icon,
+		BellDotIcon,
 		ChatAdd01Icon,
+		CheckmarkCircle01Icon,
+		Clock01Icon,
+		Delete02Icon,
 		DollarCircleIcon,
 		File01Icon,
 		Folder01Icon,
+		InboxIcon,
 		Logout01Icon,
 		PanelRightCloseIcon,
 		PanelRightOpenIcon,
@@ -119,6 +134,7 @@
 	let isDeletingProject = $state(false);
 	let isDeletingThread = $state(false);
 	let deleteNavError = $state('');
+	let notificationActionId = $state('');
 
 	const pathname = $derived($page.url.pathname);
 	const pathIds = $derived(workspacePathIds(pathname));
@@ -132,6 +148,12 @@
 	const threads = useQuery(listThreadsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const artifacts = useQuery(listArtifactsQuery, () => (auth.isAuthenticated ? {} : 'skip'));
 	const tabStrip = useQuery(getWorkspaceTabStripQuery, () => (auth.isAuthenticated ? {} : 'skip'));
+	const notifications = useQuery(listNotificationsQuery, () =>
+		auth.isAuthenticated ? { limit: 20 } : 'skip'
+	);
+	const unreadNotifications = useQuery(countUnreadNotificationsQuery, () =>
+		auth.isAuthenticated ? {} : 'skip'
+	);
 	const threadArtifacts = useQuery(listThreadArtifactsQuery, () =>
 		auth.isAuthenticated && activeThreadId
 			? { threadId: activeThreadId as Id<'chatThreads'> }
@@ -141,6 +163,7 @@
 	const workspaceListError = $derived(
 		projects.error ?? threads.error ?? artifacts.error ?? budget.error
 	);
+	const notificationError = $derived(notifications.error ?? unreadNotifications.error);
 	const selectedThread = $derived(
 		threads.data?.find((thread) => thread._id === activeThreadId) ?? null
 	);
@@ -162,6 +185,11 @@
 	);
 	const selectedArtifact = $derived(
 		artifacts.data?.find((artifact) => artifact._id === activeArtifactId) ?? null
+	);
+	const notificationRows = $derived(notifications.data ?? []);
+	const unreadNotificationCount = $derived(unreadNotifications.data?.count ?? 0);
+	const unreadNotificationLabel = $derived(
+		unreadNotificationCount > 99 ? '99+' : String(unreadNotificationCount)
 	);
 	const generalThreads = $derived(
 		threads.data?.filter((thread) => thread.scopeType === 'general') ?? []
@@ -559,6 +587,184 @@
 			}
 		);
 	};
+
+	const markNotificationRead = async (notification: SavedNotification) => {
+		if (notification.status !== 'unread') return;
+		await getConvexClient().mutation(markNotificationReadMutation, {
+			notificationId: notification._id
+		});
+	};
+
+	const markAllNotificationsRead = async () => {
+		if (notificationActionId || unreadNotificationCount === 0) return;
+		notificationActionId = 'mark-all';
+		try {
+			await getConvexClient().mutation(markAllNotificationsReadMutation, {});
+		} catch (error) {
+			console.error(error);
+			workspaceNotice = 'Could not mark notifications read. Please try again.';
+		} finally {
+			notificationActionId = '';
+		}
+	};
+
+	const dismissNotification = async (notification: SavedNotification) => {
+		if (notificationActionId) return;
+		notificationActionId = `dismiss:${notification._id}`;
+		try {
+			await getConvexClient().mutation(dismissNotificationMutation, {
+				notificationId: notification._id
+			});
+		} catch (error) {
+			console.error(error);
+			workspaceNotice = 'Could not dismiss that notification. Please try again.';
+		} finally {
+			notificationActionId = '';
+		}
+	};
+
+	const deleteNotification = async (notification: SavedNotification) => {
+		if (notificationActionId) return;
+		notificationActionId = `delete:${notification._id}`;
+		try {
+			await getConvexClient().mutation(deleteNotificationMutation, {
+				notificationId: notification._id
+			});
+		} catch (error) {
+			console.error(error);
+			workspaceNotice = 'Could not delete that notification. Please try again.';
+		} finally {
+			notificationActionId = '';
+		}
+	};
+
+	const openNotification = async (notification: SavedNotification) => {
+		if (notificationActionId) return;
+		notificationActionId = `open:${notification._id}`;
+		try {
+			await markNotificationRead(notification);
+			const href = notificationHref(notification);
+			if (!href) {
+				workspaceNotice = missingNotificationTargetMessage(notification);
+				return;
+			}
+			await goto(resolve(href as '/workspace'), { noScroll: true, keepFocus: true });
+		} catch (error) {
+			console.error(error);
+			workspaceNotice = 'Could not open that notification. Please try again.';
+		} finally {
+			notificationActionId = '';
+		}
+	};
+
+	function notificationHref(notification: SavedNotification) {
+		switch (notification.targetKind) {
+			case 'chatThread':
+				if (threads.data && !threads.data.some((thread) => thread._id === notification.targetId)) {
+					return null;
+				}
+				return workspaceThreadHref(notification.targetId);
+			case 'project':
+				if (
+					projects.data &&
+					!projects.data.some((project) => project._id === notification.targetId)
+				) {
+					return null;
+				}
+				return workspaceProjectHref(notification.targetId);
+			case 'artifact':
+				if (
+					artifacts.data &&
+					!artifacts.data.some((artifact) => artifact._id === notification.targetId)
+				) {
+					return null;
+				}
+				return workspaceArtifactHref(notification.targetId);
+			case 'externalContextImportDraft':
+				return null;
+		}
+	}
+
+	function primaryNotificationActionLabel(notification: SavedNotification) {
+		if (notification.type === 'external_context_import') {
+			switch (notification.state) {
+				case 'success':
+					return 'Review';
+				case 'failed':
+					return 'Retry';
+				case 'in_progress':
+					return 'View progress';
+				case 'activity':
+					return 'Open';
+			}
+		}
+
+		switch (notification.targetKind) {
+			case 'artifact':
+				return 'Open artifact';
+			case 'project':
+				return 'Open project';
+			case 'chatThread':
+				return 'Open chat';
+			case 'externalContextImportDraft':
+				return 'Open';
+		}
+	}
+
+	function missingNotificationTargetMessage(notification: SavedNotification) {
+		if (notification.targetKind === 'externalContextImportDraft') {
+			return 'Import review notifications are reserved for the upcoming import workflow.';
+		}
+		return 'That notification target is no longer available.';
+	}
+
+	function notificationStateClasses(state: NotificationState) {
+		switch (state) {
+			case 'success':
+				return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
+			case 'failed':
+				return 'border-destructive/30 bg-destructive/10 text-destructive';
+			case 'in_progress':
+				return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300';
+			case 'activity':
+				return 'border-border bg-muted/40 text-muted-foreground';
+		}
+	}
+
+	function notificationStateLabel(state: NotificationState) {
+		switch (state) {
+			case 'success':
+				return 'Ready';
+			case 'failed':
+				return 'Failed';
+			case 'in_progress':
+				return 'Working';
+			case 'activity':
+				return 'Update';
+		}
+	}
+
+	function notificationStateIcon(state: NotificationState) {
+		switch (state) {
+			case 'success':
+				return CheckmarkCircle01Icon;
+			case 'failed':
+				return Delete02Icon;
+			case 'in_progress':
+				return Clock01Icon;
+			case 'activity':
+				return InboxIcon;
+		}
+	}
+
+	function formatNotificationTime(createdAt: number) {
+		return new Intl.DateTimeFormat(undefined, {
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		}).format(new Date(createdAt));
+	}
 
 	function isWorkspaceTypableTarget(target: EventTarget | null) {
 		return (
@@ -1438,6 +1644,160 @@
 						<span class="min-[420px]:hidden">Project</span>
 					</Button>
 				{/if}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						type="button"
+						class="relative inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground ring-ring hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden"
+						aria-label={unreadNotificationCount > 0
+							? `${unreadNotificationCount} unread notifications`
+							: 'Open notifications'}
+					>
+						<HugeiconsIcon icon={BellDotIcon} strokeWidth={2} class="size-4" />
+						{#if unreadNotificationCount > 0}
+							<span
+								class="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-4 font-semibold text-primary-foreground"
+							>
+								{unreadNotificationLabel}
+							</span>
+						{/if}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end" class="w-[22rem] max-w-[calc(100vw-1rem)] p-0">
+						<div class="flex h-10 items-center justify-between border-b border-border/50 px-3">
+							<div>
+								<p class="text-xs font-semibold tracking-tight">Notifications</p>
+								<p class="text-[11px] text-muted-foreground">
+									{unreadNotificationCount === 0
+										? 'All caught up'
+										: `${unreadNotificationCount} unread`}
+								</p>
+							</div>
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								class="h-7 px-2 text-[11px]"
+								disabled={unreadNotificationCount === 0 || notificationActionId === 'mark-all'}
+								onclick={markAllNotificationsRead}
+							>
+								Mark all read
+							</Button>
+						</div>
+
+						{#if notificationError}
+							<div class="px-3 py-4 text-xs text-destructive" role="status">
+								Could not load notifications.
+							</div>
+						{:else if notifications.data === undefined}
+							<div class="space-y-2 px-3 py-3">
+								<div class="h-10 rounded-md bg-muted/70"></div>
+								<div class="h-10 rounded-md bg-muted/50"></div>
+							</div>
+						{:else if notificationRows.length === 0}
+							<div class="px-3 py-6 text-center">
+								<div
+									class="mx-auto flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground"
+								>
+									<HugeiconsIcon icon={InboxIcon} strokeWidth={2} class="size-4" />
+								</div>
+								<p class="mt-2 text-xs font-medium">No notifications</p>
+								<p class="mt-1 text-[11px] text-muted-foreground">
+									New workspace updates will appear here.
+								</p>
+							</div>
+						{:else}
+							<div class="max-h-[min(30rem,70vh)] overflow-y-auto p-1">
+								{#each notificationRows as notification (notification._id)}
+									<div
+										class="group/notification rounded-md px-2 py-2 hover:bg-accent/70"
+										data-unread={notification.status === 'unread'}
+									>
+										<div class="flex items-start gap-2">
+											<div
+												class={cn(
+													'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border [&>svg]:size-3',
+													notificationStateClasses(notification.state)
+												)}
+											>
+												<HugeiconsIcon
+													icon={notificationStateIcon(notification.state)}
+													strokeWidth={2}
+												/>
+											</div>
+											<div class="min-w-0 flex-1">
+												<div class="flex min-w-0 items-start justify-between gap-2">
+													<button
+														type="button"
+														class="min-w-0 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
+														onclick={() => openNotification(notification)}
+													>
+														<span class="flex min-w-0 items-center gap-1.5">
+															{#if notification.status === 'unread'}
+																<span
+																	class="size-1.5 shrink-0 rounded-full bg-primary"
+																	aria-hidden="true"
+																></span>
+															{/if}
+															<span class="truncate text-xs font-medium">{notification.title}</span>
+														</span>
+														{#if notification.body}
+															<span
+																class="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-muted-foreground"
+															>
+																{notification.body}
+															</span>
+														{/if}
+													</button>
+													<span
+														class="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] leading-none {notificationStateClasses(
+															notification.state
+														)}"
+													>
+														{notificationStateLabel(notification.state)}
+													</span>
+												</div>
+												<div class="mt-2 flex flex-wrap items-center gap-1.5">
+													<Button
+														type="button"
+														variant="secondary"
+														size="sm"
+														class="h-6 px-2 text-[11px]"
+														disabled={notificationActionId === `open:${notification._id}`}
+														onclick={() => openNotification(notification)}
+													>
+														{primaryNotificationActionLabel(notification)}
+													</Button>
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														class="h-6 px-2 text-[11px]"
+														disabled={notificationActionId === `dismiss:${notification._id}`}
+														onclick={() => dismissNotification(notification)}
+													>
+														Dismiss
+													</Button>
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														class="h-6 px-2 text-[11px] text-destructive hover:text-destructive"
+														disabled={notificationActionId === `delete:${notification._id}`}
+														onclick={() => deleteNotification(notification)}
+													>
+														Delete
+													</Button>
+													<span class="ml-auto text-[10px] text-muted-foreground">
+														{formatNotificationTime(notification.createdAt)}
+													</span>
+												</div>
+											</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 				{#if activeThreadId}
 					<Button
 						type="button"
