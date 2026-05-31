@@ -124,7 +124,8 @@ export default defineSchema({
 		deletedAt: v.optional(v.number())
 	})
 		.index('by_ownerId_and_createdAt', ['ownerId', 'createdAt'])
-		.index('by_ownerId_and_status_and_createdAt', ['ownerId', 'status', 'createdAt']),
+		.index('by_ownerId_and_status_and_createdAt', ['ownerId', 'status', 'createdAt'])
+		.index('by_ownerId_and_targetKind_and_targetId', ['ownerId', 'targetKind', 'targetId']),
 	externalContextImportDrafts: defineTable({
 		ownerId: v.string(),
 		sourceMarkdown: v.string(),

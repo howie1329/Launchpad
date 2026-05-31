@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 import { getOptionalAuthUserId, requireAuthUserId } from './authHelpers';
-import { createNotificationForOwner } from './notifications';
+import { createNotificationForOwner, dismissNotificationsForOwnerTarget } from './notifications';
+import { logActivityEvent } from './activityHelpers';
 import { internal } from './_generated/api';
 import { internalMutation, internalQuery, mutation, query } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
@@ -124,6 +125,94 @@ export const updateDraftReview = mutation({
 		});
 
 		return { ok: true };
+	}
+});
+
+export const createProjectFromDraft = mutation({
+	args: {
+		draftId: v.id('externalContextImportDrafts'),
+		projectName: v.string(),
+		projectSummary: v.optional(v.string()),
+		projectBriefMarkdown: v.string()
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireAuthUserId(ctx);
+		const draft = await getOwnedDraft(ctx, args.draftId, ownerId);
+		if (draft.status === 'created') throw new Error('Project already created from this import');
+		if (draft.status !== 'ready') throw new Error('Import review is not ready');
+
+		const projectName = args.projectName.trim();
+		const projectSummary = args.projectSummary?.trim();
+		const projectBriefMarkdown = args.projectBriefMarkdown.trim();
+		if (!projectName) throw new Error('Project name is required');
+		if (!projectBriefMarkdown) throw new Error('Project Brief is required');
+
+		const now = Date.now();
+		const projectId = await ctx.db.insert('projects', {
+			ownerId,
+			name: projectName,
+			...(projectSummary ? { summary: projectSummary } : {}),
+			createdAt: now,
+			updatedAt: now
+		});
+		const sourceArtifactId = await insertImportedArtifact(ctx, {
+			ownerId,
+			projectId,
+			title: 'Imported external context',
+			type: 'source',
+			contentMarkdown: draft.sourceMarkdown,
+			metadata: {
+				source: 'external-ai-context-import',
+				draftId: draft._id,
+				sourceToolHint: draft.sourceToolHint
+			},
+			actor: 'user',
+			summary: 'Raw imported external AI context',
+			now
+		});
+		const briefArtifactId = await insertImportedArtifact(ctx, {
+			ownerId,
+			projectId,
+			title: 'Project Brief',
+			type: 'brief',
+			contentMarkdown: projectBriefMarkdown,
+			metadata: {
+				source: 'external-ai-context-import',
+				draftId: draft._id,
+				sourceArtifactId
+			},
+			actor: 'ai',
+			summary: 'Generated project brief from imported external context',
+			now
+		});
+
+		await ctx.db.patch(draft._id, {
+			status: 'created',
+			generatedProjectName: projectName,
+			generatedProjectSummary: projectSummary ?? '',
+			generatedProjectBriefMarkdown: projectBriefMarkdown,
+			createdProjectId: projectId,
+			projectCreatedAt: now,
+			updatedAt: now
+		});
+		await dismissNotificationsForOwnerTarget(ctx, {
+			ownerId,
+			targetKind: 'externalContextImportDraft',
+			targetId: draft._id
+		});
+		await logActivityEvent(ctx, {
+			ownerId,
+			eventType: 'project_created_from_external_context_import',
+			metadata: {
+				projectId,
+				draftId: draft._id,
+				sourceArtifactId,
+				briefArtifactId
+			},
+			occurredAtMs: now
+		});
+
+		return { projectId, sourceArtifactId, briefArtifactId };
 	}
 });
 
@@ -448,4 +537,60 @@ async function getOwnedDraftOrNull(
 	const draft = await ctx.db.get(draftId);
 	if (!draft || draft.ownerId !== ownerId) return null;
 	return draft;
+}
+
+async function insertImportedArtifact(
+	ctx: MutationCtx,
+	args: {
+		ownerId: Id<'users'>;
+		projectId: Id<'projects'>;
+		title: string;
+		type: string;
+		contentMarkdown: string;
+		metadata: Record<string, unknown>;
+		actor: 'user' | 'ai';
+		summary: string;
+		now: number;
+	}
+) {
+	const artifactId = await ctx.db.insert('artifacts', {
+		ownerId: args.ownerId,
+		type: args.type,
+		title: args.title,
+		contentMarkdown: args.contentMarkdown,
+		contentFormat: 'markdown',
+		revision: 1,
+		metadata: args.metadata,
+		projectId: args.projectId,
+		createdAt: args.now,
+		updatedAt: args.now
+	});
+
+	await ctx.db.insert('artifactVersions', {
+		ownerId: args.ownerId,
+		artifactId,
+		versionNumber: 1,
+		title: args.title,
+		contentMarkdown: args.contentMarkdown,
+		actor: args.actor,
+		source: 'editor',
+		summary: args.summary,
+		createdAt: args.now,
+		updatedAt: args.now
+	});
+
+	await logActivityEvent(ctx, {
+		ownerId: args.ownerId,
+		eventType: 'artifact_created',
+		metadata: {
+			artifactId,
+			artifactType: args.type,
+			projectId: args.projectId,
+			revision: 1,
+			summary: args.summary
+		},
+		occurredAtMs: args.now
+	});
+
+	return artifactId;
 }

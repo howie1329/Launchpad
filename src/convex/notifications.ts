@@ -212,6 +212,37 @@ export async function createNotificationForOwner(
 	});
 }
 
+export async function dismissNotificationsForOwnerTarget(
+	ctx: MutationCtx,
+	args: {
+		ownerId: Id<'users'>;
+		targetKind: 'externalContextImportDraft' | 'chatThread' | 'artifact' | 'project';
+		targetId: string;
+	}
+) {
+	const rows = await ctx.db
+		.query('notifications')
+		.withIndex('by_ownerId_and_targetKind_and_targetId', (q) =>
+			q.eq('ownerId', args.ownerId).eq('targetKind', args.targetKind).eq('targetId', args.targetId)
+		)
+		.take(25);
+	const now = Date.now();
+	let updated = 0;
+
+	for (const row of rows) {
+		if (row.status === 'dismissed' || row.status === 'deleted') continue;
+		await ctx.db.patch(row._id, {
+			status: 'dismissed',
+			dismissedAt: now,
+			...(row.readAt ? {} : { readAt: now }),
+			updatedAt: now
+		});
+		updated += 1;
+	}
+
+	return { updated };
+}
+
 async function getOwnedNotification(
 	ctx: MutationCtx,
 	notificationId: Id<'notifications'>,

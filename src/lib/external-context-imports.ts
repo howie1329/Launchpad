@@ -79,6 +79,21 @@ export const updateExternalContextImportDraftReviewMutation = makeFunctionRefere
 	{ ok: true }
 >('externalContextImports:updateDraftReview');
 
+export const createProjectFromExternalContextImportDraftMutation = makeFunctionReference<
+	'mutation',
+	{
+		draftId: Id<'externalContextImportDrafts'>;
+		projectName: string;
+		projectSummary?: string;
+		projectBriefMarkdown: string;
+	},
+	{
+		projectId: Id<'projects'>;
+		sourceArtifactId: Id<'artifacts'>;
+		briefArtifactId: Id<'artifacts'>;
+	}
+>('externalContextImports:createProjectFromDraft');
+
 export const markExternalContextImportDraftProcessingMutation = makeFunctionReference<
 	'mutation',
 	{ draftId: Id<'externalContextImportDrafts'> },

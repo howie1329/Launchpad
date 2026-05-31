@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import {
+		createProjectFromExternalContextImportDraftMutation,
 		getExternalContextImportDraftQuery,
 		startExternalContextImportDraftReviewMutation,
 		updateExternalContextImportDraftReviewMutation
@@ -10,6 +13,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { workspaceProjectHref } from '$lib/workspace-route-contract';
 	import { useQuery } from 'convex-svelte';
 	import type { Id } from '../../../../../convex/_generated/dataModel';
 
@@ -27,8 +31,10 @@
 	let syncedDraftKey = $state('');
 	let saveError = $state('');
 	let retryError = $state('');
+	let createError = $state('');
 	let isSaving = $state(false);
 	let isRetrying = $state(false);
+	let isCreatingProject = $state(false);
 
 	$effect(() => {
 		const row = draft.data;
@@ -41,6 +47,7 @@
 		syncedDraftKey = draftKey;
 		saveError = '';
 		retryError = '';
+		createError = '';
 	});
 
 	const hasReviewChanges = $derived(
@@ -118,6 +125,53 @@
 				error instanceof Error && error.message ? error.message : 'Could not retry import review.';
 		} finally {
 			isRetrying = false;
+		}
+	}
+
+	async function createProject() {
+		if (!draft.data || draft.data.status !== 'ready' || isCreatingProject) return;
+
+		const name = projectName.trim();
+		const summary = projectSummary.trim();
+		const brief = projectBriefMarkdown.trim();
+		if (!name) {
+			createError = 'Project name is required.';
+			return;
+		}
+		if (!brief) {
+			createError = 'Project Brief is required.';
+			return;
+		}
+
+		isCreatingProject = true;
+		createError = '';
+		try {
+			if (hasReviewChanges) {
+				await getConvexClient().mutation(updateExternalContextImportDraftReviewMutation, {
+					draftId: draft.data._id,
+					generatedProjectName: name,
+					generatedProjectSummary: summary,
+					generatedProjectBriefMarkdown: brief
+				});
+			}
+			const result = await getConvexClient().mutation(
+				createProjectFromExternalContextImportDraftMutation,
+				{
+					draftId: draft.data._id,
+					projectName: name,
+					...(summary ? { projectSummary: summary } : {}),
+					projectBriefMarkdown: brief
+				}
+			);
+			await goto(resolve(workspaceProjectHref(result.projectId) as `/workspace/project/${string}`));
+		} catch (error) {
+			console.error(error);
+			createError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not create project from this import.';
+		} finally {
+			isCreatingProject = false;
 		}
 	}
 </script>
@@ -233,16 +287,28 @@
 					</div>
 
 					<div class="flex flex-wrap items-center justify-between gap-3">
-						{#if saveError}
-							<p class="text-xs text-destructive">{saveError}</p>
+						{#if saveError || createError}
+							<p class="text-xs text-destructive">{saveError || createError}</p>
 						{:else}
 							<p class="text-xs text-muted-foreground">
 								Raw imported context is preserved separately below.
 							</p>
 						{/if}
-						<Button type="submit" disabled={!canSaveReview || isSaving}>
-							{isSaving ? 'Saving...' : 'Save changes'}
-						</Button>
+						<div class="flex shrink-0 flex-wrap items-center gap-2">
+							<Button type="submit" variant="secondary" disabled={!canSaveReview || isSaving}>
+								{isSaving ? 'Saving...' : 'Save changes'}
+							</Button>
+							<Button
+								type="button"
+								disabled={isCreatingProject ||
+									isSaving ||
+									!projectName.trim() ||
+									!projectBriefMarkdown.trim()}
+								onclick={createProject}
+							>
+								{isCreatingProject ? 'Creating...' : 'Create project'}
+							</Button>
+						</div>
 					</div>
 				</form>
 			{:else}

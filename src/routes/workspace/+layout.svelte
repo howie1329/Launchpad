@@ -44,6 +44,10 @@
 		type NotificationState,
 		type SavedNotification
 	} from '$lib/notifications';
+	import {
+		startExternalContextImportDraftReviewMutation,
+		type ExternalContextImportSourceToolHint
+	} from '$lib/external-context-imports';
 	import { LaunchpadMarkOutline } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
@@ -112,6 +116,12 @@
 	let artifactBody = $state('');
 	let artifactCreateError = $state('');
 	let isCreatingArtifact = $state(false);
+	let importDialogOpen = $state(false);
+	let importSourceMarkdown = $state('');
+	let importSourceToolHint = $state<ExternalContextImportSourceToolHint>('unknown');
+	let importError = $state('');
+	let importNotice = $state('');
+	let isStartingImportReview = $state(false);
 	let importingArtifactId = $state('');
 	let artifactActionError = $state('');
 	let workspaceNotice = $state('');
@@ -440,6 +450,131 @@
 		if (isCreatingArtifact) return;
 		createArtifactDialogOpen = false;
 		artifactCreateError = '';
+	};
+
+	const externalContextPrompt = `I want to import this project context into LaunchPad, a project-focused AI workspace.
+
+Please summarize the current conversation/project using the exact Markdown structure below.
+
+Important rules:
+- Do not invent details.
+- If something is unclear or missing, write it under "Things Not Known" or "Open Questions".
+- Prefer concise, practical bullets.
+- Preserve important decisions, goals, constraints, and next steps.
+- Write this so another AI assistant can help me continue the project later.
+
+# Project Name
+
+[Suggest a clear project name.]
+
+## One-Sentence Summary
+
+[Summarize the project in one sentence.]
+
+## Background
+
+[Explain the relevant context, history, problem, audience, and why this project matters.]
+
+## Goals
+
+- [Goal 1]
+- [Goal 2]
+- [Goal 3]
+
+## Key Decisions
+
+- [Decision 1 and why it was made]
+- [Decision 2 and why it was made]
+
+## Constraints and Requirements
+
+- [Important constraint, requirement, platform, stack, timeline, style, or business rule]
+
+## Open Questions
+
+- [Question 1]
+- [Question 2]
+
+## Next Steps
+
+- [Concrete next step 1]
+- [Concrete next step 2]
+- [Concrete next step 3]
+
+## Useful Files, Artifacts, or References
+
+- [Mention any documents, files, links, designs, notes, or artifacts that matter]
+
+## Durable Project Context
+
+[Write facts, preferences, definitions, or project-specific context that would help an AI assistant continue the work accurately.]
+
+## Things Not Known
+
+- [Anything important that is missing, uncertain, or should not be assumed]`;
+
+	const openImportDialog = () => {
+		importDialogOpen = true;
+		importError = '';
+		importNotice = '';
+	};
+
+	const closeImportDialog = () => {
+		if (isStartingImportReview) return;
+		importDialogOpen = false;
+		importError = '';
+		importNotice = '';
+	};
+
+	const copyExternalContextPrompt = async () => {
+		importNotice = '';
+		importError = '';
+		try {
+			await navigator.clipboard.writeText(externalContextPrompt);
+			importNotice = 'Prompt copied.';
+		} catch (error) {
+			console.error(error);
+			importError = 'Could not copy the prompt. Select and copy it manually.';
+		}
+	};
+
+	const startExternalContextImportReview = async () => {
+		if (isStartingImportReview) return;
+		const sourceMarkdown = importSourceMarkdown.trim();
+		if (!sourceMarkdown) {
+			importError = 'Paste the external AI summary before reviewing.';
+			return;
+		}
+
+		isStartingImportReview = true;
+		importError = '';
+		importNotice = '';
+		try {
+			const result = await getConvexClient().mutation(
+				startExternalContextImportDraftReviewMutation,
+				{
+					sourceMarkdown,
+					sourceToolHint: importSourceToolHint
+				}
+			);
+			importDialogOpen = false;
+			importSourceMarkdown = '';
+			importSourceToolHint = 'unknown';
+			workspaceNotice = 'Import review started. You can leave this page.';
+			await goto(
+				resolve(
+					`/workspace/imports/external-context/${result.draftId}` as `/workspace/imports/external-context/${string}`
+				)
+			);
+		} catch (error) {
+			console.error(error);
+			importError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not start import review. Please try again.';
+		} finally {
+			isStartingImportReview = false;
+		}
 	};
 
 	const createArtifact = async () => {
@@ -1647,6 +1782,28 @@
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger
 						type="button"
+						class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
+					>
+						<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} class="size-3.5 shrink-0" />
+						<span class="hidden min-[460px]:inline">New project</span>
+						<span class="min-[460px]:hidden">New</span>
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end" class="min-w-56">
+						<DropdownMenu.Item
+							onclick={() => {
+								void goto(resolve(workspaceRootHref() as '/workspace'));
+							}}
+						>
+							Start from scratch
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={openImportDialog}>
+							Import external AI context
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger
+						type="button"
 						class="relative inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground ring-ring hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden"
 						aria-label={unreadNotificationCount > 0
 							? `${unreadNotificationCount} unread notifications`
@@ -1845,6 +2002,103 @@
 			onUseArtifactInThread={useArtifactInThread}
 			onToggleThreadContext={toggleThreadContext}
 		/>
+
+		<Dialog.Root bind:open={importDialogOpen}>
+			<Dialog.Content
+				class="flex h-[min(48rem,calc(100vh-2rem))] flex-col sm:max-w-5xl"
+				showCloseButton={!isStartingImportReview}
+			>
+				<form
+					class="flex min-h-0 flex-1 flex-col gap-4"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void startExternalContextImportReview();
+					}}
+				>
+					<Dialog.Header>
+						<Dialog.Title>Import external AI context</Dialog.Title>
+						<Dialog.Description>
+							Copy the prompt into ChatGPT, Claude, or another AI tool, then paste the returned
+							project summary here.
+						</Dialog.Description>
+					</Dialog.Header>
+
+					<div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+						<section class="flex min-h-0 flex-col gap-2">
+							<div class="flex items-center justify-between gap-3">
+								<Label for="external-context-prompt">Prompt</Label>
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									disabled={isStartingImportReview}
+									onclick={copyExternalContextPrompt}
+								>
+									Copy prompt
+								</Button>
+							</div>
+							<Textarea
+								id="external-context-prompt"
+								value={externalContextPrompt}
+								readonly
+								class="min-h-0 flex-1 resize-none font-mono text-xs"
+							/>
+						</section>
+
+						<section class="flex min-h-0 flex-col gap-3">
+							<div class="grid gap-3 sm:grid-cols-[1fr_11rem]">
+								<div class="space-y-1.5">
+									<Label for="external-context-source">External summary</Label>
+									<p class="text-xs leading-5 text-muted-foreground">
+										Do not paste passwords, API keys, private keys, or sensitive personal data.
+									</p>
+								</div>
+								<div class="space-y-1.5">
+									<Label for="external-context-source-tool">Source</Label>
+									<NativeSelect
+										id="external-context-source-tool"
+										bind:value={importSourceToolHint}
+										disabled={isStartingImportReview}
+									>
+										<NativeSelectOption value="unknown">Unknown</NativeSelectOption>
+										<NativeSelectOption value="chatgpt">ChatGPT</NativeSelectOption>
+										<NativeSelectOption value="claude">Claude</NativeSelectOption>
+										<NativeSelectOption value="other">Other</NativeSelectOption>
+									</NativeSelect>
+								</div>
+							</div>
+							<Textarea
+								id="external-context-source"
+								bind:value={importSourceMarkdown}
+								placeholder="# Project Name&#10;&#10;Paste the structured Markdown summary here..."
+								class="min-h-0 flex-1 resize-none font-mono text-xs"
+								disabled={isStartingImportReview}
+							/>
+						</section>
+					</div>
+
+					{#if importError || importNotice}
+						<p class="text-xs {importError ? 'text-destructive' : 'text-muted-foreground'}">
+							{importError || importNotice}
+						</p>
+					{/if}
+
+					<Dialog.Footer>
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={isStartingImportReview}
+							onclick={closeImportDialog}
+						>
+							Cancel
+						</Button>
+						<Button type="submit" disabled={isStartingImportReview || !importSourceMarkdown.trim()}>
+							{isStartingImportReview ? 'Starting review...' : 'Review Project'}
+						</Button>
+					</Dialog.Footer>
+				</form>
+			</Dialog.Content>
+		</Dialog.Root>
 
 		<Dialog.Root bind:open={projectDeleteDialogOpen}>
 			<Dialog.Content class="sm:max-w-md" showCloseButton={!isDeletingProject}>
