@@ -1,11 +1,14 @@
 <!-- agentkit:start agents -->
-# [Project Name] Agent Guide
+
+# Launchpad Agent Guide
 
 ## Purpose
 
 This is the primary instruction file for AI coding agents working in this repository.
 
-[Project Name] is [short project description]. Agents should optimize for safe, focused, production-ready changes that follow local patterns.
+Launchpad is a SvelteKit and Convex workspace for solo builders and indie hackers. It helps users think through ideas in chat, preserve decisions as markdown artifacts, organize mature work into projects, import external AI context, and use an AI assistant that can read and write workspace state.
+
+Agents should optimize for safe, focused, production-ready changes that follow local SvelteKit, Convex, Tailwind, and shadcn-svelte patterns.
 
 ## Source Of Truth
 
@@ -17,36 +20,37 @@ For routine bugfixes and small features, do not open `WORKFLOWS.md`, planning te
 
 ## When To Use Other Guides
 
-| Trigger | Action |
-| --- | --- |
-| Any file edits (final message) | Use the change-explanation format in **After Coding (Required)**; see `CHANGE-EXPLANATION.md` for detail |
-| UI, components, styling, layout | Read `[design system path, e.g. docs/design-system.md]` or `DESIGN-SYSTEM.md` |
-| Review, refactor, dependencies | Read `CODE-QUALITY.md` |
-| Tests, fixtures, QA strategy | Read `TESTING.md` if present |
-| Auth, permissions, secrets, PII | Read `SECURITY-CHECKLIST.md` if present |
-| Stack-specific code | Read `STACK.md` if present |
-| User or issue requests a PRD | Create from `PRD-TEMPLATE.md` under `[briefs path, e.g. docs/briefs]` |
-| User or issue requests an implementation brief | Create from `IMPLEMENTATION-BRIEF-TEMPLATE.md` under `[briefs path, e.g. docs/briefs]` |
-| Release or branching process (optional) | Read `WORKFLOWS.md` if present |
+| Trigger                                        | Action                                                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Any file edits (final message)                 | Use the change-explanation format in **After Coding (Required)**; see `docs/CHANGE-EXPLANATION.md` for detail |
+| UI, components, styling, layout                | Read `docs/DESIGN-SYSTEM.md`                                                                                  |
+| Review, refactor, dependencies                 | Read `docs/CODE-QUALITY.md`                                                                                   |
+| Tests, fixtures, QA strategy                   | Read `docs/TESTING.md` if present                                                                             |
+| Auth, permissions, secrets, PII                | Read `docs/SECURITY-CHECKLIST.md` if present                                                                  |
+| Stack-specific code                            | Read `docs/STACK.md`                                                                                          |
+| Architecture, data flow, AI, memory, env       | Read `docs/architecture.md`                                                                                   |
+| User or issue requests a PRD                   | Create from `docs/PRD-TEMPLATE.md` under `docs/briefs`                                                        |
+| User or issue requests an implementation brief | Create from `docs/IMPLEMENTATION-BRIEF-TEMPLATE.md` under `docs/briefs`                                       |
+| Release or branching process (optional)        | Read `docs/WORKFLOWS.md` if present                                                                           |
 
 ### Optional Guides (Full Template Set)
 
 These files are not installed with the standard template set. Do not assume they exist unless present in the repository:
 
-- `TESTING.md`
-- `SECURITY-CHECKLIST.md`
-- `PRD-TEMPLATE.md`
-- `IMPLEMENTATION-BRIEF-TEMPLATE.md`
-- `WORKFLOWS.md`
+- `docs/TESTING.md`
+- `docs/SECURITY-CHECKLIST.md`
+- `docs/PRD-TEMPLATE.md`
+- `docs/IMPLEMENTATION-BRIEF-TEMPLATE.md`
+- `docs/WORKFLOWS.md`
 
 ## Planning Artifacts
 
 Use this decision tree before creating planning documents:
 
 - **Tiny obvious fix** — implement directly; no PRD or brief required.
-- **Product uncertainty** — create a PRD from `PRD-TEMPLATE.md` only when the user, issue, or task explicitly requests planning documentation. Save it under `[briefs path, e.g. docs/briefs]`.
-- **Multi-file engineering with meaningful risk** — create an implementation brief from `IMPLEMENTATION-BRIEF-TEMPLATE.md` only when the user, issue, or task explicitly requests it. Save it under `[briefs path, e.g. docs/briefs]`.
-- **Security-sensitive change** — follow `SECURITY-CHECKLIST.md` if present.
+- **Product uncertainty** — create a PRD from `docs/PRD-TEMPLATE.md` only when the user, issue, or task explicitly requests planning documentation. Save it under `docs/briefs`.
+- **Multi-file engineering with meaningful risk** — create an implementation brief from `docs/IMPLEMENTATION-BRIEF-TEMPLATE.md` only when the user, issue, or task explicitly requests it. Save it under `docs/briefs`.
+- **Security-sensitive change** — follow `docs/SECURITY-CHECKLIST.md` if present.
 
 Do not read planning templates on every task. Copy and fill them only when planning documentation is requested.
 
@@ -79,7 +83,7 @@ Before making meaningful code changes:
 1. Confirm the task, scope, and acceptance criteria.
 2. Inspect nearby code, tests, and existing patterns.
 3. Read at most one triggered companion from **When To Use Other Guides** if it applies.
-4. For non-trivial work: link to or create an issue in [issue tracker, e.g. Linear or GitHub Issues] and use an appropriate branch when the project expects branches.
+4. For non-trivial work: link to or create a Linear issue and use an appropriate branch when the project expects branches.
 5. Ask for clarification if requirements, risk, or approval boundaries are unclear.
 
 Tiny fixes can skip issue-and-branch ceremony when the change is obvious and low risk.
@@ -93,8 +97,8 @@ While implementing:
 - Avoid unrelated formatting churn.
 - Prefer existing utilities, components, and conventions.
 - Add or update tests when behavior changes.
-- For UI work, follow `[design system path, e.g. docs/design-system.md]` and preserve existing interaction patterns.
-- For stack-specific work, read `STACK.md` when present.
+- For UI work, follow `docs/DESIGN-SYSTEM.md` and preserve existing interaction patterns.
+- For stack-specific work, read `docs/STACK.md`.
 - Document meaningful decisions in the change explanation when they matter.
 
 ## Approval Boundaries
@@ -123,7 +127,7 @@ Do not write a separate change-explanation file unless the project asks for one.
 - **Risks or limitations** — merge blockers, untested paths, follow-up (use "None identified" for trivial low-risk fixes when appropriate).
 - **Suggested review focus** — where the developer should look first.
 
-See `CHANGE-EXPLANATION.md` for examples and style rules.
+See `docs/CHANGE-EXPLANATION.md` for examples and style rules.
 
 ## Before Finishing
 
@@ -138,37 +142,43 @@ Before marking work complete:
 
 ## Project Commands
 
-Replace these examples with the project's real commands:
-
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the local development server |
-| `npm test` | Run tests |
-| `npm run lint` | Run lint checks |
-| `npm run build` | Build the project |
-
-Remove commands that do not apply.
+| Command               | Description                                     |
+| --------------------- | ----------------------------------------------- |
+| `npm run dev`         | Start the SvelteKit frontend development server |
+| `npm run dev:backend` | Start Convex dev                                |
+| `npm run dev:all`     | Start SvelteKit and Convex together             |
+| `npm run check`       | Run SvelteKit sync and `svelte-check`           |
+| `npm run lint`        | Run Prettier check and ESLint                   |
+| `npm run build`       | Build the project                               |
 
 ## Environment
 
-Document required environment variables here:
+Set local values in `.env.local` or the deployment environment. Never document or commit real secret values.
 
-- `[ENV_VAR_NAME]`: [description]
+| Variable                 | Required         | Purpose                                                                   |
+| ------------------------ | ---------------- | ------------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`      | Yes              | Convex deployment URL used by browser clients and SvelteKit server routes |
+| `AI_GATEWAY_API_KEY`     | Yes              | Vercel AI Gateway key for default workspace AI workflows                  |
+| `OPENROUTER_API_KEY`     | Optional         | Enables OpenRouter model catalog entries                                  |
+| `GROQ_API_KEY`           | Optional         | Enables Groq model catalog entries                                        |
+| `NIM_API_KEY`            | Optional         | Enables NVIDIA NIM model catalog entries                                  |
+| `TAVILY_API_KEY`         | Optional         | Enables workspace web search and page extraction                          |
+| `SUPERMEMORY_API_KEY`    | Optional         | Enables Supermemory recall, profile context, and artifact memory sync     |
+| `CONVEX_SITE_URL`        | Deployment       | Convex Auth site URL for deployed auth configuration                      |
+| `PUBLIC_CONVEX_SITE_URL` | Optional         | Public Convex site URL when client-facing site routes need it             |
+| `CONVEX_DEPLOYMENT`      | Local Convex dev | Convex deployment identifier managed by `convex dev`                      |
 
 Never commit API keys, tokens, private keys, or local `.env` values. Keep secrets in environment variables or the project-approved secret store.
 
 ## Stack
 
-When `STACK.md` is present (for example after a preset install), read it before changing stack-specific code.
+Agents must read `docs/STACK.md` before changing stack-specific code.
 
-Otherwise document the real stack for this project:
-
-- [Primary framework]
-- [Language/runtime]
-- [Backend/data layer]
-- [Styling system]
-- [Test tools]
-- [Lint/format tools]
-
-Preset: SvelteKit. Agents must read `STACK.md` before changing stack-specific code.
+- Primary framework: SvelteKit with Svelte 5
+- Language/runtime: TypeScript on Node/Vite
+- Backend/data layer: Convex queries, mutations, realtime data, HTTP actions, and Convex Auth
+- AI: Vercel AI SDK with Vercel AI Gateway, OpenRouter, Groq, NVIDIA NIM, Tavily, and optional Supermemory
+- Styling system: Tailwind CSS v4 with shadcn-svelte/Bits UI primitives and project CSS in `src/routes/layout.css`
+- Test/check tools: `svelte-check`, SvelteKit sync, Vite build
+- Lint/format tools: ESLint, Prettier, `prettier-plugin-svelte`, `prettier-plugin-tailwindcss`
 <!-- agentkit:end agents -->
