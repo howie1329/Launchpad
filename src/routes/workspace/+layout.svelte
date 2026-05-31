@@ -681,7 +681,7 @@
 				}
 				return workspaceArtifactHref(notification.targetId);
 			case 'externalContextImportDraft':
-				return null;
+				return `/workspace/imports/external-context/${notification.targetId}`;
 		}
 	}
 
@@ -713,7 +713,7 @@
 
 	function missingNotificationTargetMessage(notification: SavedNotification) {
 		if (notification.targetKind === 'externalContextImportDraft') {
-			return 'Import review notifications are reserved for the upcoming import workflow.';
+			return 'That import draft is no longer available.';
 		}
 		return 'That notification target is no longer available.';
 	}

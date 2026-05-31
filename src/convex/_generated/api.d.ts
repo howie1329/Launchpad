@@ -16,6 +16,8 @@ import type * as auth from "../auth.js";
 import type * as authHelpers from "../authHelpers.js";
 import type * as chat from "../chat.js";
 import type * as dateKey from "../dateKey.js";
+import type * as externalContextImportSynthesis from "../externalContextImportSynthesis.js";
+import type * as externalContextImports from "../externalContextImports.js";
 import type * as http from "../http.js";
 import type * as memory from "../memory.js";
 import type * as notifications from "../notifications.js";
@@ -40,6 +42,8 @@ declare const fullApi: ApiFromModules<{
   authHelpers: typeof authHelpers;
   chat: typeof chat;
   dateKey: typeof dateKey;
+  externalContextImportSynthesis: typeof externalContextImportSynthesis;
+  externalContextImports: typeof externalContextImports;
   http: typeof http;
   memory: typeof memory;
   notifications: typeof notifications;

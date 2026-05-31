@@ -22,6 +22,18 @@ const notificationTargetKindValue = v.union(
 );
 const notificationMetadataValue = v.record(v.string(), v.any());
 
+type CreateNotificationForOwnerArgs = {
+	ownerId: Id<'users'>;
+	type: 'external_context_import' | 'ai_chat_activity';
+	state: 'activity' | 'success' | 'failed' | 'in_progress';
+	title: string;
+	body?: string;
+	targetKind: 'externalContextImportDraft' | 'chatThread' | 'artifact' | 'project';
+	targetId: string;
+	metadata?: Record<string, unknown>;
+	createdAt?: number;
+};
+
 export const createNotification = mutation({
 	args: {
 		type: notificationTypeValue,
@@ -35,26 +47,16 @@ export const createNotification = mutation({
 	},
 	handler: async (ctx, args) => {
 		const ownerId = await requireAuthUserId(ctx);
-		const title = args.title.trim();
-		const body = args.body?.trim();
-		const targetId = args.targetId.trim();
-
-		if (!title) throw new Error('Notification title is required');
-		if (!targetId) throw new Error('Notification target is required');
-
-		const now = args.createdAt ?? Date.now();
-		const notificationId = await ctx.db.insert('notifications', {
+		const notificationId = await createNotificationForOwner(ctx, {
 			ownerId,
 			type: args.type,
 			state: args.state,
-			status: 'unread',
-			title,
-			...(body ? { body } : {}),
+			title: args.title,
+			body: args.body,
 			targetKind: args.targetKind,
-			targetId,
-			...(args.metadata ? { metadata: args.metadata } : {}),
-			createdAt: now,
-			updatedAt: now
+			targetId: args.targetId,
+			metadata: args.metadata,
+			createdAt: args.createdAt
 		});
 
 		return { notificationId };
@@ -182,6 +184,33 @@ export const deleteNotification = mutation({
 		return { ok: true };
 	}
 });
+
+export async function createNotificationForOwner(
+	ctx: MutationCtx,
+	args: CreateNotificationForOwnerArgs
+) {
+	const title = args.title.trim();
+	const body = args.body?.trim();
+	const targetId = args.targetId.trim();
+
+	if (!title) throw new Error('Notification title is required');
+	if (!targetId) throw new Error('Notification target is required');
+
+	const now = args.createdAt ?? Date.now();
+	return await ctx.db.insert('notifications', {
+		ownerId: args.ownerId,
+		type: args.type,
+		state: args.state,
+		status: 'unread',
+		title,
+		...(body ? { body } : {}),
+		targetKind: args.targetKind,
+		targetId,
+		...(args.metadata ? { metadata: args.metadata } : {}),
+		createdAt: now,
+		updatedAt: now
+	});
+}
 
 async function getOwnedNotification(
 	ctx: MutationCtx,
