@@ -157,14 +157,14 @@
 	}
 
 	/**
-	 * List row pattern (docs/design-system.md §6): `text-xs`, 12px icons, `accent` selection pill,
+	 * List row pattern (docs/DESIGN-SYSTEM.md §6): `text-xs`, 12px icons, `accent` selection pill,
 	 * `hover:bg-accent/50` — workspace palette only; overrides `Command.Item` defaults.
 	 */
 	const paletteItemClass =
 		'gap-2 rounded-md px-2 py-2 font-sans text-xs hover:bg-accent/50 ' +
 		'data-selected:bg-accent data-selected:font-medium data-selected:text-accent-foreground ' +
 		'data-selected:hover:bg-accent data-selected:[&_svg]:text-accent-foreground';
-	/** Nav-style section label (docs/design-system.md §2–3) for this overlay. */
+	/** Nav-style section label (docs/DESIGN-SYSTEM.md §2–3) for this overlay. */
 	const paletteGroupHeadingClass = '!text-[11px] uppercase tracking-wide !text-muted-foreground';
 </script>
 

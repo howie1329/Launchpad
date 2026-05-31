@@ -1,52 +1,20 @@
-# Launchpad Docs Index
+# Launchpad Docs
 
-This folder is organized by intent so product, engineering, and research docs are easy to find.
+This folder is intentionally small. The codebase is the source of truth for shipped behavior; these docs explain product positioning, maintainer context, and contribution rules.
 
-## Structure
+## Product
 
-- `features/` — Product requirements and feature plans
-- `architecture/` — Technical architecture and implementation design
-- `research/` — Evaluations, handoffs, and exploration notes
-- `history/` — Time-based snapshots, checklists, and follow-up logs
-- `operations/` — Cross-cutting workflows, process, and operational guidance
+- [Product summary](product-summary.md) — user/investor-facing snapshot of what Launchpad is and why it matters.
+- [Architecture](architecture.md) — concise maintainer map of routes, data, AI, memory, environment, and checks.
 
-## Quick links
+## Contributor And Agent Guides
 
-### Features
+- [Stack](STACK.md) — SvelteKit implementation guidance.
+- [Code quality](CODE-QUALITY.md) — review, testing, dependency, and handoff standards.
+- [Workflows](WORKFLOWS.md) — lightweight research, planning, implementation, review, and release workflows.
+- [Change explanation](CHANGE-EXPLANATION.md) — final handoff format.
+- [Design system](DESIGN-SYSTEM.md) — UI principles for surfaces, navigation, controls, motion, and accessibility.
 
-- [Chat-first Launchpad PRD](./features/chat-first-launchpad-prd.md)
-- [Artifact version history PRD](./features/artifact-version-history-prd.md)
-- [Diffs full replacement PRD](./features/diffs-full-replacement-prd.md)
-- [Artifact history diff rendering fix plan](./features/artifact-history-diff-rendering-fix-plan.md)
-- [Supermemory integration PRD](./features/supermemory-integration-prd.md)
-- [User-created artifacts and project-wide mentions PRD](./features/user-created-artifacts-project-wide-mentions-prd.md)
-- [User AI preferences plan](./features/user-ai-preferences-plan.md)
-- [Workspace chat UX PRD](./features/workspace-chat-ux-prd.md)
-- [Workspace chat UX implementation plan](./features/workspace-chat-ux-implementation-plan.md)
-- [Promotion readiness gate PRD](./features/promotion-readiness-gate-prd.md)
-- [Mobile-first responsive implementation plan](./features/mobile-first-responsive-implementation-plan.md)
-- [NVIDIA NIM provider PRD](./features/nvidia-nim-provider-prd.md)
+## Pruning Policy
 
-### Architecture
-
-- [Artifact schema plan](./architecture/artifact-schema-plan.md)
-- [Design system](./architecture/design-system.md)
-- [Durable workflows and orchestration](./architecture/durable-workflows-and-orchestration.md)
-- [shadcn-svelte notes](./architecture/shadcn-svelte.md)
-
-### Research
-
-- [Diffs integration evaluation](./research/diffs-integration-evaluation.md)
-- [Supermemory integration handoff](./research/supermemory-integration-handoff.md)
-- [Supermemory integration GitHub issue body](./research/supermemory-integration-github-issue-body.md)
-
-### History
-
-- [Current state](./history/current-state.md)
-- [Day 1 launch checklist](./history/day1-launch-checklist.md)
-- [Tech debt follow-up](./history/tech-debt-followup.md)
-
-### Operations
-
-- [AI chat tools and Vercel workflows](./operations/ai-chat-tools-and-vercel-workflows.md)
-- [Product overview](./operations/product-overview.md)
+Old PRDs, research notes, implementation plans, handoffs, and launch checklists should not accumulate here once the product has moved on. Keep current product truth in [README.md](../README.md), [product-summary.md](product-summary.md), and [architecture.md](architecture.md).

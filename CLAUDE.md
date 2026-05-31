@@ -7,13 +7,12 @@ Follow `AGENTS.md` first. Treat it as the primary source of truth for project ru
 
 When relevant, also read:
 
-- `CODE-QUALITY.md`
-- `WORKFLOWS.md`
-- `CHANGE-EXPLANATION.md`
-- `DESIGN-SYSTEM.md`
-- `TESTING.md`
-- `SECURITY-CHECKLIST.md`
-- `STACK.md`
+- `docs/STACK.md`
+- `docs/CODE-QUALITY.md`
+- `docs/WORKFLOWS.md`
+- `docs/CHANGE-EXPLANATION.md`
+- `docs/DESIGN-SYSTEM.md`
+- `docs/architecture.md`
 
 Keep context focused. Do not load companion files unless they are relevant to the task.
 
