@@ -6,7 +6,17 @@ import type { ToolSet } from 'ai';
 import type { ConvexHttpClient } from 'convex/browser';
 import type { Id } from '../../convex/_generated/dataModel';
 
-export const ALLOWED_COMPOSIO_TOOLKITS = ['github', 'linear', 'slack', 'gmail'] as const;
+export const ALLOWED_COMPOSIO_TOOLKITS = [
+	'github',
+	'linear',
+	'slack',
+	'gmail',
+	'notion',
+	'googledrive',
+	'googledocs',
+	'googlecalendar',
+	'googlesheets'
+] as const;
 
 export type AllowedComposioToolkit = (typeof ALLOWED_COMPOSIO_TOOLKITS)[number];
 
@@ -285,7 +295,18 @@ function isAllowedComposioToolkit(value: unknown): value is AllowedComposioToolk
 }
 
 function fallbackToolkitName(slug: AllowedComposioToolkit) {
-	return slug === 'github' ? 'GitHub' : slug.charAt(0).toUpperCase() + slug.slice(1);
+	const names: Record<AllowedComposioToolkit, string> = {
+		github: 'GitHub',
+		linear: 'Linear',
+		slack: 'Slack',
+		gmail: 'Gmail',
+		notion: 'Notion',
+		googledrive: 'Google Drive',
+		googledocs: 'Google Docs',
+		googlecalendar: 'Google Calendar',
+		googlesheets: 'Google Sheets'
+	};
+	return names[slug];
 }
 
 function unavailableComposioApps(): ComposioAppStatus[] {

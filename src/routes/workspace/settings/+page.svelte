@@ -58,7 +58,16 @@
 				aiBehaviorMarkdown.trim() !== savedAiBehaviorMarkdown)
 	);
 
-	type AllowedExternalApp = 'github' | 'linear' | 'slack' | 'gmail';
+	type AllowedExternalApp =
+		| 'github'
+		| 'linear'
+		| 'slack'
+		| 'gmail'
+		| 'notion'
+		| 'googledrive'
+		| 'googledocs'
+		| 'googlecalendar'
+		| 'googlesheets';
 	type ExternalAppStatus = {
 		slug: AllowedExternalApp;
 		name: string;
@@ -230,7 +239,17 @@
 	}
 
 	function isAllowedExternalApp(value: unknown): value is AllowedExternalApp {
-		return value === 'github' || value === 'linear' || value === 'slack' || value === 'gmail';
+		return (
+			value === 'github' ||
+			value === 'linear' ||
+			value === 'slack' ||
+			value === 'gmail' ||
+			value === 'notion' ||
+			value === 'googledrive' ||
+			value === 'googledocs' ||
+			value === 'googlecalendar' ||
+			value === 'googlesheets'
+		);
 	}
 
 	function externalAppStatusLabel(app: ExternalAppStatus) {

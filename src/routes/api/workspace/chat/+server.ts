@@ -349,7 +349,7 @@ function composioInstructions(
 	composioAvailable: boolean
 ) {
 	if (!composioAvailable) {
-		return 'External app tools are not configured for this workspace. Do not imply that you can use Gmail, GitHub, Linear, Slack, or other external app tools.';
+		return 'External app tools are not configured for this workspace. Do not imply that you can use Gmail, GitHub, Google Calendar, Google Docs, Google Drive, Google Sheets, Linear, Notion, Slack, or other external app tools.';
 	}
 
 	const activeToolkits =
@@ -358,20 +358,31 @@ function composioInstructions(
 	const scopeLine =
 		selectedToolkits.length > 0
 			? `External app tool badges are selected for this task. Use only these selected apps: ${labels}. Do not use unselected external apps.`
-			: `No external app badges are selected. GitHub, Linear, Slack, and Gmail are available when relevant; choose from them only when they directly help the user.`;
+			: `No external app badges are selected. ${labels} are available when relevant; choose from them only when they directly help the user.`;
 
 	return [
 		scopeLine,
 		'- If an available app needs authentication, use the Composio connection flow and ask the user to complete the Connect Link before continuing.',
 		'- Reading or searching available external apps is allowed when it directly helps answer the user.',
 		'- Before any external write action, summarize the exact action and ask for explicit confirmation unless the latest user message already confirms that exact action.',
-		'- Write actions include sending Gmail email, sending Slack messages, creating or updating Linear issues, and creating GitHub issues, comments, or pull requests.',
+		'- Write actions include sending Gmail email, sending Slack messages, creating or updating Linear issues, creating GitHub issues/comments/pull requests, changing Notion pages or databases, changing Google Drive files, editing Google Docs, changing Google Calendar events, and updating Google Sheets.',
 		'- Never delete, archive, or destructively modify external resources without explicit confirmation in the latest user turn.'
 	].join('\n');
 }
 
 function composioToolkitLabel(toolkit: AllowedComposioToolkit) {
-	return toolkit === 'github' ? 'GitHub' : toolkit.charAt(0).toUpperCase() + toolkit.slice(1);
+	const names: Record<AllowedComposioToolkit, string> = {
+		github: 'GitHub',
+		linear: 'Linear',
+		slack: 'Slack',
+		gmail: 'Gmail',
+		notion: 'Notion',
+		googledrive: 'Google Drive',
+		googledocs: 'Google Docs',
+		googlecalendar: 'Google Calendar',
+		googlesheets: 'Google Sheets'
+	};
+	return names[toolkit];
 }
 
 function webSearchInstructions(webSearchRequested: boolean, webSearchAvailable: boolean) {

@@ -139,7 +139,16 @@
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
 	let mediaMinLg = $state(false);
 
-	type AllowedComposioToolkit = 'github' | 'linear' | 'slack' | 'gmail';
+	type AllowedComposioToolkit =
+		| 'github'
+		| 'linear'
+		| 'slack'
+		| 'gmail'
+		| 'notion'
+		| 'googledrive'
+		| 'googledocs'
+		| 'googlecalendar'
+		| 'googlesheets';
 	type ComposioToolkitStatus = {
 		slug: AllowedComposioToolkit;
 		name: string;
@@ -152,7 +161,12 @@
 		{ slug: 'github', name: 'GitHub', connected: false },
 		{ slug: 'linear', name: 'Linear', connected: false },
 		{ slug: 'slack', name: 'Slack', connected: false },
-		{ slug: 'gmail', name: 'Gmail', connected: false }
+		{ slug: 'gmail', name: 'Gmail', connected: false },
+		{ slug: 'notion', name: 'Notion', connected: false },
+		{ slug: 'googledrive', name: 'Google Drive', connected: false },
+		{ slug: 'googledocs', name: 'Google Docs', connected: false },
+		{ slug: 'googlecalendar', name: 'Google Calendar', connected: false },
+		{ slug: 'googlesheets', name: 'Google Sheets', connected: false }
 	];
 
 	/** @artifact mention picker (thread-linked artifacts only) */
@@ -535,7 +549,7 @@
 	}
 
 	function isAllowedComposioToolkit(value: unknown): value is AllowedComposioToolkit {
-		return value === 'github' || value === 'linear' || value === 'slack' || value === 'gmail';
+		return fallbackComposioToolkits.some((toolkit) => toolkit.slug === value);
 	}
 
 	function toolkitFallback(slug: AllowedComposioToolkit): ComposioToolkitStatus {
