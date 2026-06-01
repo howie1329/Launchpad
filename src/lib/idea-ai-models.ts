@@ -70,6 +70,15 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		cachedInputCostPerMillionTokens: 0.25
 	},
 	{
+		id: 'or:openai/gpt-5.4-nano',
+		label: 'GPT-5.4 Nano',
+		provider: 'openrouter',
+		openRouterModel: 'openai/gpt-5.4-nano',
+		maxContextTokens: 400_000,
+		inputCostPerMillionTokens: 0.2,
+		outputCostPerMillionTokens: 1.25
+	},
+	{
 		id: 'or:arcee-ai/trinity-mini',
 		label: 'Trinity Mini',
 		provider: 'openrouter',
