@@ -255,7 +255,7 @@
 	const composioScopeLabel = $derived(
 		selectedComposioToolkits.length > 0
 			? `Only ${selectedComposioToolkits.length} selected ${selectedComposioToolkits.length === 1 ? 'app' : 'apps'}`
-			: 'All connected apps'
+			: 'All app tools'
 	);
 	const availableProjectArtifactCount = $derived(
 		(mentionableArtifacts.data ?? []).filter((item) => !item.linkedToThread).length
@@ -1502,7 +1502,7 @@
 															{#if selectedComposioToolkits.length > 0}
 																Only selected apps are available.
 															{:else}
-																All connected apps are available.
+																All app tools are available.
 															{/if}
 														</p>
 													</div>
@@ -1536,20 +1536,17 @@
 												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
 													Apps are not configured.
 												</div>
-											{:else if connectedComposioToolkits.length === 0}
+											{:else if orderedComposioToolkits.length === 0}
 												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
-													Connect apps in settings to use them here.
+													No app tools are available.
 												</div>
 											{:else}
 												<div class="max-h-72 overflow-y-auto py-1">
 													{#each orderedComposioToolkits as toolkit (toolkit.slug)}
 														<DropdownMenu.CheckboxItem
 															checked={selectedComposioToolkits.includes(toolkit.slug)}
-															disabled={!composioToolkitsAvailable || isChatBusy || !toolkit.connected}
-															class={cn(
-																'min-h-8 gap-2 pr-7 pl-2',
-																!toolkit.connected && 'opacity-60'
-															)}
+															disabled={!composioToolkitsAvailable || isChatBusy}
+															class="min-h-8 gap-2 pr-7 pl-2"
 															onSelect={(event) => event.preventDefault()}
 															onclick={() => toggleComposioToolkit(toolkit.slug)}
 														>
@@ -1570,7 +1567,7 @@
 																	toolkit.connected ? 'text-muted-foreground' : 'text-muted-foreground/80'
 																)}
 															>
-																{toolkit.connected ? 'Connected' : 'Not connected'}
+																{toolkit.connected ? 'Connected' : 'Connect if needed'}
 															</span>
 														</DropdownMenu.CheckboxItem>
 													{/each}
