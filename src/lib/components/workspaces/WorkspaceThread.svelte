@@ -236,11 +236,26 @@
 	const visibleComposioToolkits = $derived(
 		composioToolkits.length > 0 ? composioToolkits : fallbackComposioToolkits
 	);
+	const connectedComposioToolkits = $derived(
+		visibleComposioToolkits.filter((toolkit) => toolkit.connected)
+	);
+	const disconnectedComposioToolkits = $derived(
+		visibleComposioToolkits.filter((toolkit) => !toolkit.connected)
+	);
+	const orderedComposioToolkits = $derived([
+		...connectedComposioToolkits,
+		...disconnectedComposioToolkits
+	]);
 	const selectedComposioToolkitRows = $derived(
 		selectedComposioToolkits.map(
 			(slug) =>
 				visibleComposioToolkits.find((toolkit) => toolkit.slug === slug) ?? toolkitFallback(slug)
 		)
+	);
+	const composioScopeLabel = $derived(
+		selectedComposioToolkits.length > 0
+			? `Only ${selectedComposioToolkits.length} selected ${selectedComposioToolkits.length === 1 ? 'app' : 'apps'}`
+			: 'All connected apps'
 	);
 	const availableProjectArtifactCount = $derived(
 		(mentionableArtifacts.data ?? []).filter((item) => !item.linkedToThread).length
@@ -557,6 +572,12 @@
 			fallbackComposioToolkits.find((toolkit) => toolkit.slug === slug) ??
 			fallbackComposioToolkits[0]
 		);
+	}
+
+	function clearComposioToolkits() {
+		if (isChatBusy) return;
+		selectedComposioToolkits = [];
+		focusComposer();
 	}
 
 	function toggleComposioToolkit(slug: AllowedComposioToolkit) {
@@ -1446,13 +1467,13 @@
 										<DropdownMenu.Trigger
 											type="button"
 											class={cn(
-												'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+												'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
 												selectedComposioToolkits.length > 0
 													? 'bg-muted text-foreground'
 													: 'text-muted-foreground hover:bg-muted hover:text-foreground'
 											)}
 											disabled={isChatBusy}
-											aria-label="Select external app tools"
+											aria-label={`Select external app tools. ${composioScopeLabel}`}
 										>
 											<HugeiconsIcon
 												icon={Plug02Icon}
@@ -1460,58 +1481,100 @@
 												class="size-3"
 												aria-hidden="true"
 											/>
-											Apps
+											<span>Apps</span>
 											{#if selectedComposioToolkits.length > 0}
-												<span class="text-[10px] text-muted-foreground"
-													>{selectedComposioToolkits.length}</span
+												<span
+													class="rounded-sm bg-background/80 px-1 text-[10px] leading-4 text-muted-foreground ring-1 ring-border/70"
+													aria-label={`${selectedComposioToolkits.length} selected apps`}
 												>
+													{selectedComposioToolkits.length}
+												</span>
 											{/if}
 										</DropdownMenu.Trigger>
-										<DropdownMenu.Content align="start" class="w-64">
-											<DropdownMenu.Label
-												class="space-y-1 text-[11px] font-normal text-muted-foreground"
-											>
-												<span class="block text-foreground">External app tools</span>
-												<span class="block leading-4">
-													No selection lets Launchpad choose from all apps. Selecting apps restricts
-													this task.
-												</span>
-											</DropdownMenu.Label>
+										<DropdownMenu.Content align="start" class="w-72 max-w-[calc(100vw-1rem)] p-1.5">
+											<div class="px-2 py-1.5">
+												<div class="flex items-start justify-between gap-3">
+													<div class="min-w-0 space-y-0.5">
+														<DropdownMenu.Label class="p-0 text-xs font-semibold text-foreground">
+															Apps
+														</DropdownMenu.Label>
+														<p class="text-[11px] leading-4 text-muted-foreground">
+															{#if selectedComposioToolkits.length > 0}
+																Only selected apps are available.
+															{:else}
+																All connected apps are available.
+															{/if}
+														</p>
+													</div>
+													{#if selectedComposioToolkits.length > 0}
+														<button
+															type="button"
+															class="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+															onclick={clearComposioToolkits}
+														>
+															Use all apps
+														</button>
+													{/if}
+												</div>
+											</div>
 											<DropdownMenu.Separator />
 											{#if composioToolkitsLoading}
-												<div class="px-2 py-2 text-xs text-muted-foreground">Loading apps…</div>
+												<div class="space-y-1 px-1 py-1.5" aria-label="Loading apps">
+													{#each Array.from({ length: 4 }, (_, index) => index) as index (index)}
+														<div class="flex h-8 items-center gap-2 rounded-md px-2">
+															<span class="size-4 rounded-sm bg-muted"></span>
+															<span class="h-3 w-24 rounded bg-muted"></span>
+															<span class="ml-auto h-3 w-14 rounded bg-muted"></span>
+														</div>
+													{/each}
+												</div>
 											{:else if composioToolkitsError}
-												<div class="px-2 py-2 text-xs text-muted-foreground">
+												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
 													{composioToolkitsError}
 												</div>
 											{:else if !composioToolkitsAvailable && composioToolkitsLoadedForThread === activeThreadId}
-												<div class="px-2 py-2 text-xs text-muted-foreground">
+												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
 													Apps are not configured.
 												</div>
+											{:else if connectedComposioToolkits.length === 0}
+												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
+													Connect apps in settings to use them here.
+												</div>
 											{:else}
-												{#each visibleComposioToolkits as toolkit (toolkit.slug)}
-													<DropdownMenu.CheckboxItem
-														checked={selectedComposioToolkits.includes(toolkit.slug)}
-														disabled={!composioToolkitsAvailable || isChatBusy}
-														onSelect={(event) => event.preventDefault()}
-														onclick={() => toggleComposioToolkit(toolkit.slug)}
-													>
-														<span class="flex min-w-0 flex-1 items-center gap-2">
-															{#if toolkit.logo}
-																<img src={toolkit.logo} alt="" class="size-3.5 rounded-sm" />
-															{:else}
-																<span
-																	class="size-2 rounded-full bg-muted-foreground/50"
-																	aria-hidden="true"
-																></span>
-															{/if}
-															<span class="truncate">{toolkit.name}</span>
-														</span>
-														<span class="text-[10px] text-muted-foreground">
-															{toolkit.connected ? 'Connected' : 'Connect in chat'}
-														</span>
-													</DropdownMenu.CheckboxItem>
-												{/each}
+												<div class="max-h-72 overflow-y-auto py-1">
+													{#each orderedComposioToolkits as toolkit (toolkit.slug)}
+														<DropdownMenu.CheckboxItem
+															checked={selectedComposioToolkits.includes(toolkit.slug)}
+															disabled={!composioToolkitsAvailable || isChatBusy || !toolkit.connected}
+															class={cn(
+																'min-h-8 gap-2 pr-7 pl-2',
+																!toolkit.connected && 'opacity-60'
+															)}
+															onSelect={(event) => event.preventDefault()}
+															onclick={() => toggleComposioToolkit(toolkit.slug)}
+														>
+															<span class="flex min-w-0 flex-1 items-center gap-2">
+																<span class="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted ring-1 ring-border/70">
+																	{#if toolkit.logo}
+																		<img src={toolkit.logo} alt="" class="size-3.5 rounded-[3px]" />
+																	{:else}
+																		<span class="size-1.5 rounded-full bg-muted-foreground/60" aria-hidden="true"
+																		></span>
+																	{/if}
+																</span>
+																<span class="truncate font-medium">{toolkit.name}</span>
+															</span>
+															<span
+																class={cn(
+																	'shrink-0 text-[10px]',
+																	toolkit.connected ? 'text-muted-foreground' : 'text-muted-foreground/80'
+																)}
+															>
+																{toolkit.connected ? 'Connected' : 'Not connected'}
+															</span>
+														</DropdownMenu.CheckboxItem>
+													{/each}
+												</div>
 											{/if}
 										</DropdownMenu.Content>
 									</DropdownMenu.Root>
