@@ -441,6 +441,34 @@
 		readinessIncludedArtifacts = [];
 	};
 
+	const selectedArtifactTypeLabel = $derived(
+		artifactTypePreset === 'custom'
+			? artifactCustomType.trim() || 'Custom type'
+			: (artifactTypePresets.find((preset) => preset.value === artifactTypePreset)?.label ?? 'Artifact')
+	);
+	const createArtifactDestination = $derived(
+		activeThreadId
+			? 'This will save to the workspace and link to the active chat.'
+			: activeProjectId
+				? 'This will save to the current project.'
+				: 'This will save to the workspace artifacts library.'
+	);
+	const isCreateArtifactDirty = $derived(
+		Boolean(
+			artifactTitle.trim() ||
+				artifactBody.trim() ||
+				artifactCustomType.trim() ||
+				artifactTypePreset !== 'notes'
+		)
+	);
+	const canCreateArtifact = $derived(
+		Boolean(
+			artifactTitle.trim() &&
+				artifactBody.trim() &&
+				(artifactTypePreset !== 'custom' || artifactCustomType.trim())
+		)
+	);
+
 	const openCreateArtifactDialog = () => {
 		artifactTitle = '';
 		artifactTypePreset = 'notes';
@@ -452,8 +480,21 @@
 
 	const closeCreateArtifactDialog = () => {
 		if (isCreatingArtifact) return;
+		if (isCreateArtifactDirty && !window.confirm('Discard this artifact draft?')) return;
 		createArtifactDialogOpen = false;
 		artifactCreateError = '';
+	};
+
+	const handleCreateArtifactKeydown = (event: KeyboardEvent) => {
+		if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && canCreateArtifact) {
+			event.preventDefault();
+			void createArtifact();
+		}
+	};
+
+	const handleCreateArtifactDismiss = (event: Event) => {
+		event.preventDefault();
+		closeCreateArtifactDialog();
 	};
 
 	const externalContextPrompt = `I want to import this project context into LaunchPad, a project-focused AI workspace.
@@ -2418,79 +2459,119 @@ Important rules:
 		</Dialog.Root>
 
 		<Dialog.Root bind:open={createArtifactDialogOpen}>
-			<Dialog.Content class="sm:max-w-2xl" showCloseButton={!isCreatingArtifact}>
+			<Dialog.Content
+				class="overflow-hidden p-0 sm:max-w-2xl"
+				showCloseButton={false}
+				onEscapeKeydown={handleCreateArtifactDismiss}
+				onInteractOutside={handleCreateArtifactDismiss}
+			>
 				<form
-					class="space-y-4"
+					class="grid max-h-[min(44rem,calc(100vh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto]"
 					onsubmit={(event) => {
 						event.preventDefault();
 						void createArtifact();
 					}}
 				>
-					<Dialog.Header>
-						<Dialog.Title>Create artifact</Dialog.Title>
-						<Dialog.Description>
-							Save a markdown document to this workspace
-							{activeThreadId
-								? ' and link it to the active chat'
-								: activeProjectId
-									? ' project'
-									: ''}.
-						</Dialog.Description>
+					<Dialog.Header class="border-b border-border/70 px-5 py-4 text-left">
+						<div class="flex items-start justify-between gap-4">
+							<div class="min-w-0 space-y-1">
+								<Dialog.Title>Create artifact</Dialog.Title>
+								<Dialog.Description class="max-w-prose text-pretty">
+									Save a Markdown document to this workspace. {createArtifactDestination}
+								</Dialog.Description>
+							</div>
+							<div
+								class="hidden shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground sm:block"
+							>
+								{selectedArtifactTypeLabel}
+							</div>
+						</div>
 					</Dialog.Header>
 
-					<div class="grid gap-3 sm:grid-cols-[1fr_11rem]">
-						<div class="space-y-1.5">
-							<Label for="create-artifact-title">Title</Label>
-							<Input
-								id="create-artifact-title"
-								bind:value={artifactTitle}
-								placeholder="Artifact title"
+					<div class="min-h-0 overflow-y-auto px-5 py-4">
+						<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+							<div class="space-y-1.5">
+								<Label for="create-artifact-title">Title</Label>
+								<Input
+									id="create-artifact-title"
+									bind:value={artifactTitle}
+									placeholder="Artifact title"
+									autofocus
+									aria-invalid={artifactCreateError && !artifactTitle.trim() ? 'true' : undefined}
+									disabled={isCreatingArtifact}
+								/>
+								<p class="text-[11px] leading-4 text-muted-foreground">
+									Use the name you will scan for later in the artifacts list.
+								</p>
+							</div>
+							<div class="space-y-1.5">
+								<Label for="create-artifact-type">Type</Label>
+								<NativeSelect
+									id="create-artifact-type"
+									bind:value={artifactTypePreset}
+									class="w-full"
+									disabled={isCreatingArtifact}
+								>
+									{#each artifactTypePresets as preset (preset.value)}
+										<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
+									{/each}
+								</NativeSelect>
+							</div>
+						</div>
+
+						{#if artifactTypePreset === 'custom'}
+							<div class="mt-3 space-y-1.5">
+								<Label for="create-artifact-custom-type">Custom type</Label>
+								<Input
+									id="create-artifact-custom-type"
+									bind:value={artifactCustomType}
+									placeholder="decision, spec, notes"
+									aria-invalid={artifactCreateError && !artifactCustomType.trim() ? 'true' : undefined}
+									disabled={isCreatingArtifact}
+								/>
+								<p class="text-[11px] leading-4 text-muted-foreground">
+									Keep it short. This becomes the artifact category.
+								</p>
+							</div>
+						{/if}
+
+						<div class="mt-4 space-y-1.5">
+							<div class="flex items-end justify-between gap-3">
+								<div class="space-y-1.5">
+									<Label for="create-artifact-body">Markdown</Label>
+									<p class="max-w-prose text-xs leading-5 text-muted-foreground">
+										Write the durable version here. You can edit it after creation.
+									</p>
+								</div>
+								<span class="hidden text-[11px] text-muted-foreground sm:inline">
+									⌘/Ctrl Enter creates
+								</span>
+							</div>
+							<Textarea
+								id="create-artifact-body"
+								bind:value={artifactBody}
+								placeholder="# Decision&#10;&#10;Capture the useful details, constraints, and next step."
+								class="min-h-72 resize-y bg-background font-mono text-xs leading-5 sm:min-h-80"
+								onkeydown={handleCreateArtifactKeydown}
+								aria-invalid={artifactCreateError && !artifactBody.trim() ? 'true' : undefined}
 								disabled={isCreatingArtifact}
 							/>
 						</div>
-						<div class="space-y-1.5">
-							<Label for="create-artifact-type">Type</Label>
-							<NativeSelect
-								id="create-artifact-type"
-								bind:value={artifactTypePreset}
-								class="w-full"
-								disabled={isCreatingArtifact}
-							>
-								{#each artifactTypePresets as preset (preset.value)}
-									<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
-								{/each}
-							</NativeSelect>
+
+						<div class="mt-3 min-h-5">
+							{#if artifactCreateError}
+								<p class="text-xs leading-5 text-destructive" role="status">
+									{artifactCreateError}
+								</p>
+							{:else}
+								<p class="text-xs leading-5 text-muted-foreground">
+									Artifacts are saved as Markdown and remain editable from the artifact page.
+								</p>
+							{/if}
 						</div>
 					</div>
 
-					{#if artifactTypePreset === 'custom'}
-						<div class="space-y-1.5">
-							<Label for="create-artifact-custom-type">Custom type</Label>
-							<Input
-								id="create-artifact-custom-type"
-								bind:value={artifactCustomType}
-								placeholder="decision, spec, notes..."
-								disabled={isCreatingArtifact}
-							/>
-						</div>
-					{/if}
-
-					<div class="space-y-1.5">
-						<Label for="create-artifact-body">Markdown</Label>
-						<Textarea
-							id="create-artifact-body"
-							bind:value={artifactBody}
-							placeholder="# Notes&#10;&#10;Write the durable version here."
-							class="min-h-72 font-mono text-xs"
-							disabled={isCreatingArtifact}
-						/>
-					</div>
-
-					{#if artifactCreateError}
-						<p class="text-xs text-destructive">{artifactCreateError}</p>
-					{/if}
-
-					<Dialog.Footer>
+					<Dialog.Footer class="border-t border-border/70 bg-muted/35 px-5 py-4">
 						<Button
 							type="button"
 							variant="secondary"
@@ -2499,11 +2580,8 @@ Important rules:
 						>
 							Cancel
 						</Button>
-						<Button
-							type="submit"
-							disabled={isCreatingArtifact || !artifactTitle.trim() || !artifactBody.trim()}
-						>
-							{isCreatingArtifact ? 'Creating...' : 'Create artifact'}
+						<Button type="submit" disabled={isCreatingArtifact || !canCreateArtifact}>
+							{isCreatingArtifact ? 'Creating…' : 'Create artifact'}
 						</Button>
 					</Dialog.Footer>
 				</form>
