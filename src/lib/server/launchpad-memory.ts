@@ -1,6 +1,10 @@
 import { getArtifactMemorySyncQuery, recordArtifactMemorySyncMutation } from '$lib/memory-sync';
 import { getArtifactQuery } from '$lib/artifacts';
-import { memoryLog, syncArtifactToSupermemory } from '$lib/server/memory';
+import {
+	deleteSupermemoryDocument,
+	memoryLog,
+	syncArtifactToSupermemory
+} from '$lib/server/memory';
 import type { ConvexHttpClient } from 'convex/browser';
 import type { Id } from '../../convex/_generated/dataModel';
 
@@ -35,10 +39,24 @@ export async function syncArtifactMemory(convex: ConvexHttpClient, artifactId: I
 		});
 	}
 
+	if (result.status === 'blocked' && existing?.supermemoryDocumentId) {
+		const deleted = await deleteSupermemoryDocument(existing.supermemoryDocumentId);
+		if (!deleted.ok) {
+			memoryLog(
+				'supermemory.blocked_artifact_delete_failed',
+				{ artifactId: String(artifactId).slice(0, 8), error: deleted.error },
+				'warn'
+			);
+		}
+	}
+
 	await convex.mutation(recordArtifactMemorySyncMutation, {
 		artifactId,
 		customId: result.customId,
 		containerTag: result.containerTag,
+		...(result.status === 'blocked' && existing?.supermemoryDocumentId
+			? { supermemoryDocumentId: '' }
+			: {}),
 		status: result.status,
 		lastError: result.status === 'blocked' ? result.reason : result.error
 	});

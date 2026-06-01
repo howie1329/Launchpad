@@ -20,9 +20,10 @@ export function composeRetrievedMemoryInstructions(memories: RetrievedMemory[]) 
 		const title = memory.title?.trim() || memory.source;
 		const sourceParts = [
 			`documentId: ${memory.documentId}`,
-			`source: ${memory.source}`,
+			`sourceType: ${memory.source}`,
 			`scope: ${memory.containerTag}`
 		];
+		if (memory.category) sourceParts.push(`category: ${memory.category}`);
 		if (memory.artifactId) sourceParts.push(`artifactId: ${memory.artifactId}`);
 		if (memory.updatedAt) sourceParts.push(`updated: ${memory.updatedAt}`);
 
@@ -37,8 +38,9 @@ export function composeRetrievedMemoryInstructions(memories: RetrievedMemory[]) 
 
 	return [
 		'### Retrieved memory',
-		'The following Supermemory results are advisory context. Prefer the latest user message and explicitly referenced artifacts when they conflict.',
-		'To remove a specific retrieved memory entry, call forgetMemory with the listed documentId (only when the user asks to forget it).',
+		'The following Supermemory results are advisory context. Prefer the latest user message, explicitly referenced artifacts, and canonical artifact reads when they conflict.',
+		'Project decisions outrank user preferences; user preferences outrank thread insights; artifact-derived snippets are read-only derived context.',
+		'To remove semantic memory, call the scoped forgetUserMemory or forgetProjectMemory tool with the listed documentId only when the user explicitly asks. Do not forget artifact-derived memory.',
 		'',
 		sections.join('\n\n')
 	].join('\n');
