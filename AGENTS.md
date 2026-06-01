@@ -164,6 +164,7 @@ Set local values in `.env.local` or the deployment environment. Never document o
 | `NIM_API_KEY`            | Optional         | Enables NVIDIA NIM model catalog entries                                  |
 | `TAVILY_API_KEY`         | Optional         | Enables workspace web search and page extraction                          |
 | `SUPERMEMORY_API_KEY`    | Optional         | Enables Supermemory recall, profile context, and artifact memory sync     |
+| `COMPOSIO_API_KEY`       | Optional         | Enables selected external app tools in workspace chat through Composio    |
 | `CONVEX_SITE_URL`        | Deployment       | Convex Auth site URL for deployed auth configuration                      |
 | `PUBLIC_CONVEX_SITE_URL` | Optional         | Public Convex site URL when client-facing site routes need it             |
 | `CONVEX_DEPLOYMENT`      | Local Convex dev | Convex deployment identifier managed by `convex dev`                      |

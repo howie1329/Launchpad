@@ -267,6 +267,29 @@ export const forkThreadFromMessage = mutation({
 	}
 });
 
+export const setThreadComposioSessionId = mutation({
+	args: {
+		threadId: v.id('chatThreads'),
+		composioSessionId: v.string()
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireAuthUserId(ctx);
+		const thread = await getOwnedThread(ctx, args.threadId, ownerId);
+		const composioSessionId = args.composioSessionId.trim();
+
+		if (!composioSessionId) {
+			throw new Error('Composio session id is required');
+		}
+
+		await ctx.db.patch(thread._id, {
+			composioSessionId,
+			updatedAt: Date.now()
+		});
+
+		return { ok: true as const };
+	}
+});
+
 export const setThreadGeneratedTitle = mutation({
 	args: {
 		threadId: v.id('chatThreads'),

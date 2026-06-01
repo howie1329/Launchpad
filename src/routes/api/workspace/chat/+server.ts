@@ -27,6 +27,13 @@ import {
 } from '$lib/server/resolve-workspace-language-model';
 import { syncArtifactMemory } from '$lib/server/launchpad-memory';
 import {
+	ALLOWED_COMPOSIO_TOOLKITS,
+	getComposioToolsForChatRun,
+	isComposioConfigured,
+	parseComposioToolkits,
+	type AllowedComposioToolkit
+} from '$lib/server/composio';
+import {
 	addProjectDecisionMemoryDocument,
 	addThreadInsightMemoryDocument,
 	addUserPreferenceMemoryDocument,
@@ -195,11 +202,14 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 		const memoryBlock = composeRetrievedMemoryInstructions(memories);
 		const webSearchRequested = body.webSearchRequested === true;
+		const selectedComposioToolkits = parseComposioToolkits(body.composioToolkits);
+		const composioAvailable = isComposioConfigured();
 		const webSearchApiKey = env.TAVILY_API_KEY?.trim() ?? '';
 		const webSearchAvailable = Boolean(webSearchApiKey);
 		const coreInstructions = [
 			workspaceInstructions(project),
 			webSearchInstructions(webSearchRequested, webSearchAvailable),
+			composioInstructions(selectedComposioToolkits, composioAvailable),
 			referenced.block,
 			profileBlock,
 			memoryBlock
@@ -219,6 +229,19 @@ export const POST: RequestHandler = async ({ request }) => {
 			webSearchAvailable,
 			webSearchApiKey
 		});
+
+		try {
+			Object.assign(
+				tools,
+				await getComposioToolsForChatRun({
+					convex,
+					thread,
+					toolkits: selectedComposioToolkits
+				})
+			);
+		} catch (error) {
+			console.error('Could not load Composio tools', error);
+		}
 
 		let languageModel;
 		try {
@@ -319,6 +342,36 @@ function workspaceInstructions(project: WorkspaceProject | null) {
 	return `${baseInstructions}
 
 ${projectContext}`;
+}
+
+function composioInstructions(
+	selectedToolkits: AllowedComposioToolkit[],
+	composioAvailable: boolean
+) {
+	if (!composioAvailable) {
+		return 'External app tools are not configured for this workspace. Do not imply that you can use Gmail, GitHub, Linear, Slack, or other external app tools.';
+	}
+
+	const activeToolkits =
+		selectedToolkits.length > 0 ? selectedToolkits : [...ALLOWED_COMPOSIO_TOOLKITS];
+	const labels = activeToolkits.map(composioToolkitLabel).join(', ');
+	const scopeLine =
+		selectedToolkits.length > 0
+			? `External app tool badges are selected for this task. Use only these selected apps: ${labels}. Do not use unselected external apps.`
+			: `No external app badges are selected. GitHub, Linear, Slack, and Gmail are available when relevant; choose from them only when they directly help the user.`;
+
+	return [
+		scopeLine,
+		'- If an available app needs authentication, use the Composio connection flow and ask the user to complete the Connect Link before continuing.',
+		'- Reading or searching available external apps is allowed when it directly helps answer the user.',
+		'- Before any external write action, summarize the exact action and ask for explicit confirmation unless the latest user message already confirms that exact action.',
+		'- Write actions include sending Gmail email, sending Slack messages, creating or updating Linear issues, and creating GitHub issues, comments, or pull requests.',
+		'- Never delete, archive, or destructively modify external resources without explicit confirmation in the latest user turn.'
+	].join('\n');
+}
+
+function composioToolkitLabel(toolkit: AllowedComposioToolkit) {
+	return toolkit === 'github' ? 'GitHub' : toolkit.charAt(0).toUpperCase() + toolkit.slice(1);
 }
 
 function webSearchInstructions(webSearchRequested: boolean, webSearchAvailable: boolean) {

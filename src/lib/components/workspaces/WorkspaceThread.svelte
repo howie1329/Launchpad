@@ -66,6 +66,7 @@
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
@@ -98,7 +99,8 @@
 		Cancel01Icon,
 		File01Icon,
 		GlobeIcon,
-		Loading03Icon
+		Loading03Icon,
+		Plug02Icon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Chat } from '@ai-sdk/svelte';
@@ -118,6 +120,13 @@
 	let modelSelectorOpen = $state(false);
 	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId);
 	let webSearchRequested = $state(false);
+	let composioPickerOpen = $state(false);
+	let composioToolkitsLoading = $state(false);
+	let composioToolkitsError = $state('');
+	let composioToolkitsAvailable = $state(false);
+	let composioToolkitsLoadedForThread = $state('');
+	let composioToolkits = $state<ComposioToolkitStatus[]>([]);
+	let selectedComposioToolkits = $state<AllowedComposioToolkit[]>([]);
 	let chatError = $state('');
 	let saveError = $state('');
 	let copiedMessageId = $state('');
@@ -129,6 +138,22 @@
 	let contextDateSort = $state<'newest' | 'oldest'>('newest');
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
 	let mediaMinLg = $state(false);
+
+	type AllowedComposioToolkit = 'github' | 'linear' | 'slack' | 'gmail';
+	type ComposioToolkitStatus = {
+		slug: AllowedComposioToolkit;
+		name: string;
+		logo?: string;
+		connected: boolean;
+		connectionStatus?: string;
+	};
+
+	const fallbackComposioToolkits: ComposioToolkitStatus[] = [
+		{ slug: 'github', name: 'GitHub', connected: false },
+		{ slug: 'linear', name: 'Linear', connected: false },
+		{ slug: 'slack', name: 'Slack', connected: false },
+		{ slug: 'gmail', name: 'Gmail', connected: false }
+	];
 
 	/** @artifact mention picker (thread-linked artifacts only) */
 	let mentionOpen = $state(false);
@@ -194,6 +219,15 @@
 		return rows;
 	});
 	const linkedArtifactCount = $derived(threadArtifacts.data?.length ?? 0);
+	const visibleComposioToolkits = $derived(
+		composioToolkits.length > 0 ? composioToolkits : fallbackComposioToolkits
+	);
+	const selectedComposioToolkitRows = $derived(
+		selectedComposioToolkits.map(
+			(slug) =>
+				visibleComposioToolkits.find((toolkit) => toolkit.slug === slug) ?? toolkitFallback(slug)
+		)
+	);
 	const availableProjectArtifactCount = $derived(
 		(mentionableArtifacts.data ?? []).filter((item) => !item.linkedToThread).length
 	);
@@ -224,6 +258,19 @@
 		if (!mentionOpen) return;
 		void mentionFilter;
 		mentionHighlight = 0;
+	});
+
+	$effect(() => {
+		void activeThreadId;
+		selectedComposioToolkits = [];
+		composioPickerOpen = false;
+		composioToolkitsError = '';
+	});
+
+	$effect(() => {
+		if (!composioPickerOpen || !activeThreadId) return;
+		if (composioToolkitsLoadedForThread === activeThreadId || composioToolkitsLoading) return;
+		void loadComposioToolkits();
 	});
 	const selectedThreadArtifact = $derived(
 		contextArtifactId
@@ -439,6 +486,73 @@
 		focusComposer();
 	};
 
+	async function loadComposioToolkits() {
+		if (!activeThreadId || !auth.token) return;
+
+		composioToolkitsLoading = true;
+		composioToolkitsError = '';
+		try {
+			const response = await fetch(
+				`/api/workspace/composio/toolkits?threadId=${encodeURIComponent(activeThreadId)}`,
+				{ headers: authHeaders() }
+			);
+			const data = (await response.json()) as {
+				available?: boolean;
+				toolkits?: ComposioToolkitStatus[];
+				error?: string;
+			};
+
+			if (!response.ok) {
+				throw new Error(data.error ?? 'Could not load app tools.');
+			}
+
+			composioToolkitsAvailable = data.available === true;
+			composioToolkits = normalizeComposioToolkits(data.toolkits);
+			composioToolkitsLoadedForThread = activeThreadId;
+			if (!composioToolkitsAvailable) {
+				selectedComposioToolkits = [];
+			}
+		} catch (error) {
+			console.error(error);
+			composioToolkitsError = 'External app tools are unavailable.';
+			composioToolkitsAvailable = false;
+			composioToolkits = [];
+			selectedComposioToolkits = [];
+		} finally {
+			composioToolkitsLoading = false;
+		}
+	}
+
+	function normalizeComposioToolkits(value: unknown): ComposioToolkitStatus[] {
+		if (!Array.isArray(value)) return [];
+		return value.filter(isComposioToolkitStatus);
+	}
+
+	function isComposioToolkitStatus(value: unknown): value is ComposioToolkitStatus {
+		if (!value || typeof value !== 'object') return false;
+		const row = value as Partial<ComposioToolkitStatus>;
+		return isAllowedComposioToolkit(row.slug) && typeof row.name === 'string';
+	}
+
+	function isAllowedComposioToolkit(value: unknown): value is AllowedComposioToolkit {
+		return value === 'github' || value === 'linear' || value === 'slack' || value === 'gmail';
+	}
+
+	function toolkitFallback(slug: AllowedComposioToolkit): ComposioToolkitStatus {
+		return (
+			fallbackComposioToolkits.find((toolkit) => toolkit.slug === slug) ??
+			fallbackComposioToolkits[0]
+		);
+	}
+
+	function toggleComposioToolkit(slug: AllowedComposioToolkit) {
+		if (!composioToolkitsAvailable || isChatBusy) return;
+		selectedComposioToolkits = selectedComposioToolkits.includes(slug)
+			? selectedComposioToolkits.filter((item) => item !== slug)
+			: [...selectedComposioToolkits, slug];
+		focusComposer();
+	}
+
 	const submitMessage = async (message: PromptInputMessage) => {
 		const prose = message.text.trim();
 		const outgoing = buildOutgoingUserMessageWithTokens(
@@ -453,6 +567,7 @@
 		const prevProse = prose;
 		const prevChips = mentionChips.slice();
 		const prevWebSearchRequested = webSearchRequested;
+		const prevComposioToolkits = selectedComposioToolkits.slice();
 
 		try {
 			if (activeThreadId) {
@@ -470,6 +585,7 @@
 			composerText = prevProse;
 			mentionChips = prevChips;
 			webSearchRequested = prevWebSearchRequested;
+			selectedComposioToolkits = prevComposioToolkits;
 			chatError = buildChatErrorMessage(error);
 			throw error;
 		}
@@ -478,6 +594,7 @@
 	async function submitChoiceAnswer(answer: string) {
 		if (!chat || isChatBusy) return;
 		const prevWebSearchRequested = webSearchRequested;
+		const prevComposioToolkits = selectedComposioToolkits.slice();
 		chatError = '';
 		saveError = '';
 		try {
@@ -486,6 +603,7 @@
 		} catch (error) {
 			console.error(error);
 			webSearchRequested = prevWebSearchRequested;
+			selectedComposioToolkits = prevComposioToolkits;
 			chatError = buildChatErrorMessage(error);
 			throw error;
 		}
@@ -585,7 +703,8 @@
 						threadId,
 						modelId: selectedModelId,
 						messages,
-						webSearchRequested
+						webSearchRequested,
+						composioToolkits: selectedComposioToolkits
 					},
 					headers: authHeaders()
 				})
@@ -949,7 +1068,9 @@
 												Durable artifacts and project context available to this chat.
 											</p>
 										</div>
-										<div class="shrink-0 rounded-md border border-border/60 bg-muted/35 px-2 py-1 text-right">
+										<div
+											class="shrink-0 rounded-md border border-border/60 bg-muted/35 px-2 py-1 text-right"
+										>
 											<p class="text-[11px] leading-none font-semibold">{linkedArtifactCount}</p>
 											<p class="mt-0.5 text-[10px] leading-none text-muted-foreground">linked</p>
 										</div>
@@ -1022,7 +1143,9 @@
 
 							<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 								{#if threadArtifacts.error}
-									<div class="space-y-2 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-3">
+									<div
+										class="space-y-2 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-3"
+									>
 										<p class="text-xs font-medium text-destructive">Could not load context</p>
 										<p class="text-[11px] leading-4 text-muted-foreground">
 											The artifacts linked to this thread are unavailable right now.
@@ -1086,7 +1209,7 @@
 											<div class="space-y-1">
 												{#each filteredContextArtifacts as item (item.link._id)}
 													<div
-														class="group/context-row flex min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors hover:bg-accent/45 focus-within:bg-accent/45"
+														class="group/context-row flex min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors focus-within:bg-accent/45 hover:bg-accent/45"
 													>
 														<button
 															type="button"
@@ -1114,7 +1237,7 @@
 															type="button"
 															variant="ghost"
 															size="sm"
-															class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover/context-row:opacity-100 sm:group-focus-within/context-row:opacity-100"
+															class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground opacity-100 sm:opacity-0 sm:group-focus-within/context-row:opacity-100 sm:group-hover/context-row:opacity-100"
 															aria-label={`Cite ${item.artifact.title}`}
 															onclick={() => citeArtifact(item.artifact._id, item.artifact.title)}
 														>
@@ -1253,11 +1376,26 @@
 							clearOnSubmit={false}
 							onSubmit={submitMessage}
 						>
-							{#if mentionChips.length > 0}
+							{#if mentionChips.length > 0 || selectedComposioToolkitRows.length > 0}
 								<div
 									class="flex flex-wrap gap-1.5 px-3 pt-2"
-									aria-label="Artifacts to include in this message"
+									aria-label="Context and app tools to include in this message"
 								>
+									{#each selectedComposioToolkitRows as toolkit (toolkit.slug)}
+										<span class={artifactMentionPill}>
+											<span class="size-1.5 shrink-0 rounded-full bg-sky-500/80" aria-hidden="true"
+											></span>
+											<span class="max-w-40 min-w-0 truncate">{toolkit.name}</span>
+											<button
+												type="button"
+												class="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+												aria-label={`Remove ${toolkit.name} app tools`}
+												onclick={() => toggleComposioToolkit(toolkit.slug)}
+											>
+												<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} class="size-3" />
+											</button>
+										</span>
+									{/each}
 									{#each mentionChips as chip (chip.id)}
 										<span class={artifactMentionPill}>
 											<span class="size-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden="true"
@@ -1290,6 +1428,79 @@
 							/>
 							<PromptInputToolbar class="gap-2 px-3 py-2">
 								<PromptInputTools class="min-w-0 flex-1 flex-wrap">
+									<DropdownMenu.Root bind:open={composioPickerOpen}>
+										<DropdownMenu.Trigger
+											type="button"
+											class={cn(
+												'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+												selectedComposioToolkits.length > 0
+													? 'bg-muted text-foreground'
+													: 'text-muted-foreground hover:bg-muted hover:text-foreground'
+											)}
+											disabled={isChatBusy}
+											aria-label="Select external app tools"
+										>
+											<HugeiconsIcon
+												icon={Plug02Icon}
+												strokeWidth={2}
+												class="size-3"
+												aria-hidden="true"
+											/>
+											Apps
+											{#if selectedComposioToolkits.length > 0}
+												<span class="text-[10px] text-muted-foreground"
+													>{selectedComposioToolkits.length}</span
+												>
+											{/if}
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Content align="start" class="w-64">
+											<DropdownMenu.Label
+												class="space-y-1 text-[11px] font-normal text-muted-foreground"
+											>
+												<span class="block text-foreground">External app tools</span>
+												<span class="block leading-4">
+													No selection lets Launchpad choose from all apps. Selecting apps restricts
+													this task.
+												</span>
+											</DropdownMenu.Label>
+											<DropdownMenu.Separator />
+											{#if composioToolkitsLoading}
+												<div class="px-2 py-2 text-xs text-muted-foreground">Loading apps…</div>
+											{:else if composioToolkitsError}
+												<div class="px-2 py-2 text-xs text-muted-foreground">
+													{composioToolkitsError}
+												</div>
+											{:else if !composioToolkitsAvailable && composioToolkitsLoadedForThread === activeThreadId}
+												<div class="px-2 py-2 text-xs text-muted-foreground">
+													Apps are not configured.
+												</div>
+											{:else}
+												{#each visibleComposioToolkits as toolkit (toolkit.slug)}
+													<DropdownMenu.CheckboxItem
+														checked={selectedComposioToolkits.includes(toolkit.slug)}
+														disabled={!composioToolkitsAvailable || isChatBusy}
+														onSelect={(event) => event.preventDefault()}
+														onclick={() => toggleComposioToolkit(toolkit.slug)}
+													>
+														<span class="flex min-w-0 flex-1 items-center gap-2">
+															{#if toolkit.logo}
+																<img src={toolkit.logo} alt="" class="size-3.5 rounded-sm" />
+															{:else}
+																<span
+																	class="size-2 rounded-full bg-muted-foreground/50"
+																	aria-hidden="true"
+																></span>
+															{/if}
+															<span class="truncate">{toolkit.name}</span>
+														</span>
+														<span class="text-[10px] text-muted-foreground">
+															{toolkit.connected ? 'Connected' : 'Connect in chat'}
+														</span>
+													</DropdownMenu.CheckboxItem>
+												{/each}
+											{/if}
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
 									<button
 										type="button"
 										class={cn(

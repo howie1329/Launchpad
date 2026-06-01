@@ -157,6 +157,8 @@ export default defineSchema({
 		title: v.string(),
 		scopeType: chatThreadScopeType,
 		projectId: v.optional(v.id('projects')),
+		/** Opaque Composio tool-router session scoped to this workspace thread. */
+		composioSessionId: v.optional(v.string()),
 		/** Set when the LLM has written the sidebar title (one-time). */
 		titleGeneratedAt: v.optional(v.number()),
 		createdAt: v.number(),

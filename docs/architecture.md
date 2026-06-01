@@ -56,8 +56,9 @@ Optional AI context:
 
 - Tavily search/page extraction via `TAVILY_API_KEY`
 - Supermemory retrieval, profile context, user memory tools, artifact sync, and deletion via `SUPERMEMORY_API_KEY`
+- Composio external app tools via `COMPOSIO_API_KEY`, scoped per thread and activated per message with selected app/toolkit badges
 
-Convex artifacts remain canonical workspace memory. Supermemory is derived recall infrastructure and must not replace Convex state.
+Convex artifacts remain canonical workspace memory. Supermemory is derived recall infrastructure and must not replace Convex state. Composio may act on external services, but Launchpad workspace state should still be saved through Convex artifacts and thread tools.
 
 ## Artifact Rules
 
@@ -76,6 +77,7 @@ Thread-artifact links record why an artifact is present in a thread: `created`, 
 | `NIM_API_KEY` | Optional NVIDIA NIM provider key |
 | `TAVILY_API_KEY` | Optional web search/page extraction key |
 | `SUPERMEMORY_API_KEY` | Optional Supermemory key |
+| `COMPOSIO_API_KEY` | Optional Composio key for selected external app tools in workspace chat |
 | `CONVEX_SITE_URL` | Convex Auth deployment site URL |
 
 ## Maintainer Checks

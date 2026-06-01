@@ -11,6 +11,7 @@ export type SavedChatThread = {
 	title: string;
 	scopeType: ChatScopeType;
 	projectId?: Id<'projects'>;
+	composioSessionId?: string;
 	titleGeneratedAt?: number;
 	createdAt: number;
 	updatedAt: number;
@@ -80,6 +81,21 @@ export const saveMessagesMutation = makeFunctionReference<
 	SaveMessagesArgs,
 	SaveMessagesResult
 >('chat:saveMessages');
+
+export type SetThreadComposioSessionIdArgs = {
+	threadId: Id<'chatThreads'>;
+	composioSessionId: string;
+};
+
+export type SetThreadComposioSessionIdResult = {
+	ok: true;
+};
+
+export const setThreadComposioSessionIdMutation = makeFunctionReference<
+	'mutation',
+	SetThreadComposioSessionIdArgs,
+	SetThreadComposioSessionIdResult
+>('chat:setThreadComposioSessionId');
 
 export type SetThreadGeneratedTitleArgs = {
 	threadId: Id<'chatThreads'>;
