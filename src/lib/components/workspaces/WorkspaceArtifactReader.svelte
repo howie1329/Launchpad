@@ -368,50 +368,26 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-			<header class="shrink-0 border-b border-border/70 bg-background px-4 py-3">
+			<header class="shrink-0 border-b border-border/70 bg-background px-4 py-2">
 				<div
-					class={fullWidthContent ? 'mx-auto flex max-w-6xl flex-col gap-3' : 'flex flex-col gap-3'}
+					class={fullWidthContent
+						? 'mx-auto flex max-w-6xl flex-wrap items-center gap-2'
+						: 'flex flex-wrap items-center gap-2'}
 				>
-					<div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-						<div class="min-w-0 space-y-1">
-							<div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-								<span class="rounded-md bg-muted px-1.5 py-0.5 text-foreground"
-									>{artifact.type}</span
-								>
-								<span>Revision {artifact.revision}</span>
-								<span>Updated {updatedAtLabel}</span>
-							</div>
-							<h1 class="truncate text-lg font-semibold tracking-tight text-balance">
-								{artifact.title}
-							</h1>
-						</div>
-
-						<div class="flex flex-wrap items-center gap-2">
-							<p
-								class={saveError
-									? 'text-xs text-destructive'
-									: contentDirty
-										? 'text-xs text-foreground'
-										: 'text-xs text-muted-foreground'}
-								role="status"
-							>
-								{saveStateLabel}
-							</p>
-							<Button
-								type="button"
-								variant="default"
-								size="sm"
-								class="h-7 gap-1.5 px-2.5 text-xs"
-								disabled={!canSave}
-								onclick={saveChanges}
-							>
-								<HugeiconsIcon icon={SaveIcon} strokeWidth={2} class="size-3.5" />
-								{isSaving ? 'Saving…' : 'Save changes'}
-							</Button>
-						</div>
+					<div class="flex min-w-0 flex-1 items-center gap-2">
+						<h1 class="truncate text-sm font-semibold tracking-tight">{artifact.title}</h1>
+						<span class="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-foreground">
+							{artifact.type}
+						</span>
+						<span class="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
+							Revision {artifact.revision}
+						</span>
+						<span class="hidden min-w-0 truncate text-[11px] text-muted-foreground xl:inline">
+							Updated {updatedAtLabel}
+						</span>
 					</div>
 
-					<div class="flex flex-wrap items-center gap-2">
+					<div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
 						<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
 							<Button
 								type="button"
@@ -456,6 +432,28 @@
 								</Button>
 							</div>
 						{/if}
+
+						<p
+							class={saveError
+								? 'text-xs text-destructive'
+								: contentDirty
+									? 'text-xs text-foreground'
+									: 'text-xs text-muted-foreground'}
+							role="status"
+						>
+							{saveStateLabel}
+						</p>
+						<Button
+							type="button"
+							variant="default"
+							size="sm"
+							class="h-7 gap-1.5 px-2.5 text-xs"
+							disabled={!canSave}
+							onclick={saveChanges}
+						>
+							<HugeiconsIcon icon={SaveIcon} strokeWidth={2} class="size-3.5" />
+							{isSaving ? 'Saving…' : 'Save'}
+						</Button>
 					</div>
 				</div>
 			</header>
