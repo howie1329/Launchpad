@@ -2033,48 +2033,91 @@ Important rules:
 
 		<Dialog.Root bind:open={importDialogOpen}>
 			<Dialog.Content
-				class="flex h-[min(48rem,calc(100vh-2rem))] flex-col sm:max-w-5xl"
+				class="flex h-[min(44rem,calc(100vh-2rem))] flex-col p-0 sm:max-w-4xl"
 				showCloseButton={!isStartingImportReview}
 			>
 				<form
-					class="flex min-h-0 flex-1 flex-col gap-4"
+					class="flex min-h-0 flex-1 flex-col"
 					onsubmit={(event) => {
 						event.preventDefault();
 						void startExternalContextImportReview();
 					}}
 				>
-					<Dialog.Header>
+					<Dialog.Header class="border-b border-border/70 px-5 py-4 text-left">
 						<Dialog.Title>Import external AI context</Dialog.Title>
 						<Dialog.Description>
-							Copy the prompt into ChatGPT, Claude, or another AI tool, then paste the returned
-							project summary here.
+							Bring project context from another AI chat into a Launchpad review draft.
 						</Dialog.Description>
 					</Dialog.Header>
 
-					<div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-						<section class="flex min-h-0 flex-col gap-2">
-							<div class="flex items-center justify-between gap-3">
-								<Label for="external-context-prompt">Prompt</Label>
-								<Button
-									type="button"
-									variant="secondary"
-									size="sm"
-									disabled={isStartingImportReview}
-									onclick={copyExternalContextPrompt}
-								>
-									Copy prompt
-								</Button>
+					<div
+						class="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(17rem,0.78fr)_minmax(0,1.22fr)]"
+					>
+						<section
+							class="flex min-h-0 flex-col border-b border-border/70 bg-muted/30 lg:border-r lg:border-b-0"
+						>
+							<div class="space-y-3 p-5">
+								<div class="flex gap-3">
+									<div
+										class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground"
+									>
+										1
+									</div>
+									<div class="min-w-0 space-y-1">
+										<h2 class="text-sm font-semibold tracking-tight">Copy the prompt</h2>
+										<p class="text-xs leading-5 text-pretty text-muted-foreground">
+											Run this in ChatGPT, Claude, or another AI tool that already has the context
+											you want to bring over.
+										</p>
+									</div>
+								</div>
+								<div class="flex items-center gap-2 pl-9">
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										disabled={isStartingImportReview}
+										onclick={copyExternalContextPrompt}
+									>
+										Copy prompt
+									</Button>
+									{#if importNotice && !importError}
+										<p class="text-xs text-muted-foreground" role="status">{importNotice}</p>
+									{/if}
+								</div>
 							</div>
-							<Textarea
-								id="external-context-prompt"
-								value={externalContextPrompt}
-								readonly
-								class="min-h-0 flex-1 resize-none font-mono text-xs"
-							/>
+
+							<div class="flex min-h-0 flex-1 flex-col border-t border-border/70 p-5 pt-4">
+								<div class="mb-2 flex items-center justify-between gap-3">
+									<Label for="external-context-prompt">Prompt to run externally</Label>
+									<span class="text-[11px] text-muted-foreground">Read only</span>
+								</div>
+								<Textarea
+									id="external-context-prompt"
+									value={externalContextPrompt}
+									readonly
+									class="min-h-40 flex-1 resize-none bg-background font-mono text-[11px] leading-5 lg:min-h-0"
+								/>
+							</div>
 						</section>
 
-						<section class="flex min-h-0 flex-col gap-3">
-							<div class="grid gap-3 sm:grid-cols-[1fr_11rem]">
+						<section class="flex min-h-0 flex-col p-5">
+							<div class="flex gap-3">
+								<div
+									class="flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-background text-[11px] font-medium text-foreground"
+								>
+									2
+								</div>
+								<div class="min-w-0 flex-1 space-y-1">
+									<h2 class="text-sm font-semibold tracking-tight">Paste the summary</h2>
+									<p class="max-w-prose text-xs leading-5 text-pretty text-muted-foreground">
+										Paste the Markdown response. You will review it before creating or changing any
+										project.
+									</p>
+								</div>
+							</div>
+
+							<div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
 								<div class="space-y-1.5">
 									<Label for="external-context-source">External summary</Label>
 									<p class="text-xs leading-5 text-muted-foreground">
@@ -2095,23 +2138,27 @@ Important rules:
 									</NativeSelect>
 								</div>
 							</div>
+
 							<Textarea
 								id="external-context-source"
 								bind:value={importSourceMarkdown}
 								placeholder="# Project Name&#10;&#10;Paste the structured Markdown summary here..."
-								class="min-h-0 flex-1 resize-none font-mono text-xs"
+								class="mt-3 min-h-56 flex-1 resize-none font-mono text-xs leading-5"
 								disabled={isStartingImportReview}
 							/>
+
+							{#if importError}
+								<p class="mt-3 text-xs text-destructive" role="status">{importError}</p>
+							{:else}
+								<p class="mt-3 text-xs leading-5 text-muted-foreground">
+									Launchpad starts a review draft first. Nothing is added to a project until you
+									approve it.
+								</p>
+							{/if}
 						</section>
 					</div>
 
-					{#if importError || importNotice}
-						<p class="text-xs {importError ? 'text-destructive' : 'text-muted-foreground'}">
-							{importError || importNotice}
-						</p>
-					{/if}
-
-					<Dialog.Footer>
+					<Dialog.Footer class="border-t border-border/70 px-5 py-4">
 						<Button
 							type="button"
 							variant="secondary"
@@ -2121,7 +2168,7 @@ Important rules:
 							Cancel
 						</Button>
 						<Button type="submit" disabled={isStartingImportReview || !importSourceMarkdown.trim()}>
-							{isStartingImportReview ? 'Starting review...' : 'Review Project'}
+							{isStartingImportReview ? 'Starting review...' : 'Start review'}
 						</Button>
 					</Dialog.Footer>
 				</form>
