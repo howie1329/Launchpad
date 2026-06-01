@@ -38,6 +38,19 @@
 	let isDeleting = $state(false);
 	let resetError = $state('');
 	let deleteError = $state('');
+	let lastSavedAt = $state<number | null>(null);
+
+	const savedTimeZone = $derived(settings.data?.timeZone || detectedTimeZone);
+	const savedDailyCapUsd = $derived(settings.data ? String(settings.data.dailyAiCapUsd) : '0.50');
+	const savedAiContextMarkdown = $derived(settings.data?.aiContextMarkdown ?? '');
+	const savedAiBehaviorMarkdown = $derived(settings.data?.aiBehaviorMarkdown ?? '');
+	const hasUnsavedChanges = $derived(
+		settings.data !== undefined &&
+			(timeZone.trim() !== savedTimeZone ||
+				dailyCapUsd.trim() !== savedDailyCapUsd ||
+				aiContextMarkdown.trim() !== savedAiContextMarkdown ||
+				aiBehaviorMarkdown.trim() !== savedAiBehaviorMarkdown)
+	);
 
 	const confirmReset = async () => {
 		if (isResetting) return;
@@ -168,6 +181,7 @@
 			aiContextMarkdown: ctx,
 			aiBehaviorMarkdown: beh
 		});
+		lastSavedAt = Date.now();
 	};
 
 	function activityLabel(eventType: string, metadata?: Record<string, unknown>) {
@@ -198,231 +212,315 @@
 	<meta name="description" content="Launchpad workspace settings." />
 </svelte:head>
 
-<section
-	class="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col gap-6 overflow-y-auto px-5 py-10"
->
-	<header class="space-y-1">
-		<h1 class="text-xl font-semibold tracking-tight">Settings</h1>
-		<p class="text-xs leading-5 text-muted-foreground">Usage limits and workspace activity.</p>
-	</header>
-
-	{#if settingsQueryError}
-		<div
-			class="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive"
-			role="status"
+<section class="h-full min-h-0 overflow-y-auto">
+	<div class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-5 py-8 lg:px-8 lg:py-10">
+		<header
+			class="flex flex-col gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between"
 		>
-			<p class="font-medium">Could not load settings data</p>
-			<p class="mt-1 leading-snug opacity-90">{settingsQueryError.message}</p>
-			<Button
-				type="button"
-				variant="secondary"
-				size="sm"
-				class="mt-3"
-				onclick={() => {
-					void invalidateAll();
-				}}
+			<div class="max-w-2xl space-y-1.5">
+				<h1 class="text-xl font-semibold tracking-tight text-balance">Settings</h1>
+				<p class="text-sm leading-6 text-pretty text-muted-foreground">
+					Control workspace defaults, AI instructions, usage limits, and account data.
+				</p>
+			</div>
+			<div class="flex min-h-7 items-center gap-3 sm:justify-end">
+				{#if saveError}
+					<p class="text-xs text-destructive" role="status">{saveError}</p>
+				{:else if lastSavedAt && !hasUnsavedChanges}
+					<p class="text-xs text-muted-foreground" role="status">Saved</p>
+				{:else if hasUnsavedChanges}
+					<p class="text-xs text-muted-foreground">Unsaved changes</p>
+				{/if}
+				<Button type="button" size="sm" disabled={isSaving || !hasUnsavedChanges} onclick={save}>
+					{isSaving ? 'Saving…' : 'Save changes'}
+				</Button>
+			</div>
+		</header>
+
+		{#if settingsQueryError}
+			<div
+				class="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-xs text-destructive"
+				role="status"
 			>
-				Try again
-			</Button>
-		</div>
-	{/if}
-
-	<section class="space-y-4">
-		<div class="space-y-1">
-			<h2 class="text-sm font-semibold tracking-tight">AI usage</h2>
-			<p class="text-xs leading-5 text-muted-foreground">
-				Daily spend cap applies to workspace chat.
-			</p>
-		</div>
-
-		<div class="rounded-md border border-border/60 bg-background/40 p-4">
-			{#if budget.data}
-				<div class="flex items-center justify-between gap-3">
-					<p class="text-xs">
-						Today: <span class="font-medium">{money.format(budget.data.spentUsd)}</span> / {money.format(
-							budget.data.capUsd
-						)}
-					</p>
-					<p class="text-xs text-muted-foreground">
-						Remaining: {money.format(budget.data.remainingUsd)}
-					</p>
-				</div>
-				<p class="mt-1 text-[11px] text-muted-foreground">Resets daily ({budget.data.dateKey}).</p>
-			{:else if budget.error}
-				<div class="space-y-2">
-					<p class="text-xs text-destructive">Could not load usage: {budget.error.message}</p>
-					<Button
-						type="button"
-						variant="secondary"
-						size="sm"
-						onclick={() => {
-							void invalidateAll();
-						}}
-					>
-						Retry
-					</Button>
-				</div>
-			{:else}
-				<p class="text-xs text-muted-foreground">Loading usage...</p>
-			{/if}
-		</div>
-
-		<div class="grid gap-4 sm:grid-cols-2">
-			<div class="space-y-2">
-				<Label for="timezone">Timezone</Label>
-				<Input id="timezone" bind:value={timeZone} placeholder={detectedTimeZone} />
-				<p class="text-[11px] text-muted-foreground">IANA timezone (example: America/New_York).</p>
+				<p class="font-medium">Could not load settings data</p>
+				<p class="mt-1 leading-snug opacity-90">{settingsQueryError.message}</p>
+				<Button
+					type="button"
+					variant="secondary"
+					size="sm"
+					class="mt-3"
+					onclick={() => {
+						void invalidateAll();
+					}}
+				>
+					Try again
+				</Button>
 			</div>
-			<div class="space-y-2">
-				<Label for="daily-cap">Daily cap (USD)</Label>
-				<Input id="daily-cap" bind:value={dailyCapUsd} inputmode="decimal" />
-				<p class="text-[11px] text-muted-foreground">Applies per user, per day.</p>
-			</div>
-		</div>
-	</section>
-
-	<section class="space-y-4">
-		<div class="space-y-1">
-			<h2 class="text-sm font-semibold tracking-tight">AI assistant preferences</h2>
-			<p class="text-xs leading-5 text-muted-foreground">
-				Optional text included with workspace chat instructions. Artifacts remain your editable
-				workspace memory; Launchpad may use secure memory recall to find relevant artifact context
-				across chats. Do not paste passwords, API keys, or regulated personal data.
-			</p>
-		</div>
-
-		<div class="space-y-2">
-			<div class="flex items-end justify-between gap-2">
-				<Label for="ai-context">Background & context</Label>
-				<span class="text-[11px] text-muted-foreground tabular-nums">
-					{aiContextMarkdown.trim().length} / {maxAiPreferenceChars}
-				</span>
-			</div>
-			<Textarea
-				id="ai-context"
-				bind:value={aiContextMarkdown}
-				class="min-h-28"
-				placeholder="Role, product, users, constraints the assistant should keep in mind."
-			/>
-			<p class="text-[11px] text-muted-foreground">
-				Stable facts about you or your work—assumed true for every thread unless you correct it in
-				chat.
-			</p>
-		</div>
-
-		<div class="space-y-2">
-			<div class="flex items-end justify-between gap-2">
-				<Label for="ai-behavior">How to respond</Label>
-				<span class="text-[11px] text-muted-foreground tabular-nums">
-					{aiBehaviorMarkdown.trim().length} / {maxAiPreferenceChars}
-				</span>
-			</div>
-			<Textarea
-				id="ai-behavior"
-				bind:value={aiBehaviorMarkdown}
-				class="min-h-28"
-				placeholder="Tone, length, language, when to ask questions, how you like artifacts suggested."
-			/>
-			<p class="text-[11px] text-muted-foreground">
-				Style and behavior preferences. Launchpad’s safety and product rules still apply first.
-			</p>
-		</div>
-	</section>
-
-	<div class="flex items-center justify-between gap-3">
-		{#if saveError}
-			<p class="text-xs text-destructive">{saveError}</p>
-		{:else}
-			<span></span>
 		{/if}
-		<Button type="button" size="sm" disabled={isSaving} onclick={save}>
-			{isSaving ? 'Saving…' : 'Save'}
-		</Button>
-	</div>
 
-	<Separator class="my-2" />
-
-	<section class="space-y-4">
-		<div class="space-y-1">
-			<h2 class="text-sm font-semibold tracking-tight">Activity</h2>
-			<p class="text-xs leading-5 text-muted-foreground">
-				Workspace-wide history for your account.
-			</p>
-		</div>
-
-		<div class="rounded-md border border-border/60">
-			{#if activity.error}
-				<div class="space-y-2 p-4">
-					<p class="text-xs text-destructive">Could not load activity: {activity.error.message}</p>
-					<Button
-						type="button"
-						variant="secondary"
-						size="sm"
-						onclick={() => {
-							void invalidateAll();
-						}}
+		<div class="grid gap-8 lg:grid-cols-[11rem_minmax(0,1fr)] lg:items-start">
+			<nav class="hidden lg:sticky lg:top-8 lg:block" aria-label="Settings sections">
+				<div class="space-y-1 text-xs">
+					<a
+						class="block rounded-md px-2 py-1.5 font-medium text-foreground hover:bg-muted"
+						href="#usage">Usage</a
 					>
-						Retry
-					</Button>
+					<a
+						class="block rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+						href="#assistant">Assistant preferences</a
+					>
+					<a
+						class="block rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+						href="#activity">Activity</a
+					>
+					<a
+						class="block rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+						href="#account">Account</a
+					>
 				</div>
-			{:else if activity.data === undefined}
-				<p class="p-4 text-xs text-muted-foreground">Loading activity...</p>
-			{:else if activity.data.length === 0}
-				<p class="p-4 text-xs text-muted-foreground">No activity yet.</p>
-			{:else}
-				<ul class="divide-y divide-border/60">
-					{#each activity.data as item (item._id)}
-						<li class="flex items-start justify-between gap-4 px-4 py-3">
-							<div class="min-w-0">
-								<p class="text-xs font-medium">{activityLabel(item.eventType, item.metadata)}</p>
-								<p class="mt-0.5 text-[11px] text-muted-foreground">
-									{new Date(item.createdAt).toLocaleString()}
+			</nav>
+
+			<div class="min-w-0 space-y-8">
+				<section id="usage" class="scroll-mt-8 space-y-4">
+					<div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(15rem,0.8fr)] sm:items-start">
+						<div class="space-y-1">
+							<h2 class="text-sm font-semibold tracking-tight">Usage</h2>
+							<p class="max-w-prose text-xs leading-5 text-muted-foreground">
+								Daily cap applies to workspace chat spending.
+							</p>
+						</div>
+						<div class="rounded-lg border border-border/70 bg-muted/35 p-4">
+							{#if budget.data}
+								<div class="flex items-start justify-between gap-4">
+									<div>
+										<p class="text-[11px] text-muted-foreground">Spent today</p>
+										<p class="mt-1 text-lg font-semibold tracking-tight tabular-nums">
+											{money.format(budget.data.spentUsd)}
+										</p>
+									</div>
+									<div class="text-right">
+										<p class="text-[11px] text-muted-foreground">Remaining</p>
+										<p class="mt-1 text-sm font-medium tabular-nums">
+											{money.format(budget.data.remainingUsd)}
+										</p>
+									</div>
+								</div>
+								<div class="mt-3 h-1.5 overflow-hidden rounded-full bg-border/70">
+									<div
+										class="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
+										style={`width: ${Math.min(100, Math.max(0, (budget.data.spentUsd / Math.max(budget.data.capUsd, 0.01)) * 100))}%`}
+									></div>
+								</div>
+								<p class="mt-2 text-[11px] text-muted-foreground">
+									Cap {money.format(budget.data.capUsd)}. Resets daily ({budget.data.dateKey}).
 								</p>
+							{:else if budget.error}
+								<div class="space-y-2">
+									<p class="text-xs text-destructive">
+										Could not load usage: {budget.error.message}
+									</p>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										onclick={() => {
+											void invalidateAll();
+										}}
+									>
+										Retry
+									</Button>
+								</div>
+							{:else}
+								<div class="space-y-3" aria-label="Loading usage">
+									<div class="h-4 w-28 rounded bg-muted"></div>
+									<div class="h-7 w-20 rounded bg-muted"></div>
+									<div class="h-1.5 rounded-full bg-muted"></div>
+								</div>
+							{/if}
+						</div>
+					</div>
+
+					<div class="grid gap-4 rounded-lg border border-border/70 p-4 sm:grid-cols-2">
+						<div class="space-y-2">
+							<Label for="timezone">Timezone</Label>
+							<Input id="timezone" bind:value={timeZone} placeholder={detectedTimeZone} />
+							<p class="text-[11px] leading-4 text-muted-foreground">
+								IANA timezone, for example America/New_York.
+							</p>
+						</div>
+						<div class="space-y-2">
+							<Label for="daily-cap">Daily cap (USD)</Label>
+							<Input id="daily-cap" bind:value={dailyCapUsd} inputmode="decimal" />
+							<p class="text-[11px] leading-4 text-muted-foreground">Applies per user, per day.</p>
+						</div>
+					</div>
+				</section>
+
+				<Separator />
+
+				<section id="assistant" class="scroll-mt-8 space-y-4">
+					<div class="space-y-1">
+						<h2 class="text-sm font-semibold tracking-tight">Assistant preferences</h2>
+						<p class="max-w-2xl text-xs leading-5 text-pretty text-muted-foreground">
+							Optional instructions included with workspace chat. Do not paste passwords, API keys,
+							or regulated personal data.
+						</p>
+					</div>
+
+					<div class="grid gap-4">
+						<div class="space-y-2 rounded-lg border border-border/70 p-4">
+							<div class="flex items-end justify-between gap-2">
+								<div class="space-y-1">
+									<Label for="ai-context">Background and context</Label>
+									<p class="text-[11px] leading-4 text-muted-foreground">
+										Stable facts the assistant should consider across threads.
+									</p>
+								</div>
+								<span class="text-[11px] text-muted-foreground tabular-nums">
+									{aiContextMarkdown.trim().length} / {maxAiPreferenceChars}
+								</span>
 							</div>
-							<p class="shrink-0 text-[11px] text-muted-foreground">{item.dateKey}</p>
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</div>
-	</section>
+							<Textarea
+								id="ai-context"
+								bind:value={aiContextMarkdown}
+								class="min-h-32 resize-y"
+								placeholder="Role, product, users, constraints the assistant should keep in mind."
+							/>
+						</div>
 
-	<Separator class="my-2" />
+						<div class="space-y-2 rounded-lg border border-border/70 p-4">
+							<div class="flex items-end justify-between gap-2">
+								<div class="space-y-1">
+									<Label for="ai-behavior">How to respond</Label>
+									<p class="text-[11px] leading-4 text-muted-foreground">
+										Response preferences such as tone, length, and when to ask questions.
+									</p>
+								</div>
+								<span class="text-[11px] text-muted-foreground tabular-nums">
+									{aiBehaviorMarkdown.trim().length} / {maxAiPreferenceChars}
+								</span>
+							</div>
+							<Textarea
+								id="ai-behavior"
+								bind:value={aiBehaviorMarkdown}
+								class="min-h-32 resize-y"
+								placeholder="Tone, length, language, when to ask questions, how you like artifacts suggested."
+							/>
+						</div>
+					</div>
+				</section>
 
-	<section class="space-y-4">
-		<div class="space-y-1">
-			<h2 class="text-sm font-semibold tracking-tight text-destructive">Danger zone</h2>
-			<p class="text-xs leading-5 text-muted-foreground">
-				Permanent actions. Reset removes all your workspace data but keeps this login. Deleting
-				removes your data and this account, then signs you out.
-			</p>
+				<Separator />
+
+				<section id="activity" class="scroll-mt-8 space-y-4">
+					<div class="space-y-1">
+						<h2 class="text-sm font-semibold tracking-tight">Activity</h2>
+						<p class="max-w-prose text-xs leading-5 text-muted-foreground">
+							Workspace-wide history for your account.
+						</p>
+					</div>
+
+					<div class="overflow-hidden rounded-lg border border-border/70">
+						{#if activity.error}
+							<div class="space-y-2 p-4">
+								<p class="text-xs text-destructive">
+									Could not load activity: {activity.error.message}
+								</p>
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									onclick={() => {
+										void invalidateAll();
+									}}
+								>
+									Retry
+								</Button>
+							</div>
+						{:else if activity.data === undefined}
+							<div class="space-y-3 p-4" aria-label="Loading activity">
+								<div class="h-4 w-40 rounded bg-muted"></div>
+								<div class="h-4 w-56 rounded bg-muted"></div>
+								<div class="h-4 w-32 rounded bg-muted"></div>
+							</div>
+						{:else if activity.data.length === 0}
+							<p class="p-4 text-xs leading-5 text-muted-foreground">
+								No activity yet. Created threads, projects, and artifacts will appear here.
+							</p>
+						{:else}
+							<ul class="divide-y divide-border/60">
+								{#each activity.data as item (item._id)}
+									<li
+										class="flex items-start justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/35"
+									>
+										<div class="min-w-0">
+											<p class="text-xs font-medium">
+												{activityLabel(item.eventType, item.metadata)}
+											</p>
+											<p class="mt-0.5 text-[11px] text-muted-foreground">
+												{new Date(item.createdAt).toLocaleString()}
+											</p>
+										</div>
+										<p class="shrink-0 text-[11px] text-muted-foreground">{item.dateKey}</p>
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
+				</section>
+
+				<Separator />
+
+				<section id="account" class="scroll-mt-8 space-y-4">
+					<div class="space-y-1">
+						<h2 class="text-sm font-semibold tracking-tight text-destructive">Account</h2>
+						<p class="max-w-2xl text-xs leading-5 text-pretty text-muted-foreground">
+							Permanent actions for this workspace. Read the outcome before confirming either
+							action.
+						</p>
+					</div>
+					<div class="grid gap-3 sm:grid-cols-2">
+						<div class="rounded-lg border border-destructive/25 bg-destructive/5 p-4">
+							<h3 class="text-xs font-semibold">Reset workspace data</h3>
+							<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+								Deletes projects, chats, messages, artifacts, and settings. Keeps this login.
+							</p>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								class="mt-3 border-destructive/50 text-destructive hover:bg-destructive/10"
+								onclick={() => {
+									resetError = '';
+									resetDialogOpen = true;
+								}}
+							>
+								Reset workspace data
+							</Button>
+						</div>
+						<div class="rounded-lg border border-destructive/35 bg-background p-4">
+							<h3 class="text-xs font-semibold">Delete account</h3>
+							<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+								Deletes workspace data and this account, then signs you out.
+							</p>
+							<Button
+								type="button"
+								variant="destructive"
+								size="sm"
+								class="mt-3"
+								onclick={() => {
+									deleteError = '';
+									deleteDialogOpen = true;
+								}}
+							>
+								Delete account
+							</Button>
+						</div>
+					</div>
+				</section>
+			</div>
 		</div>
-		<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				class="border-destructive/50 text-destructive hover:bg-destructive/10"
-				onclick={() => {
-					resetError = '';
-					resetDialogOpen = true;
-				}}
-			>
-				Reset account
-			</Button>
-			<Button
-				type="button"
-				variant="destructive"
-				size="sm"
-				onclick={() => {
-					deleteError = '';
-					deleteDialogOpen = true;
-				}}
-			>
-				Delete account
-			</Button>
-		</div>
-	</section>
+	</div>
 </section>
 
 <Dialog.Root bind:open={resetDialogOpen}>
