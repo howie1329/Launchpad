@@ -38,11 +38,13 @@ Prefer Svelte 5 runes and existing `.svelte.ts` state helpers when touching inte
 - Model catalog and provider resolution live in `src/lib/idea-ai-models.ts` and `src/lib/server/resolve-workspace-language-model.ts`.
 - Convex artifacts are canonical workspace memory. Supermemory is optional derived recall and sync infrastructure.
 - Tavily search/page extraction and external AI providers should remain optional when their keys are absent unless the feature explicitly requires them.
+- Composio powers two separate surfaces: selected external app tools in workspace chat and project-scoped Launchpad Actions for GitHub/Linear activity capture.
+- Launchpad Actions depend on verified Composio webhook delivery and should record activity against projects rather than replacing Convex project state.
 - Track token/cost behavior through the existing usage helpers and Convex usage tables.
 
 ## UI And Styling
 
-- Follow `docs/DESIGN-SYSTEM.md` for app shell, navigation, components, layout, density, motion, and accessibility.
+- Follow `DESIGN.md` for app shell, navigation, components, layout, density, motion, and accessibility.
 - Use Tailwind CSS v4 utilities and tokens from `src/routes/layout.css`.
 - Prefer existing shadcn-svelte/Bits UI primitives before creating custom interaction primitives.
 - Keep product surfaces dense, quiet, and workspace-focused. Avoid decorative gradients, stacked cards, and broad theme changes.

@@ -8,18 +8,18 @@ Launchpad is a SvelteKit app backed by Convex. The signed-in workspace is the pr
 
 Key routes:
 
-| Route                                                     | Purpose                                                                         |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `src/routes/+page.svelte`                                 | Public marketing home                                                           |
-| `src/routes/auth/+page.svelte`                            | Convex Auth sign in/sign up                                                     |
-| `src/routes/workspace/+layout.svelte`                     | Authenticated workspace shell, sidebar, tabs, notifications, shared data        |
-| `src/routes/workspace/+page.svelte`                       | Workspace start/new chat surface                                                |
-| `src/routes/workspace/thread/[threadId]`                  | Thread page                                                                     |
-| `src/routes/workspace/project/[projectId]`                | Project overview                                                                |
-| `src/routes/workspace/artifacts/[artifactId]`             | Artifact reader/editor/history                                                  |
-| `src/routes/workspace/imports/external-context/[draftId]` | External context import review                                                  |
-| `src/routes/workspace/settings/+page.svelte`              | Settings, AI preferences, usage, activity                                       |
-| `src/routes/api/workspace/*`                              | Chat, promotion readiness, generated titles, artifact memory, artifact deletion |
+| Route                                                     | Purpose                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `src/routes/+page.svelte`                                 | Public marketing home                                                                 |
+| `src/routes/auth/+page.svelte`                            | Convex Auth sign in/sign up                                                           |
+| `src/routes/workspace/+layout.svelte`                     | Authenticated workspace shell, sidebar, tabs, notifications, shared data              |
+| `src/routes/workspace/+page.svelte`                       | Workspace start/new chat surface                                                      |
+| `src/routes/workspace/thread/[threadId]`                  | Thread page                                                                           |
+| `src/routes/workspace/project/[projectId]`                | Project overview, Launchpad Actions, and project activity                             |
+| `src/routes/workspace/artifacts/[artifactId]`             | Artifact reader/editor/history                                                        |
+| `src/routes/workspace/imports/external-context/[draftId]` | External context import review                                                        |
+| `src/routes/workspace/settings/+page.svelte`              | Settings, AI preferences, external app connections, usage, activity, account controls |
+| `src/routes/api/workspace/*`                              | Chat, artifacts, memory, external app tools, Launchpad Actions, and account APIs      |
 
 ## Data Model
 
@@ -34,6 +34,8 @@ Core tables:
 - `chatThreads` and `chatMessages` for general and project-scoped conversations
 - `artifacts`, `artifactVersions`, and `threadArtifactLinks` for durable markdown memory
 - `externalContextImportDrafts` for pasted external AI context review
+- `launchpadActions` for project-scoped GitHub and Linear Composio triggers
+- `projectActivityEvents` for external activity recorded by Launchpad Actions
 - `notifications` for workspace progress and activity feedback
 - `aiUsageEvents` and `aiDailyUsage` for token and cost tracking
 - `activityEvents` for user-visible workspace history
@@ -52,12 +54,14 @@ Supported provider paths:
 - Groq via `GROQ_API_KEY`
 - NVIDIA NIM via `NIM_API_KEY`
 
-Optional AI context:
+Optional AI context and integrations:
 
 - Tavily search/page extraction via `TAVILY_API_KEY`
 - Supermemory retrieval, profile context, user memory tools, artifact sync, and deletion via `SUPERMEMORY_API_KEY`
 - Composio external app tools via `COMPOSIO_API_KEY`, scoped per thread and activated per message with selected app/toolkit badges
 - Launchpad Actions via Composio triggers and `COMPOSIO_WEBHOOK_SECRET`, scoped per project and stored as project activity
+
+External app connections are managed from workspace settings. Chat-time app tools are selected per thread/request, while Launchpad Actions are configured from a project and currently target GitHub and Linear sources. Composio webhook deliveries are verified before recording project activity or marking an action as needing attention.
 
 Convex artifacts remain canonical workspace memory. Supermemory is derived recall infrastructure and must not replace Convex state. Composio may act on external services, but Launchpad workspace state should still be saved through Convex artifacts and thread tools.
 
@@ -66,6 +70,14 @@ Convex artifacts remain canonical workspace memory. Supermemory is derived recal
 Artifacts are markdown-first documents with flexible string `type` values. User saves and explicit AI writes create immutable `artifactVersions`. Artifact history and restore behavior should preserve the latest version as the source of truth while keeping old versions inspectable.
 
 Thread-artifact links record why an artifact is present in a thread: `created`, `referenced`, or `imported`.
+
+## Workspace Settings And Account Controls
+
+`/workspace/settings` is the owner-facing control surface for timezone, daily AI cap, user AI context and response preferences, external app connections, usage status, activity history, account reset, and account deletion. Account reset/delete flows should clean up local owner-scoped workspace data and remote Supermemory-derived data when configured.
+
+## Launchpad Actions
+
+Launchpad Actions are project-scoped external activity listeners backed by Composio triggers. The project overview lists actions, creates new GitHub or Linear actions, and supports pause/resume/delete states. Incoming Composio webhooks are verified, deduplicated, recorded as `projectActivityEvents`, or used to mark actions as `needs_attention` when connected accounts expire or triggers are disabled.
 
 ## Environment
 
@@ -78,9 +90,11 @@ Thread-artifact links record why an artifact is present in a thread: `created`, 
 | `NIM_API_KEY`             | Optional NVIDIA NIM provider key                                                         |
 | `TAVILY_API_KEY`          | Optional web search/page extraction key                                                  |
 | `SUPERMEMORY_API_KEY`     | Optional Supermemory key                                                                 |
-| `COMPOSIO_API_KEY`        | Optional Composio key for selected external app tools in workspace chat                  |
+| `COMPOSIO_API_KEY`        | Optional Composio key for selected external app tools and Launchpad Actions              |
 | `COMPOSIO_WEBHOOK_SECRET` | Optional Composio webhook secret for Launchpad Actions; set in SvelteKit and Convex envs |
 | `CONVEX_SITE_URL`         | Convex Auth deployment site URL                                                          |
+| `PUBLIC_CONVEX_SITE_URL`  | Public Convex site URL when client-facing site routes need it                            |
+| `CONVEX_DEPLOYMENT`       | Local Convex deployment identifier managed by `convex dev`                               |
 
 ## Maintainer Checks
 

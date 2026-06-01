@@ -6,20 +6,29 @@
 	import { Button } from '$lib/components/ui/button';
 
 	const loop = [
-		{ label: 'Start with a thread', detail: 'Work through the messy product question in chat.' },
+		{ label: 'Think in a thread', detail: 'Work through the messy product question in chat.' },
 		{
-			label: 'Save the useful parts',
-			detail: 'Turn decisions, notes, and PRDs into markdown artifacts.'
+			label: 'Save decisions',
+			detail: 'Turn notes, tradeoffs, and PRDs into versioned markdown artifacts.'
 		},
 		{
-			label: 'Promote when it is real',
-			detail: 'Group the thread and artifacts into a project only when scope is clear.'
+			label: 'Connect the project',
+			detail:
+				'Bring in outside context, app tools, and GitHub or Linear activity when scope is clear.'
 		}
 	];
 
 	const artifactNotes = [
 		'First user: solo dev with a half-shaped idea',
-		'MVP: one workflow, one artifact type'
+		'MVP: one workflow, one artifact type',
+		'v4 · previous version restorable'
+	];
+
+	const trustPoints = [
+		'Choose which apps the assistant can use',
+		'Capture GitHub and Linear activity',
+		'Keep daily AI spend capped',
+		'Restore artifact versions'
 	];
 </script>
 
@@ -27,7 +36,7 @@
 	<title>Launchpad | A workbench for scoped builds</title>
 	<meta
 		name="description"
-		content="Launchpad is a chat-first workspace for solo builders who turn rough ideas into markdown artifacts, scoped projects, and reviewable AI-assisted work."
+		content="Launchpad is a chat-first workspace for solo builders who turn rough ideas into markdown artifacts, scoped projects, connected app context, and reviewable AI-assisted work."
 	/>
 	<meta property="og:title" content="Launchpad | A workbench for scoped builds" />
 	<meta
@@ -59,8 +68,8 @@
 				Turn a rough thread into work you can actually build.
 			</h1>
 			<p class="mt-5 max-w-xl text-sm leading-7 text-pretty text-muted-foreground sm:text-base">
-				Launchpad keeps the conversation, the decisions, and the project context in one quiet
-				workspace, so planning stays close to shipping.
+				Launchpad keeps threads, artifacts, projects, connected context, and AI usage controls in
+				one quiet workspace, so planning stays close to shipping.
 			</p>
 
 			<div class="mt-7 flex flex-wrap items-center gap-3">
@@ -76,6 +85,17 @@
 					</div>
 				{/each}
 			</div>
+
+			<ul
+				class="mt-5 grid gap-2 text-xs leading-5 text-muted-foreground sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2"
+			>
+				{#each trustPoints as point (point)}
+					<li class="flex items-center gap-2">
+						<span class="size-1.5 rounded-full bg-foreground/70" aria-hidden="true"></span>
+						<span>{point}</span>
+					</li>
+				{/each}
+			</ul>
 		</div>
 
 		<div class="product-demo min-w-0" aria-hidden="true">
@@ -83,7 +103,9 @@
 				<div class="flex h-11 items-center justify-between border-b border-border/60 px-3">
 					<div class="min-w-0">
 						<p class="truncate text-xs font-semibold">Workspace</p>
-						<p class="truncate text-[10px] text-muted-foreground">Drafts apply only after review</p>
+						<p class="truncate text-[10px] text-muted-foreground">
+							Drafts and connected actions apply only after review
+						</p>
 					</div>
 					<div class="flex items-center gap-1.5">
 						<span class="size-2 rounded-full bg-muted-foreground/35"></span>
@@ -103,6 +125,7 @@
 							<p class="rounded-md px-2 py-1.5 text-muted-foreground">Projects</p>
 							<p class="rounded-md px-2 py-1.5 text-muted-foreground">Artifacts</p>
 							<p class="rounded-md px-2 py-1.5 text-muted-foreground">Imports</p>
+							<p class="rounded-md px-2 py-1.5 text-muted-foreground">Actions</p>
 						</div>
 
 						<div class="mt-8 space-y-2">
@@ -112,6 +135,15 @@
 								<p class="mt-1 text-[10px] leading-4 text-muted-foreground">
 									2 artifacts, 1 thread
 								</p>
+								<div class="mt-2 flex flex-wrap gap-1">
+									<span class="rounded-full bg-secondary px-1.5 py-0.5 text-[9px]">GitHub</span>
+									<span class="rounded-full bg-secondary px-1.5 py-0.5 text-[9px]">Linear</span>
+								</div>
+							</div>
+
+							<div class="rounded-lg border border-border/60 bg-background p-2">
+								<p class="text-[10px] font-medium text-muted-foreground">Daily AI cap</p>
+								<p class="mt-1 text-[11px] font-medium">$0.50 · in control</p>
 							</div>
 						</div>
 					</aside>
@@ -133,6 +165,18 @@
 									<div class="rounded-lg bg-accent/70 px-3 py-2 text-xs leading-5">
 										Let’s make the first user a solo dev validating a narrow workflow.
 									</div>
+									<div class="flex flex-wrap gap-1.5 pt-1">
+										<span
+											class="rounded-full border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground"
+										>
+											GitHub enabled
+										</span>
+										<span
+											class="rounded-full border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground"
+										>
+											Linear enabled
+										</span>
+									</div>
 								</div>
 							</section>
 
@@ -153,6 +197,7 @@
 									<div class="mt-4 flex flex-wrap gap-1.5">
 										<span class="rounded-full bg-secondary px-2 py-0.5 text-[10px]">review</span>
 										<span class="rounded-full bg-secondary px-2 py-0.5 text-[10px]">markdown</span>
+										<span class="rounded-full bg-secondary px-2 py-0.5 text-[10px]">history</span>
 									</div>
 								</div>
 							</section>
@@ -160,18 +205,18 @@
 
 						<div class="border-t border-border/60 bg-background p-3 sm:p-4">
 							<div
-								class="flex flex-col gap-3 rounded-lg border border-border/70 bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
+								class="grid gap-3 rounded-lg border border-border/70 bg-card p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
 							>
 								<div>
-									<p class="text-xs font-semibold">Ready to promote?</p>
+									<p class="text-xs font-semibold">Launchpad Action captured</p>
 									<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
-										Review included artifacts before this becomes a project.
+										GitHub PR opened for MVP scope. Review activity before updating project notes.
 									</p>
 								</div>
 								<div class="flex shrink-0 gap-2">
-									<span class="rounded-md bg-secondary px-2 py-1 text-[11px]">Edit draft</span>
+									<span class="rounded-md bg-secondary px-2 py-1 text-[11px]">Pause action</span>
 									<span class="rounded-md bg-primary px-2 py-1 text-[11px] text-primary-foreground">
-										Promote
+										Review
 									</span>
 								</div>
 							</div>
