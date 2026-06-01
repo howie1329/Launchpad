@@ -18,8 +18,31 @@ export type ComposioToolkitStatus = {
 	connectionStatus?: string;
 };
 
+export type ComposioAppStatus = {
+	slug: AllowedComposioToolkit;
+	name: string;
+	logo?: string;
+	connected: boolean;
+	status:
+		| 'ACTIVE'
+		| 'FAILED'
+		| 'EXPIRED'
+		| 'INACTIVE'
+		| 'REVOKED'
+		| 'INITIATED'
+		| 'INITIALIZING'
+		| 'NOT_CONNECTED'
+		| 'UNAVAILABLE';
+	statusReason?: string;
+	updatedAt?: string;
+	connectable: boolean;
+};
+
 type ComposioClient = InstanceType<typeof Composio>;
 type ComposioSession = Awaited<ReturnType<ComposioClient['create']>>;
+type ConnectedAccountListItem = Awaited<
+	ReturnType<ComposioClient['connectedAccounts']['list']>
+>['items'][number];
 
 let client: ComposioClient | null = null;
 let clientApiKey = '';
@@ -96,6 +119,110 @@ export async function getComposioToolsForChatRun({
 	return (await session.tools()) as ToolSet;
 }
 
+export async function getComposioAppStatusesForUser({
+	ownerId
+}: {
+	ownerId: string;
+}): Promise<
+	{ available: false; apps: ComposioAppStatus[] } | { available: true; apps: ComposioAppStatus[] }
+> {
+	const composio = getComposioClient();
+	if (!composio) {
+		return { available: false, apps: unavailableComposioApps() };
+	}
+
+	const accounts = await composio.connectedAccounts.list({
+		userIds: [ownerId],
+		toolkitSlugs: [...ALLOWED_COMPOSIO_TOOLKITS],
+		accountType: 'ALL',
+		limit: 100,
+		orderBy: 'updated_at'
+	});
+
+	const byToolkit = new Map<AllowedComposioToolkit, ConnectedAccountListItem>();
+	for (const account of accounts.items) {
+		if (!isAllowedComposioToolkit(account.toolkit.slug)) continue;
+		const slug = account.toolkit.slug.toLowerCase() as AllowedComposioToolkit;
+		const current = byToolkit.get(slug);
+		if (!current || Date.parse(account.updatedAt) > Date.parse(current.updatedAt)) {
+			byToolkit.set(slug, account);
+		}
+	}
+
+	return {
+		available: true,
+		apps: ALLOWED_COMPOSIO_TOOLKITS.map((slug) => {
+			const account = byToolkit.get(slug);
+			if (!account) {
+				return {
+					slug,
+					name: fallbackToolkitName(slug),
+					connected: false,
+					status: 'NOT_CONNECTED',
+					connectable: true
+				};
+			}
+
+			const connected = account.status === 'ACTIVE' && !account.isDisabled;
+			const connectable =
+				!connected &&
+				(account.isDisabled ||
+					account.status === 'FAILED' ||
+					account.status === 'EXPIRED' ||
+					account.status === 'INACTIVE' ||
+					account.status === 'REVOKED');
+
+			return {
+				slug,
+				name: fallbackToolkitName(slug),
+				connected,
+				status: account.isDisabled ? 'INACTIVE' : account.status,
+				...(account.statusReason ? { statusReason: account.statusReason } : {}),
+				updatedAt: account.updatedAt,
+				connectable
+			};
+		})
+	};
+}
+
+export async function createComposioConnectLinkForUser({
+	ownerId,
+	toolkit,
+	callbackUrl
+}: {
+	ownerId: string;
+	toolkit: AllowedComposioToolkit;
+	callbackUrl: string;
+}): Promise<{ connected: true } | { redirectUrl: string }> {
+	const composio = getComposioClient();
+	if (!composio) {
+		throw new Error('Composio is not configured');
+	}
+
+	const activeAccounts = await composio.connectedAccounts.list({
+		userIds: [ownerId],
+		toolkitSlugs: [toolkit],
+		statuses: ['ACTIVE'],
+		accountType: 'ALL',
+		limit: 1
+	});
+	if (activeAccounts.items.some((account) => !account.isDisabled)) {
+		return { connected: true };
+	}
+
+	const authConfigId = await resolveAuthConfigId(composio, toolkit);
+	const request = await composio.connectedAccounts.link(ownerId, authConfigId, {
+		callbackUrl,
+		allowMultiple: false
+	});
+
+	if (!request.redirectUrl) {
+		throw new Error('Composio did not return a connect link');
+	}
+
+	return { redirectUrl: request.redirectUrl };
+}
+
 async function getOrCreateThreadSession({
 	convex,
 	thread,
@@ -134,6 +261,18 @@ function getComposioClient(): ComposioClient | null {
 	return client;
 }
 
+async function resolveAuthConfigId(composio: ComposioClient, toolkit: AllowedComposioToolkit) {
+	const existing = await composio.authConfigs.list({ toolkit, limit: 20 });
+	const enabled = existing.items.find((config) => config.status === 'ENABLED');
+	if (enabled) return enabled.id;
+
+	const created = await composio.authConfigs.create(toolkit, {
+		type: 'use_composio_managed_auth',
+		name: `${fallbackToolkitName(toolkit)} Auth Config`
+	});
+	return created.id;
+}
+
 function composioApiKey() {
 	return env.COMPOSIO_API_KEY?.trim() ?? '';
 }
@@ -147,4 +286,14 @@ function isAllowedComposioToolkit(value: unknown): value is AllowedComposioToolk
 
 function fallbackToolkitName(slug: AllowedComposioToolkit) {
 	return slug === 'github' ? 'GitHub' : slug.charAt(0).toUpperCase() + slug.slice(1);
+}
+
+function unavailableComposioApps(): ComposioAppStatus[] {
+	return ALLOWED_COMPOSIO_TOOLKITS.map((slug) => ({
+		slug,
+		name: fallbackToolkitName(slug),
+		connected: false,
+		status: 'UNAVAILABLE',
+		connectable: false
+	}));
 }

@@ -24,6 +24,7 @@ import type * as notifications from "../notifications.js";
 import type * as projects from "../projects.js";
 import type * as usage from "../usage.js";
 import type * as userSettings from "../userSettings.js";
+import type * as viewer from "../viewer.js";
 import type * as workspaceTabValidators from "../workspaceTabValidators.js";
 import type * as workspaceTabs from "../workspaceTabs.js";
 
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   projects: typeof projects;
   usage: typeof usage;
   userSettings: typeof userSettings;
+  viewer: typeof viewer;
   workspaceTabValidators: typeof workspaceTabValidators;
   workspaceTabs: typeof workspaceTabs;
 }>;

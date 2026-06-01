@@ -31,6 +31,12 @@
 	let saveError = $state('');
 	let isSaving = $state(false);
 	let didAutofillTimeZone = $state(false);
+	let externalAppsLoading = $state(false);
+	let externalAppsLoaded = $state(false);
+	let externalAppsAvailable = $state(false);
+	let externalAppsError = $state('');
+	let externalApps = $state<ExternalAppStatus[]>([]);
+	let connectingExternalApp = $state<AllowedExternalApp | ''>('');
 
 	let resetDialogOpen = $state(false);
 	let deleteDialogOpen = $state(false);
@@ -51,6 +57,18 @@
 				aiContextMarkdown.trim() !== savedAiContextMarkdown ||
 				aiBehaviorMarkdown.trim() !== savedAiBehaviorMarkdown)
 	);
+
+	type AllowedExternalApp = 'github' | 'linear' | 'slack' | 'gmail';
+	type ExternalAppStatus = {
+		slug: AllowedExternalApp;
+		name: string;
+		logo?: string;
+		connected: boolean;
+		status: string;
+		statusReason?: string;
+		updatedAt?: string;
+		connectable: boolean;
+	};
 
 	const confirmReset = async () => {
 		if (isResetting) return;
@@ -112,6 +130,129 @@
 		}
 	}
 
+	async function loadExternalApps() {
+		if (!auth.token || externalAppsLoading) return;
+
+		externalAppsLoading = true;
+		externalAppsError = '';
+		try {
+			const response = await fetch('/api/workspace/composio/apps', {
+				headers: authHeaders()
+			});
+			const result = (await response.json().catch(() => null)) as {
+				available?: boolean;
+				apps?: ExternalAppStatus[];
+				error?: string;
+			} | null;
+
+			if (!response.ok) {
+				throw new Error(result?.error || 'Could not load external apps.');
+			}
+
+			externalAppsAvailable = result?.available === true;
+			externalApps = Array.isArray(result?.apps) ? result.apps.filter(isExternalAppStatus) : [];
+			externalAppsError = result?.error ?? '';
+			externalAppsLoaded = true;
+		} catch (error) {
+			console.error(error);
+			externalAppsAvailable = false;
+			externalApps = [];
+			externalAppsError =
+				error instanceof Error && error.message
+					? error.message
+					: 'External app tools are unavailable.';
+		} finally {
+			externalAppsLoading = false;
+		}
+	}
+
+	async function connectExternalApp(toolkit: AllowedExternalApp) {
+		if (!auth.token || connectingExternalApp) return;
+
+		connectingExternalApp = toolkit;
+		externalAppsError = '';
+		try {
+			const response = await fetch('/api/workspace/composio/apps/connect', {
+				method: 'POST',
+				headers: {
+					...authHeaders(),
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify({ toolkit })
+			});
+			const result = (await response.json().catch(() => null)) as {
+				connected?: boolean;
+				redirectUrl?: string;
+				error?: string;
+			} | null;
+
+			if (!response.ok) {
+				throw new Error(result?.error || 'Could not start external app connection.');
+			}
+
+			if (result?.connected) {
+				externalAppsLoaded = false;
+				await loadExternalApps();
+				return;
+			}
+
+			if (result?.redirectUrl) {
+				window.location.href = result.redirectUrl;
+				return;
+			}
+
+			throw new Error('Composio did not return a connect link.');
+		} catch (error) {
+			console.error(error);
+			externalAppsError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not start external app connection.';
+		} finally {
+			connectingExternalApp = '';
+		}
+	}
+
+	function authHeaders() {
+		return { authorization: `Bearer ${auth.token}` };
+	}
+
+	function isExternalAppStatus(value: unknown): value is ExternalAppStatus {
+		if (!value || typeof value !== 'object') return false;
+		const row = value as Partial<ExternalAppStatus>;
+		return (
+			isAllowedExternalApp(row.slug) &&
+			typeof row.name === 'string' &&
+			typeof row.connected === 'boolean' &&
+			typeof row.status === 'string' &&
+			typeof row.connectable === 'boolean'
+		);
+	}
+
+	function isAllowedExternalApp(value: unknown): value is AllowedExternalApp {
+		return value === 'github' || value === 'linear' || value === 'slack' || value === 'gmail';
+	}
+
+	function externalAppStatusLabel(app: ExternalAppStatus) {
+		if (!externalAppsAvailable || app.status === 'UNAVAILABLE') return 'Unavailable';
+		if (app.connected) return 'Connected';
+		if (app.status === 'NOT_CONNECTED') return 'Not connected';
+		if (app.status === 'INITIATED' || app.status === 'INITIALIZING') return 'Pending';
+		return 'Needs reconnect';
+	}
+
+	function externalAppActionLabel(app: ExternalAppStatus) {
+		return app.status === 'NOT_CONNECTED' ? 'Connect' : 'Reconnect';
+	}
+
+	function externalAppStatusClass(app: ExternalAppStatus) {
+		if (app.connected) return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700';
+		if (app.status === 'INITIATED' || app.status === 'INITIALIZING') {
+			return 'border-amber-500/25 bg-amber-500/10 text-amber-700';
+		}
+		return 'border-border bg-muted/45 text-muted-foreground';
+	}
+
 	$effect(() => {
 		if (!settings.data) return;
 		timeZone = settings.data.timeZone || detectedTimeZone;
@@ -134,6 +275,11 @@
 			didAutofillTimeZone = true;
 			void upsert({ timeZone: detectedTimeZone });
 		}
+	});
+
+	$effect(() => {
+		if (!auth.isAuthenticated || !auth.token || externalAppsLoaded) return;
+		void loadExternalApps();
 	});
 
 	async function upsert(payload: {
@@ -268,6 +414,10 @@
 					<a
 						class="block rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
 						href="#assistant">Assistant preferences</a
+					>
+					<a
+						class="block rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+						href="#external-apps">External apps</a
 					>
 					<a
 						class="block rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -407,6 +557,100 @@
 								placeholder="Tone, length, language, when to ask questions, how you like artifacts suggested."
 							/>
 						</div>
+					</div>
+				</section>
+
+				<Separator />
+
+				<section id="external-apps" class="scroll-mt-8 space-y-4">
+					<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+						<div class="space-y-1">
+							<h2 class="text-sm font-semibold tracking-tight">External apps</h2>
+							<p class="max-w-2xl text-xs leading-5 text-pretty text-muted-foreground">
+								Connect apps the workspace assistant can use when you enable app tools in chat.
+							</p>
+						</div>
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							disabled={externalAppsLoading}
+							onclick={() => {
+								externalAppsLoaded = false;
+								void loadExternalApps();
+							}}
+						>
+							{externalAppsLoading ? 'Refreshing…' : 'Refresh'}
+						</Button>
+					</div>
+
+					{#if externalAppsError}
+						<p
+							class="rounded-lg border border-border/70 bg-muted/35 p-3 text-xs text-muted-foreground"
+						>
+							{externalAppsError}
+						</p>
+					{/if}
+
+					<div class="overflow-hidden rounded-lg border border-border/70">
+						{#if externalAppsLoading && externalApps.length === 0}
+							<div class="space-y-3 p-4" aria-label="Loading external apps">
+								<div class="h-4 w-36 rounded bg-muted"></div>
+								<div class="h-4 w-52 rounded bg-muted"></div>
+								<div class="h-4 w-44 rounded bg-muted"></div>
+							</div>
+						{:else if externalApps.length === 0}
+							<p class="p-4 text-xs leading-5 text-muted-foreground">
+								External app tools are unavailable.
+							</p>
+						{:else}
+							<ul class="divide-y divide-border/60">
+								{#each externalApps as app (app.slug)}
+									<li class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+										<div class="flex min-w-0 flex-1 items-center gap-3">
+											{#if app.logo}
+												<img src={app.logo} alt="" class="size-7 shrink-0 rounded-md" />
+											{:else}
+												<span
+													class="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold text-muted-foreground uppercase"
+													aria-hidden="true"
+												>
+													{app.name.slice(0, 1)}
+												</span>
+											{/if}
+											<div class="min-w-0">
+												<p class="truncate text-xs font-medium">{app.name}</p>
+												<p class="mt-0.5 truncate text-[11px] text-muted-foreground">
+													{app.statusReason || 'Available in workspace chat app tools.'}
+												</p>
+											</div>
+										</div>
+										<div class="flex shrink-0 items-center gap-2 sm:justify-end">
+											<span
+												class={`inline-flex h-7 items-center rounded-md border px-2 text-[11px] font-medium ${externalAppStatusClass(app)}`}
+											>
+												{externalAppStatusLabel(app)}
+											</span>
+											{#if app.connectable}
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													disabled={Boolean(connectingExternalApp)}
+													onclick={() => {
+														void connectExternalApp(app.slug);
+													}}
+												>
+													{connectingExternalApp === app.slug
+														? 'Opening…'
+														: externalAppActionLabel(app)}
+												</Button>
+											{/if}
+										</div>
+									</li>
+								{/each}
+							</ul>
+						{/if}
 					</div>
 				</section>
 

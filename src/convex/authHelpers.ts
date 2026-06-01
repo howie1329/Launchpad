@@ -12,7 +12,7 @@ export async function getOptionalAuthUserId(
 	return await getAuthUserId(ctx);
 }
 
-export async function requireAuthUserId(ctx: MutationCtx): Promise<Id<'users'>> {
+export async function requireAuthUserId(ctx: QueryCtx | MutationCtx): Promise<Id<'users'>> {
 	const userId = await getAuthUserId(ctx);
 	if (!userId) throw new Error('Authentication required');
 	return userId;
