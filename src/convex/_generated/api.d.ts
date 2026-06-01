@@ -19,6 +19,7 @@ import type * as dateKey from "../dateKey.js";
 import type * as externalContextImportSynthesis from "../externalContextImportSynthesis.js";
 import type * as externalContextImports from "../externalContextImports.js";
 import type * as http from "../http.js";
+import type * as launchpadActions from "../launchpadActions.js";
 import type * as memory from "../memory.js";
 import type * as notifications from "../notifications.js";
 import type * as projects from "../projects.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   externalContextImportSynthesis: typeof externalContextImportSynthesis;
   externalContextImports: typeof externalContextImports;
   http: typeof http;
+  launchpadActions: typeof launchpadActions;
   memory: typeof memory;
   notifications: typeof notifications;
   projects: typeof projects;

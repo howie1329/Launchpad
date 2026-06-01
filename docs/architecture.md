@@ -8,18 +8,18 @@ Launchpad is a SvelteKit app backed by Convex. The signed-in workspace is the pr
 
 Key routes:
 
-| Route | Purpose |
-| --- | --- |
-| `src/routes/+page.svelte` | Public marketing home |
-| `src/routes/auth/+page.svelte` | Convex Auth sign in/sign up |
-| `src/routes/workspace/+layout.svelte` | Authenticated workspace shell, sidebar, tabs, notifications, shared data |
-| `src/routes/workspace/+page.svelte` | Workspace start/new chat surface |
-| `src/routes/workspace/thread/[threadId]` | Thread page |
-| `src/routes/workspace/project/[projectId]` | Project overview |
-| `src/routes/workspace/artifacts/[artifactId]` | Artifact reader/editor/history |
-| `src/routes/workspace/imports/external-context/[draftId]` | External context import review |
-| `src/routes/workspace/settings/+page.svelte` | Settings, AI preferences, usage, activity |
-| `src/routes/api/workspace/*` | Chat, promotion readiness, generated titles, artifact memory, artifact deletion |
+| Route                                                     | Purpose                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/routes/+page.svelte`                                 | Public marketing home                                                           |
+| `src/routes/auth/+page.svelte`                            | Convex Auth sign in/sign up                                                     |
+| `src/routes/workspace/+layout.svelte`                     | Authenticated workspace shell, sidebar, tabs, notifications, shared data        |
+| `src/routes/workspace/+page.svelte`                       | Workspace start/new chat surface                                                |
+| `src/routes/workspace/thread/[threadId]`                  | Thread page                                                                     |
+| `src/routes/workspace/project/[projectId]`                | Project overview                                                                |
+| `src/routes/workspace/artifacts/[artifactId]`             | Artifact reader/editor/history                                                  |
+| `src/routes/workspace/imports/external-context/[draftId]` | External context import review                                                  |
+| `src/routes/workspace/settings/+page.svelte`              | Settings, AI preferences, usage, activity                                       |
+| `src/routes/api/workspace/*`                              | Chat, promotion readiness, generated titles, artifact memory, artifact deletion |
 
 ## Data Model
 
@@ -57,6 +57,7 @@ Optional AI context:
 - Tavily search/page extraction via `TAVILY_API_KEY`
 - Supermemory retrieval, profile context, user memory tools, artifact sync, and deletion via `SUPERMEMORY_API_KEY`
 - Composio external app tools via `COMPOSIO_API_KEY`, scoped per thread and activated per message with selected app/toolkit badges
+- Launchpad Actions via Composio triggers and `COMPOSIO_WEBHOOK_SECRET`, scoped per project and stored as project activity
 
 Convex artifacts remain canonical workspace memory. Supermemory is derived recall infrastructure and must not replace Convex state. Composio may act on external services, but Launchpad workspace state should still be saved through Convex artifacts and thread tools.
 
@@ -68,17 +69,18 @@ Thread-artifact links record why an artifact is present in a thread: `created`, 
 
 ## Environment
 
-| Variable | Purpose |
-| --- | --- |
-| `PUBLIC_CONVEX_URL` | Convex deployment URL for browser and server HTTP clients |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key for default AI workflows |
-| `OPENROUTER_API_KEY` | Optional OpenRouter provider key |
-| `GROQ_API_KEY` | Optional Groq provider key |
-| `NIM_API_KEY` | Optional NVIDIA NIM provider key |
-| `TAVILY_API_KEY` | Optional web search/page extraction key |
-| `SUPERMEMORY_API_KEY` | Optional Supermemory key |
-| `COMPOSIO_API_KEY` | Optional Composio key for selected external app tools in workspace chat |
-| `CONVEX_SITE_URL` | Convex Auth deployment site URL |
+| Variable                  | Purpose                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`       | Convex deployment URL for browser and server HTTP clients                                |
+| `AI_GATEWAY_API_KEY`      | Vercel AI Gateway key for default AI workflows                                           |
+| `OPENROUTER_API_KEY`      | Optional OpenRouter provider key                                                         |
+| `GROQ_API_KEY`            | Optional Groq provider key                                                               |
+| `NIM_API_KEY`             | Optional NVIDIA NIM provider key                                                         |
+| `TAVILY_API_KEY`          | Optional web search/page extraction key                                                  |
+| `SUPERMEMORY_API_KEY`     | Optional Supermemory key                                                                 |
+| `COMPOSIO_API_KEY`        | Optional Composio key for selected external app tools in workspace chat                  |
+| `COMPOSIO_WEBHOOK_SECRET` | Optional Composio webhook secret for Launchpad Actions; set in SvelteKit and Convex envs |
+| `CONVEX_SITE_URL`         | Convex Auth deployment site URL                                                          |
 
 ## Maintainer Checks
 

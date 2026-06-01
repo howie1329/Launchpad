@@ -1,4 +1,5 @@
 <!-- agentkit:start stack -->
+
 # Launchpad Stack Guidance
 
 Launchpad is a SvelteKit, Svelte 5, TypeScript, and Convex app. The signed-in workspace is the main product surface, with chat threads, projects, markdown artifacts, external context imports, AI usage controls, and optional memory/search integrations.
@@ -49,14 +50,14 @@ Prefer Svelte 5 runes and existing `.svelte.ts` state helpers when touching inte
 
 ## Project Commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the SvelteKit frontend development server |
-| `npm run dev:backend` | Start Convex dev |
-| `npm run dev:all` | Start SvelteKit and Convex together |
-| `npm run check` | Run SvelteKit sync and `svelte-check` |
-| `npm run lint` | Run Prettier check and ESLint |
-| `npm run build` | Build the SvelteKit app |
+| Command               | Purpose                                         |
+| --------------------- | ----------------------------------------------- |
+| `npm run dev`         | Start the SvelteKit frontend development server |
+| `npm run dev:backend` | Start Convex dev                                |
+| `npm run dev:all`     | Start SvelteKit and Convex together             |
+| `npm run check`       | Run SvelteKit sync and `svelte-check`           |
+| `npm run lint`        | Run Prettier check and ESLint                   |
+| `npm run build`       | Build the SvelteKit app                         |
 
 Run the narrowest useful command for the change. For docs-only edits, placeholder search and diff review are enough.
 
@@ -64,18 +65,20 @@ Run the narrowest useful command for the change. For docs-only edits, placeholde
 
 Set values in `.env.local` for local development and in the deployment environment for hosted builds. Never commit real API keys or tokens.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `PUBLIC_CONVEX_URL` | Yes | Convex deployment URL for browser clients and SvelteKit server routes |
-| `AI_GATEWAY_API_KEY` | Yes | Vercel AI Gateway key for default AI workflows |
-| `OPENROUTER_API_KEY` | Optional | Enables OpenRouter models |
-| `GROQ_API_KEY` | Optional | Enables Groq models |
-| `NIM_API_KEY` | Optional | Enables NVIDIA NIM models |
-| `TAVILY_API_KEY` | Optional | Enables web search and page extraction |
-| `SUPERMEMORY_API_KEY` | Optional | Enables Supermemory recall, profile context, and artifact memory sync |
-| `CONVEX_SITE_URL` | Deployment | Convex Auth site URL for deployed auth configuration |
-| `PUBLIC_CONVEX_SITE_URL` | Optional | Public Convex site URL when client-facing site routes need it |
-| `CONVEX_DEPLOYMENT` | Local Convex dev | Convex deployment identifier managed by `convex dev` |
+| Variable                  | Required         | Purpose                                                                                      |
+| ------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`       | Yes              | Convex deployment URL for browser clients and SvelteKit server routes                        |
+| `AI_GATEWAY_API_KEY`      | Yes              | Vercel AI Gateway key for default AI workflows                                               |
+| `OPENROUTER_API_KEY`      | Optional         | Enables OpenRouter models                                                                    |
+| `GROQ_API_KEY`            | Optional         | Enables Groq models                                                                          |
+| `NIM_API_KEY`             | Optional         | Enables NVIDIA NIM models                                                                    |
+| `TAVILY_API_KEY`          | Optional         | Enables web search and page extraction                                                       |
+| `SUPERMEMORY_API_KEY`     | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                        |
+| `COMPOSIO_API_KEY`        | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |
+| `COMPOSIO_WEBHOOK_SECRET` | Optional         | Verifies Composio webhook deliveries for Launchpad Actions; set in SvelteKit and Convex envs |
+| `CONVEX_SITE_URL`         | Deployment       | Convex Auth site URL for deployed auth configuration                                         |
+| `PUBLIC_CONVEX_SITE_URL`  | Optional         | Public Convex site URL when client-facing site routes need it                                |
+| `CONVEX_DEPLOYMENT`       | Local Convex dev | Convex deployment identifier managed by `convex dev`                                         |
 
 ## Quality Bar
 

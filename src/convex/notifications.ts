@@ -6,7 +6,8 @@ import type { MutationCtx } from './_generated/server';
 
 const notificationTypeValue = v.union(
 	v.literal('external_context_import'),
-	v.literal('ai_chat_activity')
+	v.literal('ai_chat_activity'),
+	v.literal('external_project_activity')
 );
 const notificationStateValue = v.union(
 	v.literal('activity'),
@@ -24,7 +25,7 @@ const notificationMetadataValue = v.record(v.string(), v.any());
 
 type CreateNotificationForOwnerArgs = {
 	ownerId: Id<'users'>;
-	type: 'external_context_import' | 'ai_chat_activity';
+	type: 'external_context_import' | 'ai_chat_activity' | 'external_project_activity';
 	state: 'activity' | 'success' | 'failed' | 'in_progress';
 	title: string;
 	body?: string;

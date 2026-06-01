@@ -1,6 +1,7 @@
 import { env } from '$env/dynamic/private';
 import { setThreadComposioSessionIdMutation, type SavedChatThread } from '$lib/chat';
 import { Composio } from '@composio/core';
+import type { VerifyWebhookResult } from '@composio/core';
 import { VercelProvider } from '@composio/vercel';
 import type { ToolSet } from 'ai';
 import type { ConvexHttpClient } from 'convex/browser';
@@ -19,6 +20,7 @@ export const ALLOWED_COMPOSIO_TOOLKITS = [
 ] as const;
 
 export type AllowedComposioToolkit = (typeof ALLOWED_COMPOSIO_TOOLKITS)[number];
+export type LaunchpadActionToolkit = Extract<AllowedComposioToolkit, 'github' | 'linear'>;
 
 export type ComposioToolkitStatus = {
 	slug: AllowedComposioToolkit;
@@ -233,6 +235,112 @@ export async function createComposioConnectLinkForUser({
 	return { redirectUrl: request.redirectUrl };
 }
 
+export async function listComposioTriggerTypesForLaunchpadActions({
+	toolkit
+}: {
+	toolkit: LaunchpadActionToolkit;
+}): Promise<
+	{ available: false; triggers: [] } | { available: true; triggers: ComposioTriggerTypeSummary[] }
+> {
+	const composio = getComposioClient();
+	if (!composio) return { available: false, triggers: [] };
+
+	const result = await composio.triggers.listTypes({ toolkits: [toolkit], limit: 100 });
+	return {
+		available: true,
+		triggers: result.items.map((item) => ({
+			slug: item.slug,
+			name: item.name,
+			description: item.description,
+			config: item.config
+		}))
+	};
+}
+
+export async function createComposioTriggerForLaunchpadAction({
+	ownerId,
+	toolkit,
+	triggerSlug,
+	triggerConfig
+}: {
+	ownerId: string;
+	toolkit: LaunchpadActionToolkit;
+	triggerSlug: string;
+	triggerConfig: Record<string, unknown>;
+}) {
+	const composio = getComposioClient();
+	if (!composio) {
+		throw new Error('Composio is not configured');
+	}
+
+	const account = await getActiveConnectedAccountForUser(composio, ownerId, toolkit);
+	if (!account) {
+		throw new Error(`${fallbackToolkitName(toolkit)} is not connected`);
+	}
+
+	const result = await composio.triggers.create(ownerId, triggerSlug, {
+		connectedAccountId: account.id,
+		triggerConfig
+	});
+
+	return {
+		triggerId: result.triggerId,
+		connectedAccountId: account.id
+	};
+}
+
+export async function setComposioTriggerEnabled(triggerId: string, enabled: boolean) {
+	const composio = getComposioClient();
+	if (!composio) {
+		throw new Error('Composio is not configured');
+	}
+
+	if (enabled) {
+		await composio.triggers.enable(triggerId);
+	} else {
+		await composio.triggers.disable(triggerId);
+	}
+}
+
+export async function deleteComposioTrigger(triggerId: string) {
+	const composio = getComposioClient();
+	if (!composio) {
+		throw new Error('Composio is not configured');
+	}
+
+	await composio.triggers.delete(triggerId);
+}
+
+export async function verifyComposioWebhook({
+	payload,
+	signature,
+	webhookId,
+	webhookTimestamp
+}: {
+	payload: string;
+	signature: string;
+	webhookId: string;
+	webhookTimestamp: string;
+}): Promise<VerifyWebhookResult> {
+	const composio = getComposioClient();
+	if (!composio) {
+		throw new Error('Composio is not configured');
+	}
+
+	const secret = env.COMPOSIO_WEBHOOK_SECRET?.trim() ?? '';
+	if (!secret) {
+		throw new Error('Composio webhook secret is not configured');
+	}
+
+	return await composio.triggers.verifyWebhook({
+		payload,
+		signature,
+		id: webhookId,
+		timestamp: webhookTimestamp,
+		secret
+	});
+}
+
 async function getOrCreateThreadSession({
 	convex,
 	thread,
@@ -257,6 +365,23 @@ async function getOrCreateThreadSession({
 	thread.composioSessionId = session.sessionId;
 
 	return session;
+}
+
+async function getActiveConnectedAccountForUser(
+	composio: ComposioClient,
+	ownerId: string,
+	toolkit: LaunchpadActionToolkit
+) {
+	const accounts = await composio.connectedAccounts.list({
+		userIds: [ownerId],
+		toolkitSlugs: [toolkit],
+		statuses: ['ACTIVE'],
+		accountType: 'ALL',
+		limit: 10,
+		orderBy: 'updated_at'
+	});
+
+	return accounts.items.find((account) => !account.isDisabled) ?? null;
 }
 
 function getComposioClient(): ComposioClient | null {
@@ -318,3 +443,10 @@ function unavailableComposioApps(): ComposioAppStatus[] {
 		connectable: false
 	}));
 }
+
+type ComposioTriggerTypeSummary = {
+	slug: string;
+	name: string;
+	description?: string;
+	config: Record<string, unknown>;
+};
