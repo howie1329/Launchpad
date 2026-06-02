@@ -57,7 +57,9 @@ export const recordArtifactMemorySync = mutation({
 			...(artifact.sourceThreadId ? { threadId: artifact.sourceThreadId } : {}),
 			customId: args.customId,
 			containerTag: args.containerTag,
-			...(args.supermemoryDocumentId ? { supermemoryDocumentId: args.supermemoryDocumentId } : {}),
+			...(args.supermemoryDocumentId !== undefined
+				? { supermemoryDocumentId: args.supermemoryDocumentId || undefined }
+				: {}),
 			status: args.status,
 			...(args.lastError ? { lastError: args.lastError.slice(0, 1000) } : { lastError: undefined }),
 			...(args.lastSyncedAt ? { lastSyncedAt: args.lastSyncedAt } : {}),

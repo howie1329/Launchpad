@@ -27,14 +27,26 @@ import {
 } from '$lib/server/resolve-workspace-language-model';
 import { syncArtifactMemory } from '$lib/server/launchpad-memory';
 import {
-	addUserMemoryDocument,
-	assertDocumentForgettable,
+	ALLOWED_COMPOSIO_TOOLKITS,
+	getComposioToolsForChatRun,
+	isComposioConfigured,
+	parseComposioToolkits,
+	type AllowedComposioToolkit
+} from '$lib/server/composio';
+import {
+	addProjectDecisionMemoryDocument,
+	addThreadInsightMemoryDocument,
+	addUserPreferenceMemoryDocument,
 	buildSupermemoryProfileInstructions,
 	composeRetrievedMemoryInstructions,
-	deleteSupermemoryDocument,
+	deleteScopedSemanticMemoryDocument,
+	inspectScopedMemoryDocument,
+	listScopedMemoryDocuments,
 	memoryLog,
+	projectDecisionCategories,
 	retrieveRelevantMemories,
-	userMemoryTextAllowedForMessage
+	threadInsightCategories,
+	userPreferenceCategories
 } from '$lib/server/memory';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
@@ -102,10 +114,15 @@ Project behavior:
 - Future artifacts created after project promotion belong to that project automatically through the active thread.
 - Read or import project artifacts when the user asks, uses @artifact references, or clearly needs project memory.
 
-Supermemory (automatic + optional tools):
+Supermemory semantic memory tools:
 - Retrieved memory and profile snippets may appear below; treat them as non-authoritative context.
-- addMemory: only when the user clearly wants something remembered. The text argument must be copied verbatim from their latest message (substring match is enforced server-side).
-- forgetMemory: only when the user asks to remove a memory; pass the documentId from the retrieved memory list.`;
+- Precedence: latest user message > explicit @artifact references > canonical artifact reads > project decisions > user preferences > thread insights > artifact-derived memory snippets > profile background.
+- rememberUserPreference saves durable global user preferences to the user container, even in project chats. Use for communication preferences, workflow preferences, design taste, and stable work context. Do not store project-specific decisions there.
+- rememberProjectDecision saves only in project chats. Use automatically only for high-confidence commitment language about target customers, positioning, scope, constraints, architecture, tradeoffs, or confirmed direction. Do not save exploratory or uncertain brainstorming as decisions.
+- rememberThreadInsight saves conservatively for durable open questions, exploration summaries, rationale, or follow-ups that are useful later and not better captured as a user preference or project decision.
+- listRelevantMemory and inspectMemory are transparency tools for memory questions and provenance checks.
+- forgetUserMemory and forgetProjectMemory are only for explicit user requests to forget memory. Never delete artifact-derived memory through these tools.
+- Do not use memory tools to create artifact summaries; artifacts are canonical and artifact memory is lifecycle-derived.`;
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -185,11 +202,14 @@ export const POST: RequestHandler = async ({ request }) => {
 		});
 		const memoryBlock = composeRetrievedMemoryInstructions(memories);
 		const webSearchRequested = body.webSearchRequested === true;
+		const selectedComposioToolkits = parseComposioToolkits(body.composioToolkits);
+		const composioAvailable = isComposioConfigured();
 		const webSearchApiKey = env.TAVILY_API_KEY?.trim() ?? '';
 		const webSearchAvailable = Boolean(webSearchApiKey);
 		const coreInstructions = [
 			workspaceInstructions(project),
 			webSearchInstructions(webSearchRequested, webSearchAvailable),
+			composioInstructions(selectedComposioToolkits, composioAvailable),
 			referenced.block,
 			profileBlock,
 			memoryBlock
@@ -206,10 +226,22 @@ export const POST: RequestHandler = async ({ request }) => {
 			project: project as WorkspaceProject | null,
 			ownerId: thread.ownerId,
 			projectId: project?._id,
-			lastUserText,
 			webSearchAvailable,
 			webSearchApiKey
 		});
+
+		try {
+			Object.assign(
+				tools,
+				await getComposioToolsForChatRun({
+					convex,
+					thread,
+					toolkits: selectedComposioToolkits
+				})
+			);
+		} catch (error) {
+			console.error('Could not load Composio tools', error);
+		}
 
 		let languageModel;
 		try {
@@ -312,6 +344,47 @@ function workspaceInstructions(project: WorkspaceProject | null) {
 ${projectContext}`;
 }
 
+function composioInstructions(
+	selectedToolkits: AllowedComposioToolkit[],
+	composioAvailable: boolean
+) {
+	if (!composioAvailable) {
+		return 'External app tools are not configured for this workspace. Do not imply that you can use Gmail, GitHub, Google Calendar, Google Docs, Google Drive, Google Sheets, Linear, Notion, Slack, or other external app tools.';
+	}
+
+	const activeToolkits =
+		selectedToolkits.length > 0 ? selectedToolkits : [...ALLOWED_COMPOSIO_TOOLKITS];
+	const labels = activeToolkits.map(composioToolkitLabel).join(', ');
+	const scopeLine =
+		selectedToolkits.length > 0
+			? `External app tool badges are selected for this task. Use only these selected apps: ${labels}. Do not use unselected external apps.`
+			: `No external app badges are selected. ${labels} are available when relevant; choose from them only when they directly help the user.`;
+
+	return [
+		scopeLine,
+		'- If an available app needs authentication, use the Composio connection flow and ask the user to complete the Connect Link before continuing.',
+		'- Reading or searching available external apps is allowed when it directly helps answer the user.',
+		'- Before any external write action, summarize the exact action and ask for explicit confirmation unless the latest user message already confirms that exact action.',
+		'- Write actions include sending Gmail email, sending Slack messages, creating or updating Linear issues, creating GitHub issues/comments/pull requests, changing Notion pages or databases, changing Google Drive files, editing Google Docs, changing Google Calendar events, and updating Google Sheets.',
+		'- Never delete, archive, or destructively modify external resources without explicit confirmation in the latest user turn.'
+	].join('\n');
+}
+
+function composioToolkitLabel(toolkit: AllowedComposioToolkit) {
+	const names: Record<AllowedComposioToolkit, string> = {
+		github: 'GitHub',
+		linear: 'Linear',
+		slack: 'Slack',
+		gmail: 'Gmail',
+		notion: 'Notion',
+		googledrive: 'Google Drive',
+		googledocs: 'Google Docs',
+		googlecalendar: 'Google Calendar',
+		googlesheets: 'Google Sheets'
+	};
+	return names[toolkit];
+}
+
 function webSearchInstructions(webSearchRequested: boolean, webSearchAvailable: boolean) {
 	const availability = webSearchAvailable
 		? [
@@ -374,7 +447,6 @@ function workspaceTools({
 	project,
 	ownerId,
 	projectId,
-	lastUserText,
 	webSearchAvailable,
 	webSearchApiKey
 }: {
@@ -383,7 +455,6 @@ function workspaceTools({
 	project: WorkspaceProject | null;
 	ownerId: Id<'users'>;
 	projectId?: Id<'projects'>;
-	lastUserText: string;
 	webSearchAvailable: boolean;
 	webSearchApiKey: string;
 }) {
@@ -628,6 +699,7 @@ function workspaceTools({
 					contentMarkdown,
 					...(summary?.trim() ? { summary: summary.trim() } : {})
 				});
+				await syncArtifactMemoryForTool(convex, artifact._id);
 
 				return {
 					artifactId: artifact._id,
@@ -668,64 +740,179 @@ function workspaceTools({
 				};
 			}
 		}),
-		addMemory: tool({
+		rememberUserPreference: tool({
 			description:
-				'Persist a short phrase the user asked to remember. The text must be copied verbatim from their latest message.',
+				'Save a durable global user preference. Use for communication, workflow, design taste, or stable work context; never for project-specific decisions.',
 			inputSchema: z.object({
-				text: z.string().min(1).describe('Exact substring from the latest user message.')
+				category: z.enum(userPreferenceCategories),
+				content: z.string().min(1).describe('Short preference statement to remember globally.'),
+				evidence: z
+					.string()
+					.optional()
+					.describe('Short evidence quote or summary from the conversation.'),
+				confidence: z.enum(['explicit', 'high', 'inferred']).default('explicit')
 			}),
-			execute: async ({ text }) => {
-				if (!userMemoryTextAllowedForMessage(lastUserText, text)) {
-					memoryLog('supermemory.add_memory_denied', { reason: 'not_in_user_message' });
+			execute: async ({ category, content, evidence, confidence }) => {
+				const result = await addUserPreferenceMemoryDocument({
+					ownerId,
+					threadId,
+					category,
+					content,
+					...(evidence?.trim() ? { evidence: evidence.trim() } : {}),
+					confidence
+				});
+				return semanticMemoryToolResult(result);
+			}
+		}),
+		rememberProjectDecision: tool({
+			description:
+				'Save a high-confidence project decision, constraint, target customer, positioning, scope, architecture choice, tradeoff, or confirmed direction. Only works in project chats.',
+			inputSchema: z.object({
+				category: z.enum(projectDecisionCategories),
+				content: z.string().min(1).describe('Short project decision to remember.'),
+				evidence: z
+					.string()
+					.optional()
+					.describe('Short evidence quote or summary from the conversation.'),
+				confidence: z.enum(['explicit', 'high']).default('high')
+			}),
+			execute: async ({ category, content, evidence, confidence }) => {
+				if (!projectId) {
 					return {
 						ok: false as const,
-						reason: 'Text must appear verbatim in the user latest message.'
+						reason: 'Project decisions are only available in project chats.'
 					};
 				}
-				const result = await addUserMemoryDocument({
+				const result = await addProjectDecisionMemoryDocument({
+					ownerId,
+					projectId,
+					threadId,
+					category,
+					content,
+					...(evidence?.trim() ? { evidence: evidence.trim() } : {}),
+					confidence
+				});
+				return semanticMemoryToolResult(result);
+			}
+		}),
+		rememberThreadInsight: tool({
+			description:
+				'Conservatively save a durable synthesized thread takeaway that is not a user preference or project decision. Use only for open questions, exploration summaries, rationale, or follow-ups.',
+			inputSchema: z.object({
+				category: z.enum(threadInsightCategories),
+				content: z.string().min(1).describe('Short durable thread insight.'),
+				evidence: z
+					.string()
+					.optional()
+					.describe('Short evidence quote or summary from the conversation.')
+			}),
+			execute: async ({ category, content, evidence }) => {
+				const result = await addThreadInsightMemoryDocument({
 					ownerId,
 					...(projectId ? { projectId } : {}),
 					threadId,
-					text
+					category,
+					content,
+					...(evidence?.trim() ? { evidence: evidence.trim() } : {})
 				});
-				if (result.status === 'blocked') {
-					memoryLog('supermemory.add_memory_denied', { reason: result.reason });
-					return { ok: false as const, reason: result.reason };
-				}
-				if (result.status === 'disabled') {
-					return { ok: false as const, reason: 'Memory service is not configured.' };
-				}
-				if (result.status === 'failed') {
-					memoryLog('supermemory.add_memory_failed', { error: result.error });
-					return { ok: false as const, reason: result.error };
-				}
-				return { ok: true as const, documentId: result.documentId };
+				return semanticMemoryToolResult(result);
 			}
 		}),
-		forgetMemory: tool({
+		forgetUserMemory: tool({
 			description:
-				'Delete a Supermemory document when the user asks to forget it. Use documentId from the retrieved memory list.',
+				'Delete a user-scoped semantic memory only when the user explicitly asks. Cannot delete project or artifact memory.',
 			inputSchema: z.object({
 				documentId: z.string().min(1).describe('Supermemory document id.')
 			}),
 			execute: async ({ documentId }) => {
-				const gate = await assertDocumentForgettable({
+				const result = await deleteScopedSemanticMemoryDocument({
+					documentId,
+					ownerId,
+					scope: 'user'
+				});
+				if (!result.ok) memoryLog('supermemory.forget_user_denied', { reason: result.reason });
+				return result.ok ? { ok: true as const } : { ok: false as const, reason: result.reason };
+			}
+		}),
+		forgetProjectMemory: tool({
+			description:
+				'Delete a project-scoped semantic memory only when the user explicitly asks. Only works in project chats and cannot delete artifact memory.',
+			inputSchema: z.object({
+				documentId: z.string().min(1).describe('Supermemory document id.')
+			}),
+			execute: async ({ documentId }) => {
+				if (!projectId) {
+					return {
+						ok: false as const,
+						reason: 'Project memory is only available in project chats.'
+					};
+				}
+				const result = await deleteScopedSemanticMemoryDocument({
+					documentId,
+					ownerId,
+					projectId,
+					scope: 'project'
+				});
+				if (!result.ok) memoryLog('supermemory.forget_project_denied', { reason: result.reason });
+				return result.ok ? { ok: true as const } : { ok: false as const, reason: result.reason };
+			}
+		}),
+		listRelevantMemory: tool({
+			description:
+				'List or search relevant memory for transparency. With a query, returns semantic search results; without a query, lists scoped memories separated by user and project.',
+			inputSchema: z.object({
+				query: z.string().optional().describe('Optional query for semantic memory search.'),
+				limit: z.number().int().min(1).max(20).default(10)
+			}),
+			execute: async ({ query, limit }) => {
+				const cleanQuery = query?.trim() ?? '';
+				if (cleanQuery) {
+					const memories = await retrieveRelevantMemories({
+						ownerId,
+						...(projectId ? { projectId } : {}),
+						query: cleanQuery
+					});
+					return { mode: 'search' as const, memories: memories.slice(0, limit) };
+				}
+
+				const result = await listScopedMemoryDocuments({
+					ownerId,
+					...(projectId ? { projectId } : {}),
+					limit
+				});
+				return result;
+			}
+		}),
+		inspectMemory: tool({
+			description:
+				'Inspect a specific memory document with sanitized structured metadata. Artifact memory is read-only and derived from canonical artifact content.',
+			inputSchema: z.object({
+				documentId: z.string().min(1).describe('Supermemory document id.')
+			}),
+			execute: async ({ documentId }) => {
+				return inspectScopedMemoryDocument({
 					documentId,
 					ownerId,
 					...(projectId ? { projectId } : {})
 				});
-				if (!gate.ok) {
-					memoryLog('supermemory.forget_denied', { reason: gate.reason });
-					return { ok: false as const, reason: gate.reason };
-				}
-				const del = await deleteSupermemoryDocument(documentId);
-				if (!del.ok) {
-					return { ok: false as const, reason: del.error };
-				}
-				return { ok: true as const };
 			}
 		})
 	};
+}
+
+function semanticMemoryToolResult(
+	result:
+		| { status: 'synced'; documentId: string }
+		| { status: 'blocked'; reason: string }
+		| { status: 'disabled' }
+		| { status: 'failed'; error: string }
+) {
+	if (result.status === 'synced') return { ok: true as const, documentId: result.documentId };
+	if (result.status === 'disabled') {
+		return { ok: false as const, reason: 'Memory service is not configured.' };
+	}
+	if (result.status === 'failed') return { ok: false as const, reason: result.error };
+	return { ok: false as const, reason: result.reason };
 }
 
 async function syncArtifactMemoryForTool(convex: ConvexHttpClient, artifactId: Id<'artifacts'>) {

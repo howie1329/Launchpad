@@ -13,6 +13,8 @@ Launchpad is built for people who want the useful parts of product planning with
 - promote mature work into a project with its own threads and artifacts
 - review artifact history and restore older versions when needed
 - import external AI context into a project brief
+- connect external apps for selected chat tools and project activity capture
+- create Launchpad Actions that bring GitHub and Linear activity back into projects
 - keep AI usage bounded with daily spend caps
 - continue work with memory from artifacts, project context, and optional Supermemory recall
 
@@ -20,54 +22,65 @@ Launchpad is currently an active product build, not a static prototype. The main
 
 ## Core Experience
 
-| Area | What it does |
-| --- | --- |
-| Workspace | Signed-in shell for chats, projects, artifacts, settings, command palette, tabs, and notifications |
-| Threads | General or project-scoped conversations with persisted AI SDK-style messages |
-| Projects | Containers for related threads, artifacts, summaries, and imported context |
-| Artifacts | Markdown documents with version history, CodeMirror editing, Streamdown preview, and diff review |
-| External context imports | Review flow for turning pasted AI context into project material |
-| AI assistant | Streams through the Vercel AI SDK and can use workspace tools for artifacts, projects, memory, and search |
-| Memory | Convex artifacts remain canonical; Supermemory can add derived recall when configured |
-| Usage controls | Per-user daily AI cap, token/cost accounting, and workspace activity history |
+| Area                     | What it does                                                                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace                | Signed-in shell for chats, projects, artifacts, settings, command palette, tabs, and notifications                                     |
+| Threads                  | General or project-scoped conversations with persisted AI SDK-style messages                                                           |
+| Projects                 | Containers for related threads, artifacts, summaries, imported context, Launchpad Actions, and project activity                        |
+| Artifacts                | Markdown documents with version history, CodeMirror editing, Streamdown preview, and diff review                                       |
+| External context imports | Review flow for turning pasted AI context into project material                                                                        |
+| External app tools       | Composio-backed chat tools for selected connected apps such as GitHub, Linear, Slack, Gmail, Notion, Drive, Docs, Calendar, and Sheets |
+| Launchpad Actions        | Project-scoped GitHub and Linear triggers that record external activity back into Launchpad                                            |
+| AI assistant             | Streams through the Vercel AI SDK and can use workspace tools for artifacts, projects, memory, search, and connected apps              |
+| Memory                   | Convex artifacts remain canonical; Supermemory can add derived recall when configured                                                  |
+| Usage controls           | Per-user daily AI cap, token/cost accounting, user AI preferences, external app connections, account controls, and activity history    |
 
 ## Routes
 
-| Route | Purpose |
-| --- | --- |
-| `/` | Public marketing home |
-| `/auth` | Sign in and sign up with Convex Auth |
-| `/workspace` | Main workspace start surface |
-| `/workspace/thread/[threadId]` | Active chat thread |
-| `/workspace/project/[projectId]` | Project overview |
-| `/workspace/artifacts/[artifactId]` | Full-page artifact reader/editor/history |
-| `/workspace/imports/external-context/[draftId]` | External context import review |
-| `/workspace/settings` | User settings, AI preferences, daily cap, usage, and activity |
-| `/privacy`, `/terms`, `/support` | Public support and policy pages |
+| Route                                           | Purpose                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| `/`                                             | Public marketing home                                         |
+| `/auth`                                         | Sign in and sign up with Convex Auth                          |
+| `/workspace`                                    | Main workspace start surface                                  |
+| `/workspace/thread/[threadId]`                  | Active chat thread                                            |
+| `/workspace/project/[projectId]`                | Project overview                                              |
+| `/workspace/artifacts/[artifactId]`             | Full-page artifact reader/editor/history                      |
+| `/workspace/imports/external-context/[draftId]` | External context import review                                |
+| `/workspace/settings`                           | User settings, AI preferences, daily cap, usage, and activity |
+| `/privacy`, `/terms`, `/support`                | Public support and policy pages                               |
 
-Workspace APIs live under `/api/workspace/*` for chat streaming, promotion readiness, generated titles, artifact memory sync, and artifact deletion.
+Workspace APIs live under `/api/workspace/*`:
+
+| API area             | Routes                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Chat and AI          | `/api/workspace/chat`, `/api/workspace/thread/generate-title`, `/api/workspace/promotion-readiness`                  |
+| Artifacts and memory | `/api/workspace/artifacts/[artifactId]`, `/api/workspace/memory/artifact`                                            |
+| External app tools   | `/api/workspace/composio/apps`, `/api/workspace/composio/apps/connect`, `/api/workspace/composio/toolkits`           |
+| Launchpad Actions    | `/api/workspace/launchpad-actions`, `/api/workspace/launchpad-actions/[actionId]`, `/api/workspace/composio/webhook` |
+| Account management   | `/api/workspace/account/reset`, `/api/workspace/account/delete`                                                      |
 
 ## Stack
 
-| Layer | Technology |
-| --- | --- |
-| App | SvelteKit, Svelte 5, TypeScript |
-| UI | Tailwind CSS v4, shadcn-svelte/Bits UI primitives, Hugeicons |
-| Backend | Convex queries, mutations, realtime data, and Convex Auth |
-| Client data | `convex-svelte` |
-| AI | Vercel AI SDK with Vercel AI Gateway, OpenRouter, Groq, and NVIDIA NIM catalog entries |
-| Search | Tavily for optional web search/page extraction |
-| Memory | Supermemory for optional derived recall |
-| Artifacts | CodeMirror, Streamdown, `@pierre/diffs` |
+| Layer         | Technology                                                                             |
+| ------------- | -------------------------------------------------------------------------------------- |
+| App           | SvelteKit, Svelte 5, TypeScript                                                        |
+| UI            | Tailwind CSS v4, shadcn-svelte/Bits UI primitives, Hugeicons                           |
+| Backend       | Convex queries, mutations, realtime data, and Convex Auth                              |
+| Client data   | `convex-svelte`                                                                        |
+| AI            | Vercel AI SDK with Vercel AI Gateway, OpenRouter, Groq, and NVIDIA NIM catalog entries |
+| Search        | Tavily for optional web search/page extraction                                         |
+| External apps | Composio for selected chat app tools and Launchpad Actions                             |
+| Memory        | Supermemory for optional derived recall                                                |
+| Artifacts     | CodeMirror, Streamdown, `@pierre/diffs`                                                |
 
 ## Documentation
 
 - [Product summary](docs/product-summary.md) — investor/user-facing product snapshot
 - [Docs index](docs/index.md) — current documentation map
 - [Architecture](docs/architecture.md) — maintainer snapshot of routes, data, AI, memory, and env vars
-- [Design system](docs/DESIGN-SYSTEM.md) — UI rules for app shell, navigation, controls, motion, and accessibility
+- [Design system](DESIGN.md) — UI rules for app shell, navigation, controls, motion, and accessibility
 - [Stack guidance](docs/STACK.md) — SvelteKit-specific implementation guidance
-- [Code quality](docs/CODE-QUALITY.md), [workflows](docs/WORKFLOWS.md), and [handoff guide](docs/CHANGE-EXPLANATION.md) — contributor and agent operating docs
+- [Code quality](docs/CODE-QUALITY.md) and [handoff guide](docs/CHANGE-EXPLANATION.md) — contributor and agent operating docs
 
 ## Developing
 
@@ -101,16 +114,20 @@ npm run build
 
 Set local values in `.env.local` or the deployment environment.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `PUBLIC_CONVEX_URL` | Yes | Convex deployment URL for browser and server HTTP clients |
-| `AI_GATEWAY_API_KEY` | Yes | Vercel AI Gateway key for default workspace chat, title generation, and promotion readiness |
-| `OPENROUTER_API_KEY` | Optional | Enables OpenRouter catalog models |
-| `GROQ_API_KEY` | Optional | Enables Groq catalog models |
-| `NIM_API_KEY` | Optional | Enables NVIDIA NIM catalog models |
-| `TAVILY_API_KEY` | Optional | Enables workspace chat web search and page extraction |
-| `SUPERMEMORY_API_KEY` | Optional | Enables Supermemory retrieval, profile context, and artifact memory sync |
-| `CONVEX_SITE_URL` | Deployment | Convex Auth site URL for deployed auth configuration |
+| Variable                  | Required         | Purpose                                                                                      |
+| ------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`       | Yes              | Convex deployment URL for browser and server HTTP clients                                    |
+| `AI_GATEWAY_API_KEY`      | Yes              | Vercel AI Gateway key for default workspace chat, title generation, and promotion readiness  |
+| `OPENROUTER_API_KEY`      | Optional         | Enables OpenRouter catalog models                                                            |
+| `GROQ_API_KEY`            | Optional         | Enables Groq catalog models                                                                  |
+| `NIM_API_KEY`             | Optional         | Enables NVIDIA NIM catalog models                                                            |
+| `TAVILY_API_KEY`          | Optional         | Enables workspace chat web search and page extraction                                        |
+| `SUPERMEMORY_API_KEY`     | Optional         | Enables Supermemory retrieval, profile context, and artifact memory sync                     |
+| `COMPOSIO_API_KEY`        | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |
+| `COMPOSIO_WEBHOOK_SECRET` | Optional         | Verifies Composio webhook deliveries for Launchpad Actions; set in SvelteKit and Convex envs |
+| `CONVEX_SITE_URL`         | Deployment       | Convex Auth site URL for deployed auth configuration                                         |
+| `PUBLIC_CONVEX_SITE_URL`  | Optional         | Public Convex site URL when client-facing site routes need it                                |
+| `CONVEX_DEPLOYMENT`       | Local Convex dev | Convex deployment identifier managed by `convex dev`                                         |
 
 Convex deployment configuration follows the Convex environment variable model. Never commit API keys, private `.env` files, or local tokens.
 

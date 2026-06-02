@@ -21,7 +21,6 @@
 		value,
 		compact = false,
 		readMode,
-		saveState = 'saved',
 		saveError = '',
 		onChange
 	}: {
@@ -29,7 +28,6 @@
 		value: string;
 		compact?: boolean;
 		readMode: 'editor' | 'preview';
-		saveState?: 'clean' | 'dirty' | 'saving' | 'saved';
 		saveError?: string;
 		onChange: (nextValue: string) => void;
 	} = $props();
@@ -50,13 +48,6 @@
 	let scrollToLine = $state<number | null>(null);
 
 	const showOutline = $derived(readMode === 'editor' && headings.length > 1 && !compact);
-	const saveStateLabel = $derived.by(() => {
-		if (saveError) return 'Save failed';
-		if (saveState === 'saving') return 'Saving...';
-		if (saveState === 'dirty') return 'Unsaved changes';
-		return 'Saved';
-	});
-
 	function jumpToHeading(line: number) {
 		scrollToLine = line;
 		requestAnimationFrame(() => {
@@ -65,20 +56,15 @@
 	}
 </script>
 
-<div class="min-h-0 flex-1 space-y-2">
+<div class="min-h-0 flex-1 space-y-3">
 	{#if readMode === 'editor'}
 		<div class="flex items-center justify-between gap-3 px-1">
-			<p
-				class={cn(
-					'text-xs',
-					saveError
-						? 'text-destructive'
-						: saveState === 'dirty'
-							? 'text-foreground'
-							: 'text-muted-foreground'
-				)}
-			>
-				{saveStateLabel}
+			<p class="text-xs leading-5 text-muted-foreground">
+				Edit the markdown source. Use <kbd
+					class="rounded border border-border px-1 py-0.5 font-mono text-[10px]">Cmd</kbd
+				>
+				or <kbd class="rounded border border-border px-1 py-0.5 font-mono text-[10px]">Ctrl</kbd> +
+				<kbd class="rounded border border-border px-1 py-0.5 font-mono text-[10px]">S</kbd> to save.
 			</p>
 			{#if showOutline}
 				<button
@@ -94,7 +80,7 @@
 		<div
 			class={cn('grid min-h-0 gap-4', showOutline && outlineOpen ? 'lg:grid-cols-[1fr_14rem]' : '')}
 		>
-			<div class={compact ? 'min-h-[12rem]' : 'min-h-[24rem]'}>
+			<div class={compact ? 'min-h-[12rem]' : 'min-h-[calc(100vh-17rem)]'}>
 				{#key artifactId}
 					<ArtifactCodeEditor
 						{value}
@@ -129,15 +115,24 @@
 	{:else}
 		<div
 			class={cn(
-				'overflow-y-auto bg-background px-4 py-3 text-foreground',
-				compact ? 'min-h-[12rem]' : 'min-h-[18rem]'
+				'overflow-y-auto rounded-lg border border-border/70 bg-background text-foreground',
+				compact ? 'min-h-[12rem] px-4 py-3' : 'min-h-[calc(100vh-16rem)] px-5 py-6'
 			)}
 		>
 			{#if value.trim().length === 0}
-				<p class="text-xs text-muted-foreground">Nothing to preview yet.</p>
+				<div class="flex min-h-48 items-center justify-center text-center">
+					<div>
+						<p class="text-sm font-medium text-foreground">Nothing to preview yet</p>
+						<p class="mt-1 text-xs leading-5 text-muted-foreground">
+							Switch to Edit and add markdown to build this artifact.
+						</p>
+					</div>
+				</div>
 			{:else}
 				{#key artifactId}
-					<div class="prose max-w-none text-foreground">
+					<div
+						class="mx-auto prose prose-sm max-w-3xl text-foreground prose-headings:text-balance prose-p:text-pretty"
+					>
 						<Streamdown
 							content={value}
 							baseTheme="shadcn"
@@ -166,6 +161,6 @@
 		</div>
 	{/if}
 	{#if saveError}
-		<p class="mt-2 text-xs text-destructive">{saveError}</p>
+		<p class="mt-2 text-xs text-destructive" role="status">{saveError}</p>
 	{/if}
 </div>

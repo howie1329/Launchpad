@@ -66,6 +66,7 @@
 		type PromptInputMessage
 	} from '$lib/components/ai-elements/prompt-input';
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
 	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
@@ -92,11 +93,14 @@
 	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
 	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
 	import {
+		Add01Icon,
 		ArrowDown01Icon,
 		ArrowUp01Icon,
 		Cancel01Icon,
+		File01Icon,
 		GlobeIcon,
-		Loading03Icon
+		Loading03Icon,
+		Plug02Icon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Chat } from '@ai-sdk/svelte';
@@ -116,6 +120,13 @@
 	let modelSelectorOpen = $state(false);
 	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId);
 	let webSearchRequested = $state(false);
+	let composioPickerOpen = $state(false);
+	let composioToolkitsLoading = $state(false);
+	let composioToolkitsError = $state('');
+	let composioToolkitsAvailable = $state(false);
+	let composioToolkitsLoadedForThread = $state('');
+	let composioToolkits = $state<ComposioToolkitStatus[]>([]);
+	let selectedComposioToolkits = $state<AllowedComposioToolkit[]>([]);
 	let chatError = $state('');
 	let saveError = $state('');
 	let copiedMessageId = $state('');
@@ -127,6 +138,36 @@
 	let contextDateSort = $state<'newest' | 'oldest'>('newest');
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
 	let mediaMinLg = $state(false);
+
+	type AllowedComposioToolkit =
+		| 'github'
+		| 'linear'
+		| 'slack'
+		| 'gmail'
+		| 'notion'
+		| 'googledrive'
+		| 'googledocs'
+		| 'googlecalendar'
+		| 'googlesheets';
+	type ComposioToolkitStatus = {
+		slug: AllowedComposioToolkit;
+		name: string;
+		logo?: string;
+		connected: boolean;
+		connectionStatus?: string;
+	};
+
+	const fallbackComposioToolkits: ComposioToolkitStatus[] = [
+		{ slug: 'github', name: 'GitHub', connected: false },
+		{ slug: 'linear', name: 'Linear', connected: false },
+		{ slug: 'slack', name: 'Slack', connected: false },
+		{ slug: 'gmail', name: 'Gmail', connected: false },
+		{ slug: 'notion', name: 'Notion', connected: false },
+		{ slug: 'googledrive', name: 'Google Drive', connected: false },
+		{ slug: 'googledocs', name: 'Google Docs', connected: false },
+		{ slug: 'googlecalendar', name: 'Google Calendar', connected: false },
+		{ slug: 'googlesheets', name: 'Google Sheets', connected: false }
+	];
 
 	/** @artifact mention picker (thread-linked artifacts only) */
 	let mentionOpen = $state(false);
@@ -191,6 +232,37 @@
 
 		return rows;
 	});
+	const linkedArtifactCount = $derived(threadArtifacts.data?.length ?? 0);
+	const visibleComposioToolkits = $derived(
+		composioToolkits.length > 0 ? composioToolkits : fallbackComposioToolkits
+	);
+	const connectedComposioToolkits = $derived(
+		visibleComposioToolkits.filter((toolkit) => toolkit.connected)
+	);
+	const disconnectedComposioToolkits = $derived(
+		visibleComposioToolkits.filter((toolkit) => !toolkit.connected)
+	);
+	const orderedComposioToolkits = $derived([
+		...connectedComposioToolkits,
+		...disconnectedComposioToolkits
+	]);
+	const selectedComposioToolkitRows = $derived(
+		selectedComposioToolkits.map(
+			(slug) =>
+				visibleComposioToolkits.find((toolkit) => toolkit.slug === slug) ?? toolkitFallback(slug)
+		)
+	);
+	const composioScopeLabel = $derived(
+		selectedComposioToolkits.length > 0
+			? `Only ${selectedComposioToolkits.length} selected ${selectedComposioToolkits.length === 1 ? 'app' : 'apps'}`
+			: 'All app tools'
+	);
+	const availableProjectArtifactCount = $derived(
+		(mentionableArtifacts.data ?? []).filter((item) => !item.linkedToThread).length
+	);
+	const contextHasFilters = $derived(
+		Boolean(contextSearch.trim()) || contextTypeFilter !== 'all' || contextDateSort !== 'newest'
+	);
 	const mentionListboxId = $derived(
 		activeThreadId
 			? `workspace-thread-mention-listbox-${activeThreadId}`
@@ -215,6 +287,19 @@
 		if (!mentionOpen) return;
 		void mentionFilter;
 		mentionHighlight = 0;
+	});
+
+	$effect(() => {
+		void activeThreadId;
+		selectedComposioToolkits = [];
+		composioPickerOpen = false;
+		composioToolkitsError = '';
+	});
+
+	$effect(() => {
+		if (!composioPickerOpen || !activeThreadId) return;
+		if (composioToolkitsLoadedForThread === activeThreadId || composioToolkitsLoading) return;
+		void loadComposioToolkits();
 	});
 	const selectedThreadArtifact = $derived(
 		contextArtifactId
@@ -383,6 +468,30 @@
 		mentionChips = mentionChips.filter((c) => c.id !== artifactId);
 	}
 
+	function clearContextFilters() {
+		contextSearch = '';
+		contextTypeFilter = 'all';
+		contextDateSort = 'newest';
+	}
+
+	function requestCreateArtifact() {
+		if (!browser) return;
+		window.dispatchEvent(new CustomEvent('launchpad:create-artifact'));
+	}
+
+	function citeArtifact(artifactId: string, title: string) {
+		if (!mentionChips.some((chip) => chip.id === artifactId)) {
+			mentionChips = [...mentionChips, { id: artifactId, title }];
+		}
+		focusComposer();
+	}
+
+	function linkReasonLabel(reason: string) {
+		if (reason === 'created') return 'Created here';
+		if (reason === 'imported') return 'Imported';
+		return 'Referenced';
+	}
+
 	async function pickArtifactMention(item: MentionableArtifact) {
 		const el = textareaRef;
 		if (!el) return;
@@ -406,6 +515,79 @@
 		focusComposer();
 	};
 
+	async function loadComposioToolkits() {
+		if (!activeThreadId || !auth.token) return;
+
+		composioToolkitsLoading = true;
+		composioToolkitsError = '';
+		try {
+			const response = await fetch(
+				`/api/workspace/composio/toolkits?threadId=${encodeURIComponent(activeThreadId)}`,
+				{ headers: authHeaders() }
+			);
+			const data = (await response.json()) as {
+				available?: boolean;
+				toolkits?: ComposioToolkitStatus[];
+				error?: string;
+			};
+
+			if (!response.ok) {
+				throw new Error(data.error ?? 'Could not load app tools.');
+			}
+
+			composioToolkitsAvailable = data.available === true;
+			composioToolkits = normalizeComposioToolkits(data.toolkits);
+			composioToolkitsLoadedForThread = activeThreadId;
+			if (!composioToolkitsAvailable) {
+				selectedComposioToolkits = [];
+			}
+		} catch (error) {
+			console.error(error);
+			composioToolkitsError = 'External app tools are unavailable.';
+			composioToolkitsAvailable = false;
+			composioToolkits = [];
+			selectedComposioToolkits = [];
+		} finally {
+			composioToolkitsLoading = false;
+		}
+	}
+
+	function normalizeComposioToolkits(value: unknown): ComposioToolkitStatus[] {
+		if (!Array.isArray(value)) return [];
+		return value.filter(isComposioToolkitStatus);
+	}
+
+	function isComposioToolkitStatus(value: unknown): value is ComposioToolkitStatus {
+		if (!value || typeof value !== 'object') return false;
+		const row = value as Partial<ComposioToolkitStatus>;
+		return isAllowedComposioToolkit(row.slug) && typeof row.name === 'string';
+	}
+
+	function isAllowedComposioToolkit(value: unknown): value is AllowedComposioToolkit {
+		return fallbackComposioToolkits.some((toolkit) => toolkit.slug === value);
+	}
+
+	function toolkitFallback(slug: AllowedComposioToolkit): ComposioToolkitStatus {
+		return (
+			fallbackComposioToolkits.find((toolkit) => toolkit.slug === slug) ??
+			fallbackComposioToolkits[0]
+		);
+	}
+
+	function clearComposioToolkits() {
+		if (isChatBusy) return;
+		selectedComposioToolkits = [];
+		focusComposer();
+	}
+
+	function toggleComposioToolkit(slug: AllowedComposioToolkit) {
+		if (!composioToolkitsAvailable || isChatBusy) return;
+		selectedComposioToolkits = selectedComposioToolkits.includes(slug)
+			? selectedComposioToolkits.filter((item) => item !== slug)
+			: [...selectedComposioToolkits, slug];
+		focusComposer();
+	}
+
 	const submitMessage = async (message: PromptInputMessage) => {
 		const prose = message.text.trim();
 		const outgoing = buildOutgoingUserMessageWithTokens(
@@ -420,6 +602,7 @@
 		const prevProse = prose;
 		const prevChips = mentionChips.slice();
 		const prevWebSearchRequested = webSearchRequested;
+		const prevComposioToolkits = selectedComposioToolkits.slice();
 
 		try {
 			if (activeThreadId) {
@@ -437,6 +620,7 @@
 			composerText = prevProse;
 			mentionChips = prevChips;
 			webSearchRequested = prevWebSearchRequested;
+			selectedComposioToolkits = prevComposioToolkits;
 			chatError = buildChatErrorMessage(error);
 			throw error;
 		}
@@ -445,6 +629,7 @@
 	async function submitChoiceAnswer(answer: string) {
 		if (!chat || isChatBusy) return;
 		const prevWebSearchRequested = webSearchRequested;
+		const prevComposioToolkits = selectedComposioToolkits.slice();
 		chatError = '';
 		saveError = '';
 		try {
@@ -453,6 +638,7 @@
 		} catch (error) {
 			console.error(error);
 			webSearchRequested = prevWebSearchRequested;
+			selectedComposioToolkits = prevComposioToolkits;
 			chatError = buildChatErrorMessage(error);
 			throw error;
 		}
@@ -552,7 +738,8 @@
 						threadId,
 						modelId: selectedModelId,
 						messages,
-						webSearchRequested
+						webSearchRequested,
+						composioToolkits: selectedComposioToolkits
 					},
 					headers: authHeaders()
 				})
@@ -907,40 +1094,97 @@
 						/>
 					{:else}
 						<div class="flex min-h-0 flex-1 flex-col">
-							<div class="shrink-0 space-y-2 border-b border-border/50 px-3 py-3">
-								<div>
-									<p class="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-										Chat context
-									</p>
-									<p class="mt-1 text-[11px] text-muted-foreground">
-										Artifacts linked to this thread.
-									</p>
+							<div class="shrink-0 border-b border-border/50">
+								<div class="space-y-3 px-3 py-3">
+									<div class="flex items-start justify-between gap-3">
+										<div class="min-w-0">
+											<p class="text-sm font-semibold tracking-tight">Thread context</p>
+											<p class="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+												Durable artifacts and project context available to this chat.
+											</p>
+										</div>
+										<div
+											class="shrink-0 rounded-md border border-border/60 bg-muted/35 px-2 py-1 text-right"
+										>
+											<p class="text-[11px] leading-none font-semibold">{linkedArtifactCount}</p>
+											<p class="mt-0.5 text-[10px] leading-none text-muted-foreground">linked</p>
+										</div>
+									</div>
+
+									<div class="grid grid-cols-2 gap-2">
+										<div class="rounded-md border border-border/60 bg-muted/25 px-2 py-2">
+											<p class="text-[10px] leading-none font-medium text-muted-foreground">
+												Thread artifacts
+											</p>
+											<p class="mt-1 text-sm leading-none font-semibold">{linkedArtifactCount}</p>
+										</div>
+										<div class="rounded-md border border-border/60 bg-muted/25 px-2 py-2">
+											<p class="text-[10px] leading-none font-medium text-muted-foreground">
+												Project context
+											</p>
+											<p class="mt-1 text-sm leading-none font-semibold">
+												{availableProjectArtifactCount}
+											</p>
+										</div>
+									</div>
+
+									<div class="flex flex-wrap gap-2">
+										<Button
+											type="button"
+											variant="secondary"
+											size="sm"
+											class="h-7 gap-1.5 px-2 text-xs"
+											onclick={requestCreateArtifact}
+										>
+											<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
+											Create artifact
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											class="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+											onclick={focusComposer}
+										>
+											<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3" />
+											Cite with @
+										</Button>
+									</div>
 								</div>
-								<Input
-									bind:value={contextSearch}
-									type="search"
-									placeholder="Search title or type"
-									class="h-7 text-xs"
-								/>
-								<div class="grid grid-cols-2 gap-2">
-									<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
-										<NativeSelectOption value="all">All types</NativeSelectOption>
-										{#each contextArtifactTypes as type (type)}
-											<NativeSelectOption value={type}>{artifactTypeLabel(type)}</NativeSelectOption
-											>
-										{/each}
-									</NativeSelect>
-									<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
-										<NativeSelectOption value="newest">Newest first</NativeSelectOption>
-										<NativeSelectOption value="oldest">Oldest first</NativeSelectOption>
-									</NativeSelect>
+
+								<div class="space-y-2 border-t border-border/40 px-3 py-3">
+									<Input
+										bind:value={contextSearch}
+										type="search"
+										placeholder="Search title or type"
+										class="h-7 text-xs"
+									/>
+									<div class="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
+										<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
+											<NativeSelectOption value="all">All types</NativeSelectOption>
+											{#each contextArtifactTypes as type (type)}
+												<NativeSelectOption value={type}
+													>{artifactTypeLabel(type)}</NativeSelectOption
+												>
+											{/each}
+										</NativeSelect>
+										<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
+											<NativeSelectOption value="newest">Newest first</NativeSelectOption>
+											<NativeSelectOption value="oldest">Oldest first</NativeSelectOption>
+										</NativeSelect>
+									</div>
 								</div>
 							</div>
 
 							<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
 								{#if threadArtifacts.error}
-									<div class="space-y-2 px-2 py-2">
-										<p class="text-xs text-destructive">{threadArtifacts.error.message}</p>
+									<div
+										class="space-y-2 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-3"
+									>
+										<p class="text-xs font-medium text-destructive">Could not load context</p>
+										<p class="text-[11px] leading-4 text-muted-foreground">
+											The artifacts linked to this thread are unavailable right now.
+										</p>
 										<Button
 											type="button"
 											variant="secondary"
@@ -954,39 +1198,87 @@
 										</Button>
 									</div>
 								{:else if threadArtifacts.data === undefined}
-									<p class="px-2 py-1.5 text-xs text-muted-foreground">Loading artifacts...</p>
+									<div class="space-y-1.5 px-1 py-1" aria-label="Loading thread context">
+										<div class="h-12 rounded-md bg-muted/60"></div>
+										<div class="h-12 rounded-md bg-muted/45"></div>
+										<div class="h-12 rounded-md bg-muted/35"></div>
+									</div>
 								{:else}
 									<div class="space-y-3">
 										{#if threadArtifacts.data.length === 0}
-											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-												No artifacts in this chat yet. Ask Launchpad to save an idea or draft a PRD
-												when the shape is clear.
-											</p>
+											<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+												<p class="text-xs font-medium">No saved context yet</p>
+												<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+													Saved ideas, PRDs, notes, and decisions from this chat will appear here.
+												</p>
+												<Button
+													type="button"
+													variant="secondary"
+													size="sm"
+													class="mt-3 h-7 gap-1.5 px-2 text-xs"
+													onclick={requestCreateArtifact}
+												>
+													<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
+													Create artifact
+												</Button>
+											</div>
 										{:else if filteredContextArtifacts.length === 0}
-											<p class="px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-												No artifacts match those filters.
-											</p>
+											<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
+												<p class="text-xs font-medium">No matching artifacts</p>
+												<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
+													Try another title, type, or sort order.
+												</p>
+												{#if contextHasFilters}
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														class="mt-3 h-7 px-2 text-xs"
+														onclick={clearContextFilters}
+													>
+														Clear filters
+													</Button>
+												{/if}
+											</div>
 										{:else}
 											<div class="space-y-1">
 												{#each filteredContextArtifacts as item (item.link._id)}
-													<button
-														type="button"
-														class="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-														onclick={() => openThreadArtifact(item.artifact._id)}
+													<div
+														class="group/context-row flex min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors focus-within:bg-accent/45 hover:bg-accent/45"
 													>
-														<span class="size-1.5 shrink-0 rounded-full bg-primary/70"></span>
-														<span
-															class="min-w-0 flex-1 truncate text-xs font-medium tracking-tight"
+														<button
+															type="button"
+															class="flex min-w-0 flex-1 items-start gap-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+															onclick={() => openThreadArtifact(item.artifact._id)}
 														>
-															{item.artifact.title}
-														</span>
-														<span class="shrink-0 text-[10px] text-muted-foreground">
-															{artifactTypeLabel(item.artifact.type)}
-														</span>
-														<span class="shrink-0 text-[10px] text-muted-foreground">
-															{formatArtifactCreatedAt(item.artifact.createdAt)}
-														</span>
-													</button>
+															<span
+																class="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/70"
+																aria-hidden="true"
+															></span>
+															<span class="min-w-0 flex-1">
+																<span class="block truncate text-xs font-medium tracking-tight">
+																	{item.artifact.title}
+																</span>
+																<span
+																	class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] leading-3 text-muted-foreground"
+																>
+																	<span>{artifactTypeLabel(item.artifact.type)}</span>
+																	<span>{linkReasonLabel(item.link.reason)}</span>
+																	<span>{formatArtifactCreatedAt(item.artifact.createdAt)}</span>
+																</span>
+															</span>
+														</button>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground opacity-100 sm:opacity-0 sm:group-focus-within/context-row:opacity-100 sm:group-hover/context-row:opacity-100"
+															aria-label={`Cite ${item.artifact.title}`}
+															onclick={() => citeArtifact(item.artifact._id, item.artifact.title)}
+														>
+															Cite
+														</Button>
+													</div>
 												{/each}
 											</div>
 										{/if}
@@ -1119,11 +1411,26 @@
 							clearOnSubmit={false}
 							onSubmit={submitMessage}
 						>
-							{#if mentionChips.length > 0}
+							{#if mentionChips.length > 0 || selectedComposioToolkitRows.length > 0}
 								<div
 									class="flex flex-wrap gap-1.5 px-3 pt-2"
-									aria-label="Artifacts to include in this message"
+									aria-label="Context and app tools to include in this message"
 								>
+									{#each selectedComposioToolkitRows as toolkit (toolkit.slug)}
+										<span class={artifactMentionPill}>
+											<span class="size-1.5 shrink-0 rounded-full bg-sky-500/80" aria-hidden="true"
+											></span>
+											<span class="max-w-40 min-w-0 truncate">{toolkit.name}</span>
+											<button
+												type="button"
+												class="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+												aria-label={`Remove ${toolkit.name} app tools`}
+												onclick={() => toggleComposioToolkit(toolkit.slug)}
+											>
+												<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} class="size-3" />
+											</button>
+										</span>
+									{/each}
 									{#each mentionChips as chip (chip.id)}
 										<span class={artifactMentionPill}>
 											<span class="size-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden="true"
@@ -1156,6 +1463,118 @@
 							/>
 							<PromptInputToolbar class="gap-2 px-3 py-2">
 								<PromptInputTools class="min-w-0 flex-1 flex-wrap">
+									<DropdownMenu.Root bind:open={composioPickerOpen}>
+										<DropdownMenu.Trigger
+											type="button"
+											class={cn(
+												'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+												selectedComposioToolkits.length > 0
+													? 'bg-muted text-foreground'
+													: 'text-muted-foreground hover:bg-muted hover:text-foreground'
+											)}
+											disabled={isChatBusy}
+											aria-label={`Select external app tools. ${composioScopeLabel}`}
+										>
+											<HugeiconsIcon
+												icon={Plug02Icon}
+												strokeWidth={2}
+												class="size-3"
+												aria-hidden="true"
+											/>
+											<span>Apps</span>
+											{#if selectedComposioToolkits.length > 0}
+												<span
+													class="rounded-sm bg-background/80 px-1 text-[10px] leading-4 text-muted-foreground ring-1 ring-border/70"
+													aria-label={`${selectedComposioToolkits.length} selected apps`}
+												>
+													{selectedComposioToolkits.length}
+												</span>
+											{/if}
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Content align="start" class="w-72 max-w-[calc(100vw-1rem)] p-1.5">
+											<div class="px-2 py-1.5">
+												<div class="flex items-start justify-between gap-3">
+													<div class="min-w-0 space-y-0.5">
+														<DropdownMenu.Label class="p-0 text-xs font-semibold text-foreground">
+															Apps
+														</DropdownMenu.Label>
+														<p class="text-[11px] leading-4 text-muted-foreground">
+															{#if selectedComposioToolkits.length > 0}
+																Only selected apps are available.
+															{:else}
+																All app tools are available.
+															{/if}
+														</p>
+													</div>
+													{#if selectedComposioToolkits.length > 0}
+														<button
+															type="button"
+															class="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+															onclick={clearComposioToolkits}
+														>
+															Use all apps
+														</button>
+													{/if}
+												</div>
+											</div>
+											<DropdownMenu.Separator />
+											{#if composioToolkitsLoading}
+												<div class="space-y-1 px-1 py-1.5" aria-label="Loading apps">
+													{#each Array.from({ length: 4 }, (_, index) => index) as index (index)}
+														<div class="flex h-8 items-center gap-2 rounded-md px-2">
+															<span class="size-4 rounded-sm bg-muted"></span>
+															<span class="h-3 w-24 rounded bg-muted"></span>
+															<span class="ml-auto h-3 w-14 rounded bg-muted"></span>
+														</div>
+													{/each}
+												</div>
+											{:else if composioToolkitsError}
+												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
+													{composioToolkitsError}
+												</div>
+											{:else if !composioToolkitsAvailable && composioToolkitsLoadedForThread === activeThreadId}
+												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
+													Apps are not configured.
+												</div>
+											{:else if orderedComposioToolkits.length === 0}
+												<div class="px-2 py-3 text-xs leading-5 text-muted-foreground">
+													No app tools are available.
+												</div>
+											{:else}
+												<div class="max-h-72 overflow-y-auto py-1">
+													{#each orderedComposioToolkits as toolkit (toolkit.slug)}
+														<DropdownMenu.CheckboxItem
+															checked={selectedComposioToolkits.includes(toolkit.slug)}
+															disabled={!composioToolkitsAvailable || isChatBusy}
+															class="min-h-8 gap-2 pr-7 pl-2"
+															onSelect={(event) => event.preventDefault()}
+															onclick={() => toggleComposioToolkit(toolkit.slug)}
+														>
+															<span class="flex min-w-0 flex-1 items-center gap-2">
+																<span class="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted ring-1 ring-border/70">
+																	{#if toolkit.logo}
+																		<img src={toolkit.logo} alt="" class="size-3.5 rounded-[3px]" />
+																	{:else}
+																		<span class="size-1.5 rounded-full bg-muted-foreground/60" aria-hidden="true"
+																		></span>
+																	{/if}
+																</span>
+																<span class="truncate font-medium">{toolkit.name}</span>
+															</span>
+															<span
+																class={cn(
+																	'shrink-0 text-[10px]',
+																	toolkit.connected ? 'text-muted-foreground' : 'text-muted-foreground/80'
+																)}
+															>
+																{toolkit.connected ? 'Connected' : 'Connect if needed'}
+															</span>
+														</DropdownMenu.CheckboxItem>
+													{/each}
+												</div>
+											{/if}
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
 									<button
 										type="button"
 										class={cn(

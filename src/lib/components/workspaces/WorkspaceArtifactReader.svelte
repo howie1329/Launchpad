@@ -84,7 +84,17 @@
 			artifact.revision > editorBaseRevision
 		)
 	);
-	const saveState = $derived(isSaving ? 'saving' : contentDirty ? 'dirty' : 'saved');
+	const updatedAtLabel = $derived(
+		artifact
+			? new Date(artifact.updatedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+			: ''
+	);
+	const saveStateLabel = $derived.by(() => {
+		if (saveError) return 'Save failed';
+		if (isSaving) return 'Saving…';
+		if (contentDirty) return 'Unsaved changes';
+		return 'Saved';
+	});
 
 	$effect(() => {
 		if (artifact === undefined || artifact === null) {
@@ -99,7 +109,7 @@
 			contentDirty = false;
 			saveError = '';
 			surfaceMode = initialSelectedVersionNumber ? 'history' : 'read';
-			readMode = 'editor';
+			readMode = fullWidthContent ? 'preview' : 'editor';
 			selectedVersionId = null;
 			compareBaseVersionId = null;
 			editorBaseRevision = artifact.revision;
@@ -358,38 +368,116 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+			<header class="shrink-0 border-b border-border/70 bg-background px-4 py-2">
+				<div
+					class={fullWidthContent
+						? 'mx-auto flex max-w-6xl flex-wrap items-center gap-2'
+						: 'flex flex-wrap items-center gap-2'}
+				>
+					<div class="flex min-w-0 flex-1 items-center gap-2">
+						<h1 class="truncate text-sm font-semibold tracking-tight">{artifact.title}</h1>
+						<span class="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-foreground">
+							{artifact.type}
+						</span>
+						<span class="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
+							Revision {artifact.revision}
+						</span>
+						<span class="hidden min-w-0 truncate text-[11px] text-muted-foreground xl:inline">
+							Updated {updatedAtLabel}
+						</span>
+					</div>
+
+					<div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+						<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
+							<Button
+								type="button"
+								size="sm"
+								variant={surfaceMode === 'read' ? 'secondary' : 'ghost'}
+								class="h-7 rounded-sm px-2.5 text-xs font-medium"
+								onclick={setReadSurface}
+							>
+								Document
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								variant={surfaceMode === 'history' ? 'secondary' : 'ghost'}
+								class="h-7 rounded-sm px-2.5 text-xs font-medium"
+								disabled={!canShowHistory}
+								onclick={setHistorySurface}
+							>
+								History
+							</Button>
+						</div>
+
+						{#if surfaceMode === 'read'}
+							<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
+								<Button
+									type="button"
+									size="sm"
+									variant={readMode === 'preview' ? 'secondary' : 'ghost'}
+									class="h-7 rounded-sm px-2.5 text-xs font-medium"
+									onclick={setPreviewMode}
+								>
+									Preview
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									variant={readMode === 'editor' ? 'secondary' : 'ghost'}
+									class="h-7 rounded-sm px-2.5 text-xs font-medium"
+									onclick={setEditorMode}
+								>
+									Edit
+								</Button>
+							</div>
+						{/if}
+
+						<p
+							class={saveError
+								? 'text-xs text-destructive'
+								: contentDirty
+									? 'text-xs text-foreground'
+									: 'text-xs text-muted-foreground'}
+							role="status"
+						>
+							{saveStateLabel}
+						</p>
+						<Button
+							type="button"
+							variant="default"
+							size="sm"
+							class="h-7 gap-1.5 px-2.5 text-xs"
+							disabled={!canSave}
+							onclick={saveChanges}
+						>
+							<HugeiconsIcon icon={SaveIcon} strokeWidth={2} class="size-3.5" />
+							{isSaving ? 'Saving…' : 'Save'}
+						</Button>
+					</div>
+				</div>
+			</header>
+
 			<div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
 				<div
 					class={fullWidthContent
-						? 'space-y-6'
+						? 'mx-auto max-w-6xl space-y-6'
 						: compact
 							? 'space-y-5'
 							: 'mx-auto max-w-5xl space-y-6'}
 				>
 					{#if newerSavedVersionAvailable}
-						<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
-							<p class="text-sm font-medium text-foreground">A newer saved version exists</p>
+						<div class="rounded-lg border border-border/70 bg-muted/30 px-4 py-3">
+							<p class="text-sm font-medium text-foreground">A newer saved version is available</p>
 							<p class="mt-1 text-xs leading-5 text-muted-foreground">
-								Your unsaved editor changes are still here. Compare the latest saved version or
-								reload the editor when you are ready.
+								Review history before saving if this artifact was changed elsewhere. Your unsaved
+								editor changes are still here.
 							</p>
 							<div class="mt-3 flex flex-wrap gap-2">
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									class="h-7 px-2.5 text-xs"
-									onclick={viewLatestChanges}
-								>
-									View changes
+								<Button type="button" variant="secondary" size="sm" onclick={viewLatestChanges}>
+									Review history
 								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									class="h-7 px-2.5 text-xs"
-									onclick={reloadEditorToLatest}
-								>
+								<Button type="button" variant="ghost" size="sm" onclick={reloadEditorToLatest}>
 									Reload latest
 								</Button>
 							</div>
@@ -415,7 +503,6 @@
 								value={editorValue}
 								{compact}
 								{readMode}
-								{saveState}
 								{saveError}
 								onChange={(nextValue) => {
 									editorValue = nextValue;
@@ -426,46 +513,6 @@
 					</div>
 				</div>
 			</div>
-
-			{#if surfaceMode === 'read'}
-				<div
-					class="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-border/50 bg-background {compact
-						? 'px-2 py-1.5'
-						: 'px-4 py-1.5'}"
-				>
-					<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
-						<Button
-							type="button"
-							size="sm"
-							variant={readMode === 'editor' ? 'secondary' : 'ghost'}
-							class="h-7 rounded-sm px-2.5 text-xs font-medium"
-							onclick={setEditorMode}
-						>
-							Editor
-						</Button>
-						<Button
-							type="button"
-							size="sm"
-							variant={readMode === 'preview' ? 'secondary' : 'ghost'}
-							class="h-7 rounded-sm px-2.5 text-xs font-medium"
-							onclick={setPreviewMode}
-						>
-							Preview
-						</Button>
-					</div>
-					<Button
-						type="button"
-						variant="default"
-						size="sm"
-						class="h-7 gap-1.5 px-2.5 text-xs"
-						disabled={!canSave}
-						onclick={saveChanges}
-					>
-						<HugeiconsIcon icon={SaveIcon} strokeWidth={2} class="size-3.5" />
-						{isSaving ? 'Saving...' : 'Save'}
-					</Button>
-				</div>
-			{/if}
 		</div>
 	{/if}
 </section>

@@ -35,7 +35,7 @@
 	}: Props = $props();
 </script>
 
-<!-- Design system: ghost icon-only actions, size-8, 12px icons, tooltips (docs/DESIGN-SYSTEM.md §5). -->
+<!-- Design system: ghost icon-only actions, size-8, 12px icons, tooltips (DESIGN.md §5). -->
 <div
 	class={cn(
 		'flex flex-wrap items-center gap-0.5 pt-1',

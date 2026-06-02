@@ -1,7 +1,10 @@
 import { makeFunctionReference } from 'convex/server';
 import type { Id } from '../convex/_generated/dataModel';
 
-export type NotificationType = 'external_context_import' | 'ai_chat_activity';
+export type NotificationType =
+	| 'external_context_import'
+	| 'ai_chat_activity'
+	| 'external_project_activity';
 export type NotificationState = 'activity' | 'success' | 'failed' | 'in_progress';
 export type NotificationStatus = 'unread' | 'read' | 'dismissed' | 'deleted';
 export type NotificationTargetKind =

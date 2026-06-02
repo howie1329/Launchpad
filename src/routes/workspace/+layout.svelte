@@ -323,13 +323,17 @@
 		{ value: 'custom', label: 'Custom' }
 	] as const;
 
-	/** Design-system-aligned nav rows: dense, 12px icons */
+	/** Sidebar row vocabulary: compact, distinct roles, no new tokens. */
 	const navPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/72 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70';
+	const actionPill =
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/82 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground';
 	const sectionTrigger =
-		'group/section flex h-7 w-full items-center gap-1 rounded-full px-2 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
+		'group/section flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px] font-semibold text-sidebar-foreground/62 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
 	const subNavPill =
-		'h-7 min-w-0 gap-2 rounded-full px-2.5 text-xs text-sidebar-foreground/75 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70';
+	const footerPill =
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
 
 	const usageBarPct = $derived(
 		budget.data && budget.data.capUsd > 0
@@ -437,6 +441,34 @@
 		readinessIncludedArtifacts = [];
 	};
 
+	const selectedArtifactTypeLabel = $derived(
+		artifactTypePreset === 'custom'
+			? artifactCustomType.trim() || 'Custom type'
+			: (artifactTypePresets.find((preset) => preset.value === artifactTypePreset)?.label ?? 'Artifact')
+	);
+	const createArtifactDestination = $derived(
+		activeThreadId
+			? 'This will save to the workspace and link to the active chat.'
+			: activeProjectId
+				? 'This will save to the current project.'
+				: 'This will save to the workspace artifacts library.'
+	);
+	const isCreateArtifactDirty = $derived(
+		Boolean(
+			artifactTitle.trim() ||
+				artifactBody.trim() ||
+				artifactCustomType.trim() ||
+				artifactTypePreset !== 'notes'
+		)
+	);
+	const canCreateArtifact = $derived(
+		Boolean(
+			artifactTitle.trim() &&
+				artifactBody.trim() &&
+				(artifactTypePreset !== 'custom' || artifactCustomType.trim())
+		)
+	);
+
 	const openCreateArtifactDialog = () => {
 		artifactTitle = '';
 		artifactTypePreset = 'notes';
@@ -448,8 +480,21 @@
 
 	const closeCreateArtifactDialog = () => {
 		if (isCreatingArtifact) return;
+		if (isCreateArtifactDirty && !window.confirm('Discard this artifact draft?')) return;
 		createArtifactDialogOpen = false;
 		artifactCreateError = '';
+	};
+
+	const handleCreateArtifactKeydown = (event: KeyboardEvent) => {
+		if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && canCreateArtifact) {
+			event.preventDefault();
+			void createArtifact();
+		}
+	};
+
+	const handleCreateArtifactDismiss = (event: Event) => {
+		event.preventDefault();
+		closeCreateArtifactDialog();
 	};
 
 	const externalContextPrompt = `I want to import this project context into LaunchPad, a project-focused AI workspace.
@@ -1077,10 +1122,13 @@ Important rules:
 	>
 		<Sidebar.Root class="overflow-hidden" collapsible="icon">
 			<nav id="workspace-sidebar-nav" class="flex min-h-0 flex-1 flex-col" aria-label="Workspace">
-				<Sidebar.Header class="h-10 border-b border-border/50 px-2 py-1">
+				<Sidebar.Header class="flex h-10 items-center border-b border-sidebar-border/60 px-2 py-1">
 					<Sidebar.Menu class="flex flex-row items-center gap-1">
 						<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
-							<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
+							<Sidebar.MenuButton
+								size="sm"
+								class="h-8 min-w-0 gap-2 rounded-md px-1.5 text-sidebar-foreground group-data-[collapsible=icon]:px-0 hover:bg-sidebar-accent/55 hover:text-sidebar-accent-foreground"
+							>
 								{#snippet child({ props })}
 									<a
 										href={resolve(workspaceRootHref() as '/workspace')}
@@ -1094,10 +1142,16 @@ Important rules:
 										>
 											<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
 										</div>
-										<span
-											class="min-w-0 truncate font-semibold group-data-[collapsible=icon]:sr-only"
-											>{sidebarHomeDisplayLabel}</span
-										>
+										<span class="min-w-0 flex-1 group-data-[collapsible=icon]:sr-only">
+											<span
+												class="block text-[10px] leading-3 font-medium text-sidebar-foreground/60"
+											>
+												Current
+											</span>
+											<span class="block truncate text-xs leading-4 font-semibold">
+												{sidebarHomeDisplayLabel}
+											</span>
+										</span>
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>
@@ -1105,7 +1159,7 @@ Important rules:
 					</Sidebar.Menu>
 				</Sidebar.Header>
 
-				<Sidebar.Content>
+				<Sidebar.Content class="gap-1 py-1.5">
 					{#if workspaceListError}
 						<div
 							class="border-b border-destructive/25 bg-destructive/10 px-3 py-2.5 text-[11px] text-destructive"
@@ -1126,13 +1180,15 @@ Important rules:
 							</Button>
 						</div>
 					{/if}
-					<Sidebar.Group class="border-0 shadow-none ring-0">
-						<Sidebar.Menu>
+					<Sidebar.Group class="px-2 py-1 group-data-[collapsible=icon]:px-2">
+						<Sidebar.Menu
+							class="gap-1 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/25 p-1 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0"
+						>
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									size="sm"
 									isActive={isNewChatActive}
-									class={cn(navPill, 'min-w-0')}
+									class={cn(actionPill, 'min-w-0')}
 									tooltipContent="New chat"
 								>
 									{#snippet child({ props })}
@@ -1153,7 +1209,7 @@ Important rules:
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									size="sm"
-									class={cn(navPill, 'min-w-0')}
+									class={cn(actionPill, 'min-w-0')}
 									tooltipContent="Create artifact"
 									onclick={openCreateArtifactDialog}
 								>
@@ -1175,6 +1231,11 @@ Important rules:
 									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 								/>
 								<span class="min-w-0 truncate">Projects</span>
+								{#if projects.data && projects.data.length > 0}
+									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+										{projects.data.length}
+									</span>
+								{/if}
 							</Collapsible.Trigger>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
@@ -1190,8 +1251,8 @@ Important rules:
 										{:else if projects.data.length === 0}
 											<Sidebar.MenuItem>
 												<div class="space-y-2 px-2 py-1.5">
-													<p class="text-[11px] leading-snug text-sidebar-foreground/60">
-														Promote a useful chat when the idea is ready for focused work.
+													<p class="text-[11px] leading-snug text-sidebar-foreground/65">
+														Promoted chats land here when an idea becomes focused work.
 													</p>
 												</div>
 											</Sidebar.MenuItem>
@@ -1230,7 +1291,7 @@ Important rules:
 																<DropdownMenu.Root>
 																	<DropdownMenu.Trigger
 																		type="button"
-																		class="inline-flex size-7 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																		class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																		onclick={(e) => e.stopPropagation()}
 																		onpointerdown={(e) => e.stopPropagation()}
 																		aria-label={`Project actions: ${project.name}`}
@@ -1253,7 +1314,7 @@ Important rules:
 																<a
 																	href={resolve(workspaceProjectHref(project._id) as '/workspace')}
 																	data-workspace-nav-item
-																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 ring-sidebar-ring hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																	aria-label={`New chat in ${project.name}`}
 																>
 																	<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
@@ -1282,7 +1343,7 @@ Important rules:
 																					data-workspace-nav-item
 																					{...props}
 																				>
-																					<span class="text-sidebar-foreground/60">Start chat</span>
+																					<span class="text-sidebar-foreground/65">Start chat</span>
 																				</a>
 																			{/snippet}
 																		</Sidebar.MenuSubButton>
@@ -1316,7 +1377,7 @@ Important rules:
 																				<DropdownMenu.Root>
 																					<DropdownMenu.Trigger
 																						type="button"
-																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																						onclick={(e) => e.stopPropagation()}
 																						onpointerdown={(e) => e.stopPropagation()}
 																						aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -1365,6 +1426,11 @@ Important rules:
 									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 								/>
 								<span class="min-w-0 truncate">Inbox</span>
+								{#if threads.data && generalThreads.length > 0}
+									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+										{generalThreads.length}
+									</span>
+								{/if}
 							</Collapsible.Trigger>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
@@ -1380,8 +1446,8 @@ Important rules:
 										{:else if generalThreads.length === 0}
 											<Sidebar.MenuItem>
 												<div class="space-y-2 px-2 py-1.5">
-													<p class="text-[11px] leading-snug text-sidebar-foreground/60">
-														Start with a messy note. Launchpad will help turn it into a project.
+													<p class="text-[11px] leading-snug text-sidebar-foreground/65">
+														Start with a messy note, then promote it when it has shape.
 													</p>
 													<Sidebar.MenuButton size="sm" class={cn(navPill, 'min-w-0')}>
 														{#snippet child({ props })}
@@ -1422,7 +1488,7 @@ Important rules:
 														<DropdownMenu.Root>
 															<DropdownMenu.Trigger
 																type="button"
-																class="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-sidebar-foreground/75 opacity-0 ring-sidebar-ring group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
 																onclick={(e) => e.stopPropagation()}
 																onpointerdown={(e) => e.stopPropagation()}
 																aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -1458,6 +1524,11 @@ Important rules:
 									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 								/>
 								<span class="min-w-0 truncate">Artifacts</span>
+								{#if artifacts.data && artifacts.data.length > 0}
+									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+										{artifacts.data.length}
+									</span>
+								{/if}
 							</Collapsible.Trigger>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
@@ -1472,17 +1543,15 @@ Important rules:
 											</Sidebar.MenuItem>
 										{:else if artifacts.data.length === 0}
 											<Sidebar.MenuItem>
-												<p class="px-2 py-1.5 text-[11px] leading-snug text-sidebar-foreground/60">
-													Artifacts appear when a chat saves an idea, PRD, or draftable document.
+												<p class="px-2 py-1.5 text-[11px] leading-snug text-sidebar-foreground/65">
+													Saved ideas, PRDs, notes, and research appear here.
 												</p>
 											</Sidebar.MenuItem>
 										{:else}
 											{#each artifactGroups as group (group.key)}
 												{#if group.artifacts.length > 0}
 													<li class="list-none px-2 pt-2 pb-0.5 first:pt-0" role="presentation">
-														<p
-															class="text-[11px] font-medium tracking-wide text-sidebar-foreground/55 uppercase"
-														>
+														<p class="text-[10px] font-semibold text-sidebar-foreground/55">
 															{group.label}
 														</p>
 													</li>
@@ -1543,20 +1612,20 @@ Important rules:
 							<a
 								href={resolve(workspaceSettingsHref() as '/workspace/settings')}
 								data-workspace-nav-item
-								class="mb-2 block rounded-full px-2.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+								class="mb-2 block rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 px-2.5 py-2 transition-colors outline-none hover:bg-sidebar-accent/40 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 								aria-label={usageTooltip}
 							>
 								<div
-									class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/60"
+									class="mb-1.5 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/65"
 								>
-									<span class="font-medium tracking-wide uppercase">AI today</span>
+									<span class="font-semibold">AI today</span>
 									<span class="text-sidebar-foreground/75 tabular-nums">
 										{money.format(budget.data.spentUsd)} / {money.format(budget.data.capUsd)}
 									</span>
 								</div>
-								<div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+								<div class="h-1 w-full overflow-hidden rounded-full bg-sidebar-border/70">
 									<div
-										class="h-full rounded-full bg-primary transition-[width]"
+										class="h-full rounded-full bg-sidebar-foreground/75 transition-[width]"
 										style="width: {usageBarPct}%"
 									></div>
 								</div>
@@ -1577,7 +1646,7 @@ Important rules:
 								</Button>
 							</div>
 						{:else}
-							<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/50">Loading usage…</p>
+							<p class="mb-2 px-1.5 text-[10px] text-sidebar-foreground/60">Loading usage…</p>
 						{/if}
 					</div>
 
@@ -1611,7 +1680,7 @@ Important rules:
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									size="sm"
-									class={navPill}
+									class={footerPill}
 									tooltipContent={collapsedUsageTooltip}
 									tooltipContentProps={{
 										class:
@@ -1633,13 +1702,13 @@ Important rules:
 						</Sidebar.Menu>
 					</div>
 
-					<Sidebar.Menu class="gap-0.5">
+					<Sidebar.Menu class="gap-0.5 border-t border-sidebar-border/45 pt-1.5">
 						<Sidebar.MenuItem>
 							<Sidebar.MenuButton
 								size="sm"
 								isActive={isSettingsActive}
 								tooltipContent="Settings"
-								class={cn(navPill, 'min-w-0')}
+								class={cn(footerPill, 'min-w-0')}
 							>
 								{#snippet child({ props })}
 									<a
@@ -1661,7 +1730,7 @@ Important rules:
 							<Sidebar.MenuButton
 								size="sm"
 								tooltipContent="Sign out"
-								class={cn(navPill, 'min-w-0')}
+								class={cn(footerPill, 'min-w-0')}
 								aria-disabled={isSigningOut}
 								onclick={handleSignOut}
 							>
@@ -2005,48 +2074,91 @@ Important rules:
 
 		<Dialog.Root bind:open={importDialogOpen}>
 			<Dialog.Content
-				class="flex h-[min(48rem,calc(100vh-2rem))] flex-col sm:max-w-5xl"
+				class="flex h-[min(44rem,calc(100vh-2rem))] flex-col p-0 sm:max-w-4xl"
 				showCloseButton={!isStartingImportReview}
 			>
 				<form
-					class="flex min-h-0 flex-1 flex-col gap-4"
+					class="flex min-h-0 flex-1 flex-col"
 					onsubmit={(event) => {
 						event.preventDefault();
 						void startExternalContextImportReview();
 					}}
 				>
-					<Dialog.Header>
+					<Dialog.Header class="border-b border-border/70 px-5 py-4 text-left">
 						<Dialog.Title>Import external AI context</Dialog.Title>
 						<Dialog.Description>
-							Copy the prompt into ChatGPT, Claude, or another AI tool, then paste the returned
-							project summary here.
+							Bring project context from another AI chat into a Launchpad review draft.
 						</Dialog.Description>
 					</Dialog.Header>
 
-					<div class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-						<section class="flex min-h-0 flex-col gap-2">
-							<div class="flex items-center justify-between gap-3">
-								<Label for="external-context-prompt">Prompt</Label>
-								<Button
-									type="button"
-									variant="secondary"
-									size="sm"
-									disabled={isStartingImportReview}
-									onclick={copyExternalContextPrompt}
-								>
-									Copy prompt
-								</Button>
+					<div
+						class="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(17rem,0.78fr)_minmax(0,1.22fr)]"
+					>
+						<section
+							class="flex min-h-0 flex-col border-b border-border/70 bg-muted/30 lg:border-r lg:border-b-0"
+						>
+							<div class="space-y-3 p-5">
+								<div class="flex gap-3">
+									<div
+										class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground"
+									>
+										1
+									</div>
+									<div class="min-w-0 space-y-1">
+										<h2 class="text-sm font-semibold tracking-tight">Copy the prompt</h2>
+										<p class="text-xs leading-5 text-pretty text-muted-foreground">
+											Run this in ChatGPT, Claude, or another AI tool that already has the context
+											you want to bring over.
+										</p>
+									</div>
+								</div>
+								<div class="flex items-center gap-2 pl-9">
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										disabled={isStartingImportReview}
+										onclick={copyExternalContextPrompt}
+									>
+										Copy prompt
+									</Button>
+									{#if importNotice && !importError}
+										<p class="text-xs text-muted-foreground" role="status">{importNotice}</p>
+									{/if}
+								</div>
 							</div>
-							<Textarea
-								id="external-context-prompt"
-								value={externalContextPrompt}
-								readonly
-								class="min-h-0 flex-1 resize-none font-mono text-xs"
-							/>
+
+							<div class="flex min-h-0 flex-1 flex-col border-t border-border/70 p-5 pt-4">
+								<div class="mb-2 flex items-center justify-between gap-3">
+									<Label for="external-context-prompt">Prompt to run externally</Label>
+									<span class="text-[11px] text-muted-foreground">Read only</span>
+								</div>
+								<Textarea
+									id="external-context-prompt"
+									value={externalContextPrompt}
+									readonly
+									class="min-h-40 flex-1 resize-none bg-background font-mono text-[11px] leading-5 lg:min-h-0"
+								/>
+							</div>
 						</section>
 
-						<section class="flex min-h-0 flex-col gap-3">
-							<div class="grid gap-3 sm:grid-cols-[1fr_11rem]">
+						<section class="flex min-h-0 flex-col p-5">
+							<div class="flex gap-3">
+								<div
+									class="flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-background text-[11px] font-medium text-foreground"
+								>
+									2
+								</div>
+								<div class="min-w-0 flex-1 space-y-1">
+									<h2 class="text-sm font-semibold tracking-tight">Paste the summary</h2>
+									<p class="max-w-prose text-xs leading-5 text-pretty text-muted-foreground">
+										Paste the Markdown response. You will review it before creating or changing any
+										project.
+									</p>
+								</div>
+							</div>
+
+							<div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
 								<div class="space-y-1.5">
 									<Label for="external-context-source">External summary</Label>
 									<p class="text-xs leading-5 text-muted-foreground">
@@ -2067,23 +2179,27 @@ Important rules:
 									</NativeSelect>
 								</div>
 							</div>
+
 							<Textarea
 								id="external-context-source"
 								bind:value={importSourceMarkdown}
 								placeholder="# Project Name&#10;&#10;Paste the structured Markdown summary here..."
-								class="min-h-0 flex-1 resize-none font-mono text-xs"
+								class="mt-3 min-h-56 flex-1 resize-none font-mono text-xs leading-5"
 								disabled={isStartingImportReview}
 							/>
+
+							{#if importError}
+								<p class="mt-3 text-xs text-destructive" role="status">{importError}</p>
+							{:else}
+								<p class="mt-3 text-xs leading-5 text-muted-foreground">
+									Launchpad starts a review draft first. Nothing is added to a project until you
+									approve it.
+								</p>
+							{/if}
 						</section>
 					</div>
 
-					{#if importError || importNotice}
-						<p class="text-xs {importError ? 'text-destructive' : 'text-muted-foreground'}">
-							{importError || importNotice}
-						</p>
-					{/if}
-
-					<Dialog.Footer>
+					<Dialog.Footer class="border-t border-border/70 px-5 py-4">
 						<Button
 							type="button"
 							variant="secondary"
@@ -2093,7 +2209,7 @@ Important rules:
 							Cancel
 						</Button>
 						<Button type="submit" disabled={isStartingImportReview || !importSourceMarkdown.trim()}>
-							{isStartingImportReview ? 'Starting review...' : 'Review Project'}
+							{isStartingImportReview ? 'Starting review...' : 'Start review'}
 						</Button>
 					</Dialog.Footer>
 				</form>
@@ -2343,79 +2459,119 @@ Important rules:
 		</Dialog.Root>
 
 		<Dialog.Root bind:open={createArtifactDialogOpen}>
-			<Dialog.Content class="sm:max-w-2xl" showCloseButton={!isCreatingArtifact}>
+			<Dialog.Content
+				class="overflow-hidden p-0 sm:max-w-2xl"
+				showCloseButton={false}
+				onEscapeKeydown={handleCreateArtifactDismiss}
+				onInteractOutside={handleCreateArtifactDismiss}
+			>
 				<form
-					class="space-y-4"
+					class="grid max-h-[min(44rem,calc(100vh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto]"
 					onsubmit={(event) => {
 						event.preventDefault();
 						void createArtifact();
 					}}
 				>
-					<Dialog.Header>
-						<Dialog.Title>Create artifact</Dialog.Title>
-						<Dialog.Description>
-							Save a markdown document to this workspace
-							{activeThreadId
-								? ' and link it to the active chat'
-								: activeProjectId
-									? ' project'
-									: ''}.
-						</Dialog.Description>
+					<Dialog.Header class="border-b border-border/70 px-5 py-4 text-left">
+						<div class="flex items-start justify-between gap-4">
+							<div class="min-w-0 space-y-1">
+								<Dialog.Title>Create artifact</Dialog.Title>
+								<Dialog.Description class="max-w-prose text-pretty">
+									Save a Markdown document to this workspace. {createArtifactDestination}
+								</Dialog.Description>
+							</div>
+							<div
+								class="hidden shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground sm:block"
+							>
+								{selectedArtifactTypeLabel}
+							</div>
+						</div>
 					</Dialog.Header>
 
-					<div class="grid gap-3 sm:grid-cols-[1fr_11rem]">
-						<div class="space-y-1.5">
-							<Label for="create-artifact-title">Title</Label>
-							<Input
-								id="create-artifact-title"
-								bind:value={artifactTitle}
-								placeholder="Artifact title"
+					<div class="min-h-0 overflow-y-auto px-5 py-4">
+						<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+							<div class="space-y-1.5">
+								<Label for="create-artifact-title">Title</Label>
+								<Input
+									id="create-artifact-title"
+									bind:value={artifactTitle}
+									placeholder="Artifact title"
+									autofocus
+									aria-invalid={artifactCreateError && !artifactTitle.trim() ? 'true' : undefined}
+									disabled={isCreatingArtifact}
+								/>
+								<p class="text-[11px] leading-4 text-muted-foreground">
+									Use the name you will scan for later in the artifacts list.
+								</p>
+							</div>
+							<div class="space-y-1.5">
+								<Label for="create-artifact-type">Type</Label>
+								<NativeSelect
+									id="create-artifact-type"
+									bind:value={artifactTypePreset}
+									class="w-full"
+									disabled={isCreatingArtifact}
+								>
+									{#each artifactTypePresets as preset (preset.value)}
+										<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
+									{/each}
+								</NativeSelect>
+							</div>
+						</div>
+
+						{#if artifactTypePreset === 'custom'}
+							<div class="mt-3 space-y-1.5">
+								<Label for="create-artifact-custom-type">Custom type</Label>
+								<Input
+									id="create-artifact-custom-type"
+									bind:value={artifactCustomType}
+									placeholder="decision, spec, notes"
+									aria-invalid={artifactCreateError && !artifactCustomType.trim() ? 'true' : undefined}
+									disabled={isCreatingArtifact}
+								/>
+								<p class="text-[11px] leading-4 text-muted-foreground">
+									Keep it short. This becomes the artifact category.
+								</p>
+							</div>
+						{/if}
+
+						<div class="mt-4 space-y-1.5">
+							<div class="flex items-end justify-between gap-3">
+								<div class="space-y-1.5">
+									<Label for="create-artifact-body">Markdown</Label>
+									<p class="max-w-prose text-xs leading-5 text-muted-foreground">
+										Write the durable version here. You can edit it after creation.
+									</p>
+								</div>
+								<span class="hidden text-[11px] text-muted-foreground sm:inline">
+									⌘/Ctrl Enter creates
+								</span>
+							</div>
+							<Textarea
+								id="create-artifact-body"
+								bind:value={artifactBody}
+								placeholder="# Decision&#10;&#10;Capture the useful details, constraints, and next step."
+								class="min-h-72 resize-y bg-background font-mono text-xs leading-5 sm:min-h-80"
+								onkeydown={handleCreateArtifactKeydown}
+								aria-invalid={artifactCreateError && !artifactBody.trim() ? 'true' : undefined}
 								disabled={isCreatingArtifact}
 							/>
 						</div>
-						<div class="space-y-1.5">
-							<Label for="create-artifact-type">Type</Label>
-							<NativeSelect
-								id="create-artifact-type"
-								bind:value={artifactTypePreset}
-								class="w-full"
-								disabled={isCreatingArtifact}
-							>
-								{#each artifactTypePresets as preset (preset.value)}
-									<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
-								{/each}
-							</NativeSelect>
+
+						<div class="mt-3 min-h-5">
+							{#if artifactCreateError}
+								<p class="text-xs leading-5 text-destructive" role="status">
+									{artifactCreateError}
+								</p>
+							{:else}
+								<p class="text-xs leading-5 text-muted-foreground">
+									Artifacts are saved as Markdown and remain editable from the artifact page.
+								</p>
+							{/if}
 						</div>
 					</div>
 
-					{#if artifactTypePreset === 'custom'}
-						<div class="space-y-1.5">
-							<Label for="create-artifact-custom-type">Custom type</Label>
-							<Input
-								id="create-artifact-custom-type"
-								bind:value={artifactCustomType}
-								placeholder="decision, spec, notes..."
-								disabled={isCreatingArtifact}
-							/>
-						</div>
-					{/if}
-
-					<div class="space-y-1.5">
-						<Label for="create-artifact-body">Markdown</Label>
-						<Textarea
-							id="create-artifact-body"
-							bind:value={artifactBody}
-							placeholder="# Notes&#10;&#10;Write the durable version here."
-							class="min-h-72 font-mono text-xs"
-							disabled={isCreatingArtifact}
-						/>
-					</div>
-
-					{#if artifactCreateError}
-						<p class="text-xs text-destructive">{artifactCreateError}</p>
-					{/if}
-
-					<Dialog.Footer>
+					<Dialog.Footer class="border-t border-border/70 bg-muted/35 px-5 py-4">
 						<Button
 							type="button"
 							variant="secondary"
@@ -2424,11 +2580,8 @@ Important rules:
 						>
 							Cancel
 						</Button>
-						<Button
-							type="submit"
-							disabled={isCreatingArtifact || !artifactTitle.trim() || !artifactBody.trim()}
-						>
-							{isCreatingArtifact ? 'Creating...' : 'Create artifact'}
+						<Button type="submit" disabled={isCreatingArtifact || !canCreateArtifact}>
+							{isCreatingArtifact ? 'Creating…' : 'Create artifact'}
 						</Button>
 					</Dialog.Footer>
 				</form>

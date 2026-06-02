@@ -38,7 +38,6 @@
 		PanelRightCloseIcon,
 		PanelRightOpenIcon,
 		Rocket01Icon,
-		Search01Icon,
 		Settings01Icon,
 		File01Icon
 	} from '@hugeicons/core-free-icons';
@@ -116,6 +115,28 @@
 	const artifactResults = $derived(
 		artifactSearch.data ?? (artifactSearchLoading ? [] : (artifacts ?? []))
 	);
+	const hasWorkspaceItems = $derived(
+		(projects?.length ?? 0) > 0 || (threads?.length ?? 0) > 0 || (artifacts?.length ?? 0) > 0
+	);
+	const emptyMessage = $derived.by(() => {
+		if (workspaceLoading) return 'Loading workspace...';
+		if (artifactSearchLoading) return 'Searching artifacts...';
+		if (!hasWorkspaceItems && !hasArtifactSearch) return 'No workspace items yet.';
+		if (hasArtifactSearch) return `No results for "${searchValue.trim()}".`;
+		return 'No matching action, project, chat, or artifact.';
+	});
+	const typeFilterLabel = $derived(typeFilter ? artifactTypeLabel(typeFilter) : 'Type');
+	const projectFilterLabel = $derived.by(() => {
+		if (projectFilter === 'all') return 'Scope';
+		if (projectFilter === 'none') return 'No project';
+		return projectLabel(projectFilter);
+	});
+	const recencyFilterLabel = $derived.by(() => {
+		if (recencyFilter === '7') return 'Last 7 days';
+		if (recencyFilter === '30') return 'Last 30 days';
+		if (recencyFilter === '90') return 'Last 90 days';
+		return 'Updated';
+	});
 
 	function close() {
 		open = false;
@@ -139,15 +160,9 @@
 		}
 	}
 
-	const artifactsCap = 25;
-
 	function projectLabel(projectId: string | undefined) {
 		if (!projectId) return 'No project';
 		return projects?.find((project) => project._id === projectId)?.name ?? 'Project';
-	}
-
-	function useInThread(artifactId: Id<'artifacts'>) {
-		return () => void runAction(() => onUseArtifactInThread(artifactId));
 	}
 
 	function resetArtifactFilters() {
@@ -156,37 +171,97 @@
 		recencyFilter = 'any';
 	}
 
+	function useArtifactButton(event: MouseEvent, artifactId: Id<'artifacts'>) {
+		event.preventDefault();
+		event.stopPropagation();
+		void runAction(() => onUseArtifactInThread(artifactId));
+	}
+
 	/**
-	 * List row pattern (docs/DESIGN-SYSTEM.md §6): `text-xs`, 12px icons, `accent` selection pill,
+	 * List row pattern (DESIGN.md §6): `text-xs`, 12px icons, `accent` selection pill,
 	 * `hover:bg-accent/50` — workspace palette only; overrides `Command.Item` defaults.
 	 */
 	const paletteItemClass =
-		'gap-2 rounded-md px-2 py-2 font-sans text-xs hover:bg-accent/50 ' +
+		'gap-2 rounded-md px-2.5 py-2 font-sans text-xs hover:bg-accent/50 ' +
 		'data-selected:bg-accent data-selected:font-medium data-selected:text-accent-foreground ' +
 		'data-selected:hover:bg-accent data-selected:[&_svg]:text-accent-foreground';
-	/** Nav-style section label (docs/DESIGN-SYSTEM.md §2–3) for this overlay. */
-	const paletteGroupHeadingClass = '!text-[11px] uppercase tracking-wide !text-muted-foreground';
+	/** Nav-style section label (DESIGN.md §2–3) for this overlay. */
+	const paletteGroupHeadingClass =
+		'!text-[11px] !font-medium !tracking-normal !text-muted-foreground';
+	const filterChipClass =
+		'w-auto [&_[data-slot=native-select]]:h-6 [&_[data-slot=native-select]]:rounded-md ' +
+		'[&_[data-slot=native-select]]:border-border/70 [&_[data-slot=native-select]]:bg-transparent ' +
+		'[&_[data-slot=native-select]]:text-[11px] [&_[data-slot=native-select]]:text-muted-foreground ' +
+		'[&_[data-slot=native-select]]:hover:bg-accent';
 </script>
 
 <Command.CommandDialog
 	bind:open
 	title="Command center"
 	description="Search projects, chats, and artifacts, or run a quick action."
-	class="sm:max-w-lg"
+	class="sm:max-w-2xl"
 >
 	<Command.Input
 		bind:value={searchValue}
 		placeholder="Search threads, projects, artifacts, actions…"
 	/>
-	<Command.List class="max-h-[min(24rem,60vh)] px-1">
+	<div
+		class="flex flex-wrap items-center gap-1.5 border-b border-border/50 px-2.5 py-2"
+		aria-label="Artifact filters"
+	>
+		<span class="mr-0.5 text-[11px] text-muted-foreground">Artifacts</span>
+		<NativeSelect.Root
+			bind:value={projectFilter}
+			size="sm"
+			class={filterChipClass}
+			aria-label="Filter artifacts by project"
+		>
+			<option value="all" disabled hidden>{projectFilterLabel}</option>
+			<option value="all">All projects</option>
+			<option value="none">No project</option>
+			{#each projects ?? [] as project (project._id)}
+				<option value={project._id}>{project.name}</option>
+			{/each}
+		</NativeSelect.Root>
+		<NativeSelect.Root
+			bind:value={typeFilter}
+			size="sm"
+			class={filterChipClass}
+			aria-label="Filter artifacts by type"
+		>
+			<option value="" disabled hidden>{typeFilterLabel}</option>
+			<option value="">All types</option>
+			{#each typeOptions as type (type)}
+				<option value={type}>{artifactTypeLabel(type)}</option>
+			{/each}
+		</NativeSelect.Root>
+		<NativeSelect.Root
+			bind:value={recencyFilter}
+			size="sm"
+			class={filterChipClass}
+			aria-label="Filter artifacts by recency"
+		>
+			<option value="any" disabled hidden>{recencyFilterLabel}</option>
+			<option value="any">Any time</option>
+			<option value="7">Last 7 days</option>
+			<option value="30">Last 30 days</option>
+			<option value="90">Last 90 days</option>
+		</NativeSelect.Root>
+		{#if hasArtifactFilters}
+			<Button
+				type="button"
+				variant="ghost"
+				size="xs"
+				class="h-6 rounded-md px-2 text-[11px]"
+				onclick={resetArtifactFilters}
+			>
+				Clear
+			</Button>
+		{/if}
+	</div>
+	<Command.List class="max-h-[min(26rem,62vh)] px-1 py-1">
 		<Command.Empty class="px-2 py-6 text-center text-xs text-muted-foreground">
-			{#if workspaceLoading}
-				Loading workspace…
-			{:else if artifactSearchLoading}
-				Searching artifacts…
-			{:else}
-				No matching action, project, chat, or artifact.
-			{/if}
+			{emptyMessage}
 		</Command.Empty>
 
 		<Command.Group heading="Actions" value="actions" headingClass={paletteGroupHeadingClass}>
@@ -358,67 +433,32 @@
 
 		<Command.Separator class="-mx-1 h-px bg-border" />
 		<Command.Group heading="Artifacts" value="artifacts" headingClass={paletteGroupHeadingClass}>
-			<div class="grid gap-1.5 px-2 py-1.5 sm:grid-cols-[1fr_1fr_1fr_auto]">
-				<NativeSelect.Root bind:value={typeFilter} size="sm" aria-label="Filter artifacts by type">
-					<option value="">All types</option>
-					{#each typeOptions as type (type)}
-						<option value={type}>{artifactTypeLabel(type)}</option>
-					{/each}
-				</NativeSelect.Root>
-				<NativeSelect.Root
-					bind:value={projectFilter}
-					size="sm"
-					aria-label="Filter artifacts by project"
-				>
-					<option value="all">All projects</option>
-					<option value="none">No project</option>
-					{#each projects ?? [] as project (project._id)}
-						<option value={project._id}>{project.name}</option>
-					{/each}
-				</NativeSelect.Root>
-				<NativeSelect.Root
-					bind:value={recencyFilter}
-					size="sm"
-					aria-label="Filter artifacts by recency"
-				>
-					<option value="any">Any time</option>
-					<option value="7">Last 7 days</option>
-					<option value="30">Last 30 days</option>
-					<option value="90">Last 90 days</option>
-				</NativeSelect.Root>
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					class="h-8 px-2 text-xs"
-					disabled={!hasArtifactFilters}
-					onclick={resetArtifactFilters}
-				>
-					Reset
-				</Button>
-			</div>
-
 			{#if artifactSearchLoading}
-				<p class="px-2 py-3 text-xs text-muted-foreground">Searching artifacts…</p>
+				<div class="space-y-1 px-2 py-2" aria-label="Searching artifacts">
+					<div class="h-8 rounded-md bg-muted/60"></div>
+					<div class="h-8 rounded-md bg-muted/40"></div>
+				</div>
 			{:else if artifactResults.length === 0 && !workspaceLoading}
-				<div class="flex flex-col gap-2 px-2 py-3 text-xs text-muted-foreground">
-					<p>
-						{hasArtifactSearch || hasArtifactFilters
-							? 'No artifact matches your search or filters.'
-							: 'No artifacts yet.'}
+				<div
+					class="flex items-center justify-between gap-3 px-2 py-3 text-xs text-muted-foreground"
+				>
+					<p class="min-w-0">
+						{hasArtifactFilters
+							? 'No artifacts match these filters.'
+							: hasArtifactSearch
+								? `No artifacts for "${searchValue.trim()}".`
+								: 'No artifacts yet.'}
 					</p>
 					{#if hasArtifactFilters}
-						<div>
-							<Button
-								type="button"
-								variant="ghost"
-								size="sm"
-								class="h-7 px-2 text-xs"
-								onclick={resetArtifactFilters}
-							>
-								Clear filters
-							</Button>
-						</div>
+						<Button
+							type="button"
+							variant="ghost"
+							size="xs"
+							class="h-6 shrink-0 rounded-md px-2 text-[11px]"
+							onclick={resetArtifactFilters}
+						>
+							Clear filters
+						</Button>
 					{/if}
 				</div>
 			{/if}
@@ -442,7 +482,7 @@
 					]}
 					onSelect={nav(workspaceArtifactHref(artifact._id))}
 				>
-					<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+					<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3.5 text-muted-foreground" />
 					<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span class="truncate">{artifact.title}</span>
 						<span class="truncate text-[11px] font-normal text-muted-foreground">
@@ -450,7 +490,7 @@
 						</span>
 					</span>
 					<span
-						class="ml-auto flex shrink-0 items-center gap-1 pl-1 text-right text-[11px] text-muted-foreground"
+						class="ml-auto hidden shrink-0 items-center gap-1 pl-1 text-right text-[11px] font-normal text-muted-foreground sm:flex"
 					>
 						<span>{artifactTypeLabel(artifact.type)}</span>
 						<span aria-hidden="true">·</span>
@@ -458,37 +498,41 @@
 						<span aria-hidden="true">·</span>
 						<span>{formatArtifactUpdatedAt(artifact.updatedAt)}</span>
 					</span>
-				</Command.Item>
-				{#if canUseArtifact}
-					<div class="px-8 pb-1">
-						<Button variant="ghost" size="xs" onclick={useInThread(artifact._id)}>
+					{#if canUseArtifact}
+						<button
+							type="button"
+							class="ml-1 hidden h-6 shrink-0 rounded-md px-2 text-[11px] font-medium text-muted-foreground hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none sm:inline-flex"
+							onclick={(event) => useArtifactButton(event, artifact._id)}
+						>
 							Use in this chat
-						</Button>
-					</div>
-				{/if}
+						</button>
+					{/if}
+				</Command.Item>
 			{/each}
 		</Command.Group>
 	</Command.List>
 
 	<div class="border-t border-border/50 px-2.5 py-2" data-workspace-command-footer>
-		<div class="flex flex-col gap-1.5 text-[10px] leading-relaxed text-muted-foreground">
-			<div class="flex items-center gap-1.5">
-				<HugeiconsIcon
-					icon={Search01Icon}
-					strokeWidth={2}
-					class="size-3.5 shrink-0 opacity-70"
-					aria-hidden="true"
-				/>
-				<span class="text-muted-foreground/90">Open</span>
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+			<span class="inline-flex items-center gap-1">
+				Open
 				<Kbd.Group class="inline-flex items-center gap-0.5" aria-label="Command center shortcut">
 					<Kbd.Kbd>⌘</Kbd.Kbd>
 					<Kbd.Kbd>K</Kbd.Kbd>
 				</Kbd.Group>
-			</div>
-			<p class="m-0 text-pretty text-muted-foreground/85">
-				Projects and chats show recent workspace items. Artifacts search by title, type, and
-				markdown content, then shows up to {artifactsCap} matching documents.
-			</p>
+			</span>
+			<span class="inline-flex items-center gap-1">
+				Navigate
+				<Kbd.Kbd>↑↓</Kbd.Kbd>
+			</span>
+			<span class="inline-flex items-center gap-1">
+				Select
+				<Kbd.Kbd>↵</Kbd.Kbd>
+			</span>
+			<span class="inline-flex items-center gap-1">
+				Close
+				<Kbd.Kbd>Esc</Kbd.Kbd>
+			</span>
 		</div>
 	</div>
 </Command.CommandDialog>

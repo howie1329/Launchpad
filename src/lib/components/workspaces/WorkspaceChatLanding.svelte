@@ -135,7 +135,7 @@
 		delay: prefersReducedMotion.current ? 0 : 50,
 		duration: prefersReducedMotion.current ? 0 : 220
 	});
-	const suggestionsAndExamplesIn = $derived({
+	const startersIn = $derived({
 		y: 8,
 		easing: backOut,
 		delay: prefersReducedMotion.current ? 0 : 100,
@@ -144,31 +144,29 @@
 </script>
 
 <section class="flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
-	<div class="flex flex-1 flex-col justify-center px-4 pt-4 pb-6 sm:px-6 sm:pt-6 lg:px-8">
-		<div class="mx-auto flex w-full max-w-4xl flex-col gap-5">
+	<div class="flex flex-1 flex-col justify-center px-4 py-5 sm:px-6 lg:px-8">
+		<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
 			<div class="text-center" in:fly={heroIn}>
-				<p class="mb-1.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-					{kicker}
-				</p>
-				<h1 class="text-lg font-semibold tracking-tight text-balance sm:text-xl">{title}</h1>
-				<p class="mx-auto mt-2 max-w-sm text-[11px] leading-relaxed text-muted-foreground">
+				<p class="mb-1.5 text-[11px] font-medium text-muted-foreground">{kicker}</p>
+				<h1 class="text-xl font-semibold tracking-tight text-balance sm:text-2xl">{title}</h1>
+				<p class="mx-auto mt-2 max-w-lg text-xs leading-5 text-pretty text-muted-foreground">
 					{description}
 				</p>
 			</div>
 
 			<div class="w-full" in:fly={promptIn}>
 				<PromptInput
-					class="w-full overflow-hidden rounded-lg border-0 bg-card/80 shadow-none ring-1 ring-border/70 backdrop-blur-sm"
+					class="w-full overflow-hidden rounded-xl border border-border/70 bg-card shadow-none"
 					clearOnSubmit={false}
 					onSubmit={submitMessage}
 				>
 					<PromptInputTextarea
 						bind:ref={textareaRef}
 						bind:value={text}
-						class="min-h-20 px-3 py-3 text-sm leading-5 focus-visible:ring-0 sm:min-h-24"
+						class="min-h-28 px-3.5 py-3.5 text-sm leading-6 focus-visible:ring-0 sm:min-h-32"
 						{placeholder}
 					/>
-					<PromptInputToolbar class="flex items-center gap-2 px-3 py-2">
+					<PromptInputToolbar class="flex items-center gap-2 border-t border-border/60 px-3 py-2">
 						<PromptInputTools class="min-w-0 flex-1 flex-wrap gap-1.5">
 							<ModelSelector bind:open={modelSelectorOpen}>
 								<ModelSelectorTrigger
@@ -230,13 +228,15 @@
 					</PromptInputToolbar>
 				</PromptInput>
 
-				{#if submitError}
-					<p class="mt-2 w-full text-left text-xs text-destructive">{submitError}</p>
-				{/if}
+				<div class="min-h-6 pt-2">
+					{#if submitError}
+						<p class="w-full text-left text-xs text-destructive">{submitError}</p>
+					{/if}
+				</div>
 			</div>
 
-			<div class="w-full" in:fly={suggestionsAndExamplesIn}>
-				<Suggestions class="gap-1.5 py-0.5" scrollbarXClasses="hidden">
+			<div class="w-full" in:fly={startersIn}>
+				<Suggestions class="gap-1.5 py-0" scrollbarXClasses="hidden">
 					{#each suggestions as suggestion (suggestion.label)}
 						<Suggestion
 							suggestion={suggestion.label}
@@ -249,30 +249,26 @@
 					{/each}
 				</Suggestions>
 
-				<div class="w-full scroll-mt-8 pt-6 pb-10 sm:pt-8 sm:pb-16">
-					<div class="mb-1.5 flex items-center justify-between gap-3">
-						<p class="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-							Examples
-						</p>
-					</div>
-
-					<div class="grid gap-1 sm:grid-cols-3">
+				<div class="w-full scroll-mt-8 pt-4 pb-6 sm:pb-8">
+					<div class="grid gap-1.5 sm:grid-cols-2">
 						{#each examples as example (example.title)}
 							<button
 								type="button"
-								class="group flex min-h-[4.5rem] flex-col items-start rounded-md border border-transparent p-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+								class="group flex min-h-16 items-start gap-2 rounded-lg border border-border/60 bg-card/45 p-2.5 text-left transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 								onclick={() => fillComposer(example.prompt)}
 							>
 								<HugeiconsIcon
 									icon={example.icon}
 									strokeWidth={2}
-									class="mb-2 size-3 text-muted-foreground transition-colors group-hover:text-foreground"
+									class="mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
 								/>
-								<span class="text-[11px] leading-snug font-medium tracking-tight"
-									>{example.title}</span
-								>
-								<span class="mt-0.5 text-[10px] leading-relaxed text-muted-foreground">
-									{example.description}
+								<span class="min-w-0">
+									<span class="block text-[11px] leading-snug font-medium tracking-tight">
+										{example.title}
+									</span>
+									<span class="mt-0.5 block text-[10px] leading-relaxed text-muted-foreground">
+										{example.description}
+									</span>
 								</span>
 							</button>
 						{/each}

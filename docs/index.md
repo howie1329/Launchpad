@@ -11,9 +11,8 @@ This folder is intentionally small. The codebase is the source of truth for ship
 
 - [Stack](STACK.md) — SvelteKit implementation guidance.
 - [Code quality](CODE-QUALITY.md) — review, testing, dependency, and handoff standards.
-- [Workflows](WORKFLOWS.md) — lightweight research, planning, implementation, review, and release workflows.
 - [Change explanation](CHANGE-EXPLANATION.md) — final handoff format.
-- [Design system](DESIGN-SYSTEM.md) — UI principles for surfaces, navigation, controls, motion, and accessibility.
+- [Design system](../DESIGN.md) — UI principles for surfaces, navigation, controls, motion, and accessibility.
 
 ## Pruning Policy
 

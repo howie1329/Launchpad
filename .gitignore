@@ -21,3 +21,11 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Agents
+.claude
+.rpiv
+.pi
+.cursor
+.agents
+.impeccable

@@ -10,7 +10,12 @@
 	import { markThreadForAutoStart } from '$lib/workspace-thread-start';
 	import { workspaceThreadHref } from '$lib/workspace-route-contract';
 	import type { Id } from '../../../convex/_generated/dataModel';
-	import { Package01Icon, Target01Icon, TaskDaily01Icon } from '@hugeicons/core-free-icons';
+	import {
+		AiIdeaIcon,
+		BubbleChatQuestionIcon,
+		FileEditIcon,
+		Target01Icon
+	} from '@hugeicons/core-free-icons';
 	import { backOut } from 'svelte/easing';
 	import { fly } from 'svelte/transition';
 
@@ -24,46 +29,53 @@
 
 	const suggestions = [
 		{
-			label: 'Shape project',
+			label: 'Shape this idea',
 			prompt:
-				'Help me turn this rough idea into a project. Ask only the next best questions until the first version is clear.'
+				'Help me shape this rough idea. Ask only the next best question until the first version is clear.'
 		},
 		{
-			label: 'Find the risk',
+			label: 'Find the riskiest assumption',
 			prompt: 'Help me find the riskiest assumption and the fastest way to test it.'
 		},
 		{
-			label: 'Make PRD',
+			label: 'Draft the first artifact',
 			prompt:
-				'Turn this into a focused first-version PRD, then tell me when it is ready to promote into a project.'
+				'Turn my rough notes into a useful first artifact. Keep it focused and ask before making it durable.'
 		},
 		{
-			label: 'Scope MVP',
+			label: 'Cut the scope',
 			prompt: 'Reduce this to the smallest useful MVP scope for a project I could start building.'
 		}
 	] as const;
 
 	const examples = [
 		{
-			title: 'Start from a thought',
-			description: 'Find the project hiding inside a messy note',
+			title: 'Paste the messy version',
+			description: 'Start from a note, rant, quote, or half-formed product thought.',
 			prompt:
-				'I keep noticing a messy workflow that might be worth building around. Help me turn the rough thought into a clear project with a target user and first version.',
-			icon: Package01Icon
+				'I have a messy product thought and I want to find the useful shape inside it. Help me clarify the user, the pain, and the first useful version.',
+			icon: AiIdeaIcon
 		},
 		{
-			title: 'Validate the pain',
-			description: 'Decide if the project is worth promoting',
+			title: 'Interrogate the risk',
+			description: 'Find the assumption that should be tested before building.',
 			prompt:
-				'I have a possible project, but I am not sure if the pain is real. Help me find the riskiest assumption and the fastest validation path.',
+				'I have a possible project, but I am not sure the pain is real. Help me identify the riskiest assumption and the smallest test.',
 			icon: Target01Icon
 		},
 		{
-			title: 'Draft a project PRD',
-			description: 'Leave with scope you can build from',
+			title: 'Ask better questions',
+			description: 'Use chat to narrow the next decision instead of writing a spec too soon.',
 			prompt:
-				'This project feels promising. Help me shape it into a practical first-version PRD with clear must-haves and non-goals.',
-			icon: TaskDaily01Icon
+				'I am not ready for a PRD yet. Ask me the few questions that would make this idea easier to judge.',
+			icon: BubbleChatQuestionIcon
+		},
+		{
+			title: 'Draft a buildable brief',
+			description: 'Turn promising context into scope, non-goals, and next steps.',
+			prompt:
+				'This idea feels promising. Help me write a practical first-version brief with scope, non-goals, and the next build step.',
+			icon: FileEditIcon
 		}
 	] as const;
 
@@ -91,14 +103,12 @@
 	});
 
 	const landingTitle = $derived(
-		projectName.trim()
-			? `Start a chat in ${projectName.trim()}.`
-			: 'Turn a rough idea into a project.'
+		projectName.trim() ? `Start with ${projectName.trim()}.` : 'Start with the rough version.'
 	);
 	const landingDescription = $derived(
 		projectName.trim()
-			? 'Start with your current context, then shape the next decision with focused prompts and saved artifacts.'
-			: 'Start with the messy version. Leave with a named project, useful context, and a tighter first build.'
+			? 'Write the next messy thought. Launchpad will keep the project context close while you shape it.'
+			: 'Paste the thought before it is tidy. Use chat to find the user, risk, artifact, or first build.'
 	);
 </script>
 
@@ -106,7 +116,7 @@
 	<WorkspaceChatLanding
 		title={landingTitle}
 		description={landingDescription}
-		placeholder="Paste a thought, rant, customer quote, project idea, or half-formed problem..."
+		placeholder="Paste the messy thought, customer quote, product hunch, or question you keep circling..."
 		{suggestions}
 		{examples}
 		onSubmit={startThread}

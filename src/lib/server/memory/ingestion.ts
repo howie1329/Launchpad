@@ -2,17 +2,43 @@ import type { SavedArtifact } from '$lib/artifacts';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { getSupermemoryClient } from './client';
 import { memoryLog } from './log';
-import { validateArtifactForMemory, validateUserMemoryText } from './safety';
+import {
+	MAX_PROJECT_DECISION_MEMORY_CHARS,
+	MAX_THREAD_INSIGHT_MEMORY_CHARS,
+	MAX_USER_PREFERENCE_MEMORY_CHARS,
+	validateArtifactForMemory,
+	validateMemoryContent,
+	validateMemoryEvidence,
+	validateUserMemoryText
+} from './safety';
 import {
 	artifactMemoryContainerTag,
 	artifactMemoryCustomId,
-	legacyProjectMemoryContainerTag,
-	legacyUserMemoryContainerTag,
 	projectMemoryContainerTag,
 	safeTagPart,
 	userMemoryContainerTag
 } from './tags';
 import { errorMessage, withTimeout } from './fallback';
+import {
+	isProjectDecisionCategory,
+	isReadableMemorySourceType,
+	isSemanticSourceType,
+	isThreadInsightCategory,
+	isUserPreferenceCategory,
+	projectDecisionCategories,
+	readableMemorySourceTypes,
+	semanticMemoryCustomId,
+	threadInsightCategories,
+	type InspectedMemoryDocument,
+	type MemoryConfidence,
+	type MemoryScope,
+	type ProjectDecisionCategory,
+	type ScopedMemorySummary,
+	type SemanticMemorySourceType,
+	type ThreadInsightCategory,
+	type UserPreferenceCategory,
+	userPreferenceCategories
+} from './semantic';
 
 const DELETE_TIMEOUT_MS = 5_000;
 const BULK_DELETE_TIMEOUT_MS = 30_000;
@@ -282,43 +308,392 @@ export async function addUserMemoryDocument(args: {
 	}
 }
 
-export async function assertDocumentForgettable(args: {
+type AddSemanticMemoryResult =
+	| { status: 'synced'; documentId: string; containerTag: string }
+	| { status: 'blocked'; reason: string }
+	| { status: 'disabled' }
+	| { status: 'failed'; error: string };
+
+function sanitizeMetadataValue(value: unknown) {
+	return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+		? value
+		: '';
+}
+
+function metadataRecord(value: unknown): Record<string, unknown> {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {};
+}
+
+function stringMetadata(metadata: Record<string, unknown>, key: string) {
+	const value = metadata[key];
+	return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function numberOrStringMetadata(metadata: Record<string, unknown>, key: string) {
+	const value = metadata[key];
+	return typeof value === 'string' || typeof value === 'number' ? value : undefined;
+}
+
+function summarizeContent(content: string, maxChars = 500) {
+	const trimmed = content.trim().replace(/\s+/g, ' ');
+	if (trimmed.length <= maxChars) return trimmed;
+	return `${trimmed.slice(0, Math.max(0, maxChars - 16)).trimEnd()}…`;
+}
+
+async function addSemanticMemoryDocument(args: {
+	ownerId: Id<'users'>;
+	projectId?: Id<'projects'>;
+	threadId: Id<'chatThreads'>;
+	sourceType: SemanticMemorySourceType;
+	category: string;
+	content: string;
+	evidence?: string;
+	confidence: MemoryConfidence;
+	containerTag: string;
+	maxChars: number;
+}): Promise<AddSemanticMemoryResult> {
+	const content = validateMemoryContent(args.content, args.maxChars);
+	if (!content.ok) return { status: 'blocked', reason: content.reason };
+
+	const evidence = validateMemoryEvidence(args.evidence);
+	if (!evidence.ok) return { status: 'blocked', reason: evidence.reason };
+
+	const sm = getSupermemoryClient();
+	if (!sm) return { status: 'disabled' };
+
+	const now = Date.now();
+	const metadata = {
+		sourceType: args.sourceType,
+		category: args.category,
+		ownerId: args.ownerId,
+		projectId: args.projectId ?? '',
+		threadId: args.threadId,
+		createdAt: now,
+		updatedAt: now,
+		confidence: args.confidence,
+		...(evidence.evidence ? { evidence: evidence.evidence } : {})
+	} satisfies MemoryMetadata;
+
+	try {
+		const response = await withTimeout(
+			sm.add({
+				content: content.text,
+				containerTags: [args.containerTag],
+				customId: semanticMemoryCustomId({ sourceType: args.sourceType, threadId: args.threadId }),
+				metadata
+			}),
+			ADD_TIMEOUT_MS
+		);
+		memoryLog('supermemory.semantic_memory_added', {
+			sourceType: args.sourceType,
+			category: args.category,
+			containerTag: args.containerTag
+		});
+		return { status: 'synced', documentId: response.id, containerTag: args.containerTag };
+	} catch (error) {
+		return { status: 'failed', error: errorMessage(error) };
+	}
+}
+
+export async function addUserPreferenceMemoryDocument(args: {
+	ownerId: Id<'users'>;
+	threadId: Id<'chatThreads'>;
+	category: UserPreferenceCategory;
+	content: string;
+	evidence?: string;
+	confidence: MemoryConfidence;
+}) {
+	if (!isUserPreferenceCategory(args.category)) {
+		return { status: 'blocked' as const, reason: 'Unsupported user preference category.' };
+	}
+	return addSemanticMemoryDocument({
+		...args,
+		sourceType: 'user_preference',
+		containerTag: userMemoryContainerTag(args.ownerId),
+		maxChars: MAX_USER_PREFERENCE_MEMORY_CHARS
+	});
+}
+
+export async function addProjectDecisionMemoryDocument(args: {
+	ownerId: Id<'users'>;
+	projectId: Id<'projects'>;
+	threadId: Id<'chatThreads'>;
+	category: ProjectDecisionCategory;
+	content: string;
+	evidence?: string;
+	confidence: 'explicit' | 'high';
+}) {
+	if (!isProjectDecisionCategory(args.category)) {
+		return { status: 'blocked' as const, reason: 'Unsupported project decision category.' };
+	}
+	return addSemanticMemoryDocument({
+		...args,
+		sourceType: 'project_decision',
+		containerTag: projectMemoryContainerTag(args.projectId),
+		maxChars: MAX_PROJECT_DECISION_MEMORY_CHARS
+	});
+}
+
+export async function addThreadInsightMemoryDocument(args: {
+	ownerId: Id<'users'>;
+	projectId?: Id<'projects'>;
+	threadId: Id<'chatThreads'>;
+	category: ThreadInsightCategory;
+	content: string;
+	evidence?: string;
+}) {
+	if (!isThreadInsightCategory(args.category)) {
+		return { status: 'blocked' as const, reason: 'Unsupported thread insight category.' };
+	}
+	return addSemanticMemoryDocument({
+		...args,
+		sourceType: 'thread_insight',
+		confidence: 'high',
+		containerTag: args.projectId
+			? projectMemoryContainerTag(args.projectId)
+			: userMemoryContainerTag(args.ownerId),
+		maxChars: MAX_THREAD_INSIGHT_MEMORY_CHARS
+	});
+}
+
+function memoryScopeFromContainerTag(
+	containerTag: string,
+	ownerId: Id<'users'>,
+	projectId?: Id<'projects'>
+) {
+	if (containerTag === userMemoryContainerTag(ownerId)) return 'user' as const;
+	if (projectId && containerTag === projectMemoryContainerTag(projectId)) return 'project' as const;
+	return undefined;
+}
+
+function memorySummaryFromDocument(args: {
+	doc: Record<string, unknown>;
+	containerTag: string;
+	ownerId: Id<'users'>;
+	projectId?: Id<'projects'>;
+}): ScopedMemorySummary | null {
+	const metadata = metadataRecord(args.doc.metadata);
+	const sourceType = stringMetadata(metadata, 'sourceType') ?? 'supermemory';
+	if (!isReadableMemorySourceType(sourceType)) return null;
+
+	const scope = memoryScopeFromContainerTag(args.containerTag, args.ownerId, args.projectId);
+	if (!scope) return null;
+
+	const content =
+		typeof args.doc.content === 'string'
+			? args.doc.content
+			: typeof args.doc.summary === 'string'
+				? args.doc.summary
+				: '';
+	const documentId = String(args.doc.documentId ?? args.doc.id ?? '');
+	if (!documentId) return null;
+
+	return {
+		documentId,
+		scope,
+		sourceType,
+		category:
+			stringMetadata(metadata, 'category') ?? stringMetadata(metadata, 'artifactType') ?? '',
+		title:
+			stringMetadata(metadata, 'title') ??
+			(typeof args.doc.title === 'string' ? args.doc.title : undefined),
+		summary: summarizeContent(content || String(args.doc.title ?? sourceType)),
+		createdAt: numberOrStringMetadata(metadata, 'createdAt'),
+		updatedAt:
+			numberOrStringMetadata(metadata, 'updatedAt') ??
+			numberOrStringMetadata(args.doc, 'updatedAt'),
+		threadId: stringMetadata(metadata, 'threadId'),
+		projectId: stringMetadata(metadata, 'projectId'),
+		readOnly: sourceType === 'artifact',
+		derivedFromArtifact: sourceType === 'artifact'
+	};
+}
+
+function readableMemoryFilter() {
+	return {
+		OR: readableMemorySourceTypes.map((sourceType) => ({
+			key: 'sourceType',
+			value: sourceType,
+			filterType: 'metadata' as const
+		}))
+	};
+}
+
+export async function listScopedMemoryDocuments(args: {
+	ownerId: Id<'users'>;
+	projectId?: Id<'projects'>;
+	limit?: number;
+}): Promise<
+	| { status: 'disabled' }
+	| { status: 'listed'; user: ScopedMemorySummary[]; project: ScopedMemorySummary[] }
+	| { status: 'failed'; error: string }
+> {
+	const sm = getSupermemoryClient();
+	if (!sm) return { status: 'disabled' };
+
+	const limit = Math.min(Math.max(args.limit ?? 20, 1), 50);
+	const userTag = userMemoryContainerTag(args.ownerId);
+	const projectTag = args.projectId ? projectMemoryContainerTag(args.projectId) : undefined;
+
+	try {
+		const [userDocs, projectDocs] = await Promise.all([
+			withTimeout(sm.documents.list({ containerTags: [userTag], limit }), DELETE_TIMEOUT_MS),
+			projectTag
+				? withTimeout(sm.documents.list({ containerTags: [projectTag], limit }), DELETE_TIMEOUT_MS)
+				: Promise.resolve({ documents: [] })
+		]);
+		const getDocs = (response: unknown) => {
+			const record = metadataRecord(response);
+			const docs = record.documents ?? record.results ?? record.data ?? [];
+			return Array.isArray(docs) ? (docs as Record<string, unknown>[]) : [];
+		};
+		return {
+			status: 'listed',
+			user: getDocs(userDocs)
+				.map((doc) =>
+					memorySummaryFromDocument({
+						doc,
+						containerTag: userTag,
+						ownerId: args.ownerId,
+						projectId: args.projectId
+					})
+				)
+				.filter((doc): doc is ScopedMemorySummary => doc !== null),
+			project: projectTag
+				? getDocs(projectDocs)
+						.map((doc) =>
+							memorySummaryFromDocument({
+								doc,
+								containerTag: projectTag,
+								ownerId: args.ownerId,
+								projectId: args.projectId
+							})
+						)
+						.filter((doc): doc is ScopedMemorySummary => doc !== null)
+				: []
+		};
+	} catch (error) {
+		return { status: 'failed', error: errorMessage(error) };
+	}
+}
+
+export async function inspectScopedMemoryDocument(args: {
 	documentId: string;
 	ownerId: Id<'users'>;
 	projectId?: Id<'projects'>;
+}): Promise<
+	| { status: 'disabled' }
+	| { status: 'inspected'; memory: InspectedMemoryDocument }
+	| { status: 'denied'; reason: string }
+	| { status: 'failed'; error: string }
+> {
+	const sm = getSupermemoryClient();
+	if (!sm) return { status: 'disabled' };
+
+	try {
+		const doc = (await withTimeout(
+			sm.documents.get(args.documentId),
+			DELETE_TIMEOUT_MS
+		)) as unknown as Record<string, unknown>;
+		const metadata = metadataRecord(doc.metadata);
+		const sourceType = stringMetadata(metadata, 'sourceType') ?? '';
+		if (!isReadableMemorySourceType(sourceType))
+			return { status: 'denied', reason: 'Unsupported memory type.' };
+
+		const tags = Array.isArray(doc.containerTags) ? doc.containerTags.map(String) : [];
+		const containerTag = tags.find((tag) =>
+			memoryScopeFromContainerTag(tag, args.ownerId, args.projectId)
+		);
+		if (!containerTag)
+			return { status: 'denied', reason: 'Document is outside this workspace scope.' };
+
+		const summary = memorySummaryFromDocument({
+			doc,
+			containerTag,
+			ownerId: args.ownerId,
+			projectId: args.projectId
+		});
+		if (!summary) return { status: 'denied', reason: 'Document is outside this workspace scope.' };
+
+		return {
+			status: 'inspected',
+			memory: {
+				...summary,
+				content: typeof doc.content === 'string' ? doc.content : summary.summary,
+				metadata: Object.fromEntries(
+					Object.entries(metadata).map(([key, value]) => [key, sanitizeMetadataValue(value)])
+				),
+				readOnly: sourceType === 'artifact',
+				derivedFromArtifact: sourceType === 'artifact'
+			}
+		};
+	} catch (error) {
+		return { status: 'failed', error: errorMessage(error) };
+	}
+}
+
+export async function deleteScopedSemanticMemoryDocument(args: {
+	documentId: string;
+	ownerId: Id<'users'>;
+	projectId?: Id<'projects'>;
+	scope: MemoryScope;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
 	const sm = getSupermemoryClient();
 	if (!sm) return { ok: false, reason: 'Supermemory is not configured.' };
 
 	try {
-		const doc = await withTimeout(sm.documents.get(args.documentId), DELETE_TIMEOUT_MS);
-		const allowedTags = new Set([
-			userMemoryContainerTag(args.ownerId),
-			legacyUserMemoryContainerTag(args.ownerId),
-			...(args.projectId
-				? [
-						projectMemoryContainerTag(args.projectId),
-						legacyProjectMemoryContainerTag(args.projectId)
-					]
-				: [])
-		]);
-		const tags = doc.containerTags ?? [];
-		const tagOk = tags.some((t) => allowedTags.has(t));
-		if (!tagOk) {
-			return { ok: false, reason: 'Document is outside this workspace scope.' };
+		const doc = (await withTimeout(
+			sm.documents.get(args.documentId),
+			DELETE_TIMEOUT_MS
+		)) as unknown as Record<string, unknown>;
+		const metadata = metadataRecord(doc.metadata);
+		const sourceType = stringMetadata(metadata, 'sourceType') ?? '';
+		if (!isSemanticSourceType(sourceType)) {
+			return { ok: false, reason: 'Only semantic user/project memory can be forgotten here.' };
+		}
+		const expectedTag =
+			args.scope === 'user'
+				? userMemoryContainerTag(args.ownerId)
+				: args.projectId
+					? projectMemoryContainerTag(args.projectId)
+					: '';
+		if (!expectedTag)
+			return { ok: false, reason: 'Project memory is only available in project chats.' };
+
+		const tags = Array.isArray(doc.containerTags) ? doc.containerTags.map(String) : [];
+		if (!tags.includes(expectedTag)) {
+			return { ok: false, reason: 'Document is outside the requested memory scope.' };
 		}
 
-		const meta = doc.metadata;
-		const ownerFromMeta =
-			meta && typeof meta === 'object' && !Array.isArray(meta) && 'ownerId' in meta
-				? String((meta as { ownerId?: unknown }).ownerId ?? '')
-				: '';
+		const ownerFromMeta = stringMetadata(metadata, 'ownerId');
 		if (ownerFromMeta && ownerFromMeta !== args.ownerId) {
 			return { ok: false, reason: 'Document owner does not match.' };
 		}
 
-		return { ok: true };
+		const projectFromMeta = stringMetadata(metadata, 'projectId');
+		if (args.scope === 'user') {
+			if (sourceType === 'project_decision' || projectFromMeta) {
+				return { ok: false, reason: 'Use project memory tools for project-scoped memory.' };
+			}
+		} else if (sourceType === 'user_preference') {
+			return {
+				ok: false,
+				reason: 'Global user preferences cannot be deleted by project memory tools.'
+			};
+		}
+
+		const del = await deleteSupermemoryDocument(args.documentId);
+		return del.ok ? { ok: true } : { ok: false, reason: del.error };
 	} catch {
 		return { ok: false, reason: 'Document not found or inaccessible.' };
 	}
 }
+
+export {
+	readableMemoryFilter,
+	userPreferenceCategories,
+	projectDecisionCategories,
+	threadInsightCategories
+};

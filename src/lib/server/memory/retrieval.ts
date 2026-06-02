@@ -5,13 +5,15 @@ import { getSupermemoryClient } from './client';
 import { memoryLog } from './log';
 import { projectMemoryContainerTag, userMemoryContainerTag } from './tags';
 import { errorMessage, MEMORY_SEARCH_TIMEOUT_MS, withTimeout } from './fallback';
+import { readableMemorySourceTypes } from './semantic';
 
-/** Limit retrieval to Launchpad-owned document kinds (metadata.sourceType). */
+/** Limit retrieval to active Launchpad-owned document kinds (metadata.sourceType). */
 const memorySourceFilter = {
-	OR: [
-		{ key: 'sourceType', value: 'artifact', filterType: 'metadata' as const },
-		{ key: 'sourceType', value: 'user_note', filterType: 'metadata' as const }
-	]
+	OR: readableMemorySourceTypes.map((sourceType) => ({
+		key: 'sourceType',
+		value: sourceType,
+		filterType: 'metadata' as const
+	}))
 } satisfies SearchDocumentsParams.Or;
 
 export type RetrievedMemory = {
@@ -20,6 +22,7 @@ export type RetrievedMemory = {
 	containerTag: string;
 	score: number;
 	source: string;
+	category?: string;
 	title?: string;
 	artifactId?: string;
 	updatedAt?: string;
@@ -66,6 +69,7 @@ async function searchContainer(
 					containerTag,
 					score: result.score,
 					source: stringMetadata(metadata.sourceType) || 'supermemory',
+					category: stringMetadata(metadata.category) ?? stringMetadata(metadata.artifactType),
 					title: stringMetadata(metadata.title) ?? result.title ?? undefined,
 					artifactId: stringMetadata(metadata.artifactId),
 					updatedAt: result.updatedAt

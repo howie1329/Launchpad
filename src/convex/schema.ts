@@ -18,7 +18,8 @@ const memorySyncStatus = v.union(v.literal('synced'), v.literal('blocked'), v.li
 const aiUsageSourceKind = v.union(v.literal('chatThread'), v.literal('externalContextImportDraft'));
 const notificationType = v.union(
 	v.literal('external_context_import'),
-	v.literal('ai_chat_activity')
+	v.literal('ai_chat_activity'),
+	v.literal('external_project_activity')
 );
 const notificationState = v.union(
 	v.literal('activity'),
@@ -53,6 +54,17 @@ const externalContextImportSourceToolHint = v.union(
 	v.literal('claude'),
 	v.literal('other'),
 	v.literal('unknown')
+);
+const launchpadActionProvider = v.union(v.literal('github'), v.literal('linear'));
+const launchpadActionSourceKind = v.union(
+	v.literal('github_repository'),
+	v.literal('linear_project'),
+	v.literal('linear_team')
+);
+const launchpadActionStatus = v.union(
+	v.literal('active'),
+	v.literal('disabled'),
+	v.literal('needs_attention')
 );
 
 export default defineSchema({
@@ -126,6 +138,42 @@ export default defineSchema({
 		.index('by_ownerId_and_createdAt', ['ownerId', 'createdAt'])
 		.index('by_ownerId_and_status_and_createdAt', ['ownerId', 'status', 'createdAt'])
 		.index('by_ownerId_and_targetKind_and_targetId', ['ownerId', 'targetKind', 'targetId']),
+	launchpadActions: defineTable({
+		ownerId: v.string(),
+		projectId: v.id('projects'),
+		provider: launchpadActionProvider,
+		sourceKind: launchpadActionSourceKind,
+		sourceId: v.string(),
+		sourceName: v.string(),
+		triggerSlug: v.string(),
+		triggerId: v.optional(v.string()),
+		connectedAccountId: v.optional(v.string()),
+		triggerConfig: v.optional(v.record(v.string(), v.any())),
+		status: launchpadActionStatus,
+		statusReason: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		disabledAt: v.optional(v.number())
+	})
+		.index('by_projectId_and_createdAt', ['projectId', 'createdAt'])
+		.index('by_ownerId_and_updatedAt', ['ownerId', 'updatedAt'])
+		.index('by_triggerId', ['triggerId']),
+	projectActivityEvents: defineTable({
+		ownerId: v.string(),
+		projectId: v.id('projects'),
+		actionId: v.optional(v.id('launchpadActions')),
+		provider: launchpadActionProvider,
+		externalEventId: v.string(),
+		eventType: v.string(),
+		actor: v.optional(v.string()),
+		title: v.string(),
+		externalUrl: v.optional(v.string()),
+		summary: v.optional(v.string()),
+		metadata: v.optional(v.record(v.string(), v.any())),
+		createdAt: v.number()
+	})
+		.index('by_projectId_and_createdAt', ['projectId', 'createdAt'])
+		.index('by_actionId_and_externalEventId', ['actionId', 'externalEventId']),
 	externalContextImportDrafts: defineTable({
 		ownerId: v.string(),
 		sourceMarkdown: v.string(),
@@ -157,6 +205,8 @@ export default defineSchema({
 		title: v.string(),
 		scopeType: chatThreadScopeType,
 		projectId: v.optional(v.id('projects')),
+		/** Opaque Composio tool-router session scoped to this workspace thread. */
+		composioSessionId: v.optional(v.string()),
 		/** Set when the LLM has written the sidebar title (one-time). */
 		titleGeneratedAt: v.optional(v.number()),
 		createdAt: v.number(),
