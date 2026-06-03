@@ -235,6 +235,32 @@ export async function createComposioConnectLinkForUser({
 	return { redirectUrl: request.redirectUrl };
 }
 
+export async function deleteComposioConnectedAccountsForUser({
+	ownerId,
+	toolkit
+}: {
+	ownerId: string;
+	toolkit: AllowedComposioToolkit;
+}): Promise<{ deleted: number }> {
+	const composio = getComposioClient();
+	if (!composio) {
+		throw new Error('Composio is not configured');
+	}
+
+	const accounts = await composio.connectedAccounts.list({
+		userIds: [ownerId],
+		toolkitSlugs: [toolkit],
+		accountType: 'ALL',
+		limit: 100
+	});
+
+	for (const account of accounts.items) {
+		await composio.connectedAccounts.delete(account.id);
+	}
+
+	return { deleted: accounts.items.length };
+}
+
 export async function listComposioTriggerTypesForLaunchpadActions({
 	toolkit
 }: {

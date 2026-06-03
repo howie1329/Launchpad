@@ -37,6 +37,10 @@
 	let externalAppsError = $state('');
 	let externalApps = $state<ExternalAppStatus[]>([]);
 	let connectingExternalApp = $state<AllowedExternalApp | ''>('');
+	let disconnectingExternalApp = $state<AllowedExternalApp | ''>('');
+	let disconnectExternalAppDialogOpen = $state(false);
+	let disconnectExternalAppSlug = $state<AllowedExternalApp | ''>('');
+	let disconnectExternalAppError = $state('');
 
 	let resetDialogOpen = $state(false);
 	let deleteDialogOpen = $state(false);
@@ -56,6 +60,11 @@
 				dailyCapUsd.trim() !== savedDailyCapUsd ||
 				aiContextMarkdown.trim() !== savedAiContextMarkdown ||
 				aiBehaviorMarkdown.trim() !== savedAiBehaviorMarkdown)
+	);
+	const disconnectExternalApp = $derived(
+		disconnectExternalAppSlug
+			? externalApps.find((app) => app.slug === disconnectExternalAppSlug)
+			: undefined
 	);
 
 	type AllowedExternalApp =
@@ -176,7 +185,7 @@
 	}
 
 	async function connectExternalApp(toolkit: AllowedExternalApp) {
-		if (!auth.token || connectingExternalApp) return;
+		if (!auth.token || connectingExternalApp || disconnectingExternalApp) return;
 
 		connectingExternalApp = toolkit;
 		externalAppsError = '';
@@ -220,6 +229,57 @@
 		} finally {
 			connectingExternalApp = '';
 		}
+	}
+
+	async function confirmDisconnectExternalApp() {
+		if (!auth.token || !disconnectExternalAppSlug || disconnectingExternalApp) return;
+
+		const toolkit = disconnectExternalAppSlug;
+		disconnectingExternalApp = toolkit;
+		disconnectExternalAppError = '';
+		externalAppsError = '';
+		try {
+			const response = await fetch('/api/workspace/composio/apps', {
+				method: 'DELETE',
+				headers: {
+					...authHeaders(),
+					'content-type': 'application/json'
+				},
+				body: JSON.stringify({ toolkit })
+			});
+			const result = (await response.json().catch(() => null)) as {
+				ok?: boolean;
+				error?: string;
+			} | null;
+
+			if (!response.ok || !result?.ok) {
+				throw new Error(result?.error || 'Could not disconnect external app.');
+			}
+
+			externalApps = externalApps.map((app) =>
+				app.slug === toolkit
+					? { ...app, connected: false, status: 'NOT_CONNECTED', connectable: true }
+					: app
+			);
+			disconnectExternalAppDialogOpen = false;
+			disconnectExternalAppSlug = '';
+			externalAppsLoaded = false;
+			await loadExternalApps();
+		} catch (error) {
+			console.error(error);
+			disconnectExternalAppError =
+				error instanceof Error && error.message
+					? error.message
+					: 'Could not disconnect external app.';
+		} finally {
+			disconnectingExternalApp = '';
+		}
+	}
+
+	function openDisconnectExternalAppDialog(app: ExternalAppStatus) {
+		disconnectExternalAppSlug = app.slug;
+		disconnectExternalAppError = '';
+		disconnectExternalAppDialogOpen = true;
 	}
 
 	function authHeaders() {
@@ -655,7 +715,7 @@
 													type="button"
 													variant="outline"
 													size="sm"
-													disabled={Boolean(connectingExternalApp)}
+													disabled={Boolean(connectingExternalApp || disconnectingExternalApp)}
 													onclick={() => {
 														void connectExternalApp(app.slug);
 													}}
@@ -663,6 +723,18 @@
 													{connectingExternalApp === app.slug
 														? 'Opening…'
 														: externalAppActionLabel(app)}
+												</Button>
+											{/if}
+											{#if app.connected}
+												<Button
+													type="button"
+													variant="outline"
+													size="sm"
+													class="border-destructive/40 text-destructive hover:bg-destructive/10"
+													disabled={Boolean(connectingExternalApp || disconnectingExternalApp)}
+													onclick={() => openDisconnectExternalAppDialog(app)}
+												>
+													{disconnectingExternalApp === app.slug ? 'Disconnecting…' : 'Disconnect'}
 												</Button>
 											{/if}
 										</div>
@@ -785,6 +857,44 @@
 		</div>
 	</div>
 </section>
+
+<Dialog.Root bind:open={disconnectExternalAppDialogOpen}>
+	<Dialog.Content class="sm:max-w-md" showCloseButton={!disconnectingExternalApp}>
+		<Dialog.Header>
+			<Dialog.Title>Disconnect external app</Dialog.Title>
+			<Dialog.Description>
+				{#if disconnectExternalApp}
+					This removes Launchpad's Composio authorization for {disconnectExternalApp.name}. You can
+					connect it again later.
+				{:else}
+					This removes Launchpad's Composio authorization for this app. You can connect it again
+					later.
+				{/if}
+			</Dialog.Description>
+		</Dialog.Header>
+		{#if disconnectExternalAppError}
+			<p class="text-xs text-destructive">{disconnectExternalAppError}</p>
+		{/if}
+		<Dialog.Footer>
+			<Button
+				type="button"
+				variant="secondary"
+				size="sm"
+				disabled={Boolean(disconnectingExternalApp)}
+				onclick={() => (disconnectExternalAppDialogOpen = false)}>Cancel</Button
+			>
+			<Button
+				type="button"
+				variant="destructive"
+				size="sm"
+				disabled={Boolean(disconnectingExternalApp)}
+				onclick={confirmDisconnectExternalApp}
+			>
+				{disconnectingExternalApp ? 'Disconnecting…' : 'Disconnect'}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
 
 <Dialog.Root bind:open={resetDialogOpen}>
 	<Dialog.Content class="sm:max-w-md" showCloseButton={!isResetting}>
