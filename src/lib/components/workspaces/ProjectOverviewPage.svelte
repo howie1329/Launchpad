@@ -44,6 +44,13 @@
 		type ProjectActivityEvent
 	} from '$lib/launchpad-actions';
 	import {
+		findLaunchpadActionPreset,
+		launchpadActionEventLabel,
+		launchpadActionPresets,
+		type LaunchpadActionEvent,
+		type LaunchpadActionPresetId
+	} from '$lib/launchpad-action-presets';
+	import {
 		defaultIdeaAiModelId,
 		getModelSelectorLogoProvider,
 		ideaAiModels,
@@ -79,12 +86,12 @@
 	let selectedModelId = $state<IdeaAiModelId>(defaultIdeaAiModelId);
 	let submitError = $state('');
 	let isSubmitting = $state(false);
-	let actionProvider = $state<LaunchpadActionProvider>('github');
-	let actionSourceKind = $state<LaunchpadActionSourceKind>('github_repository');
+	let selectedActionPresetId = $state<LaunchpadActionPresetId>('github_repository_activity');
+	let actionSourceValue = $state('');
 	let actionSourceName = $state('');
-	let actionSourceId = $state('');
-	let actionTriggerSlug = $state('');
-	let actionTriggerConfig = $state('{\n}');
+	let actionTeamId = $state('');
+	let actionBranch = $state('');
+	let actionEventId = $state('');
 	let actionFormOpen = $state(false);
 	let actionError = $state('');
 	let actionNotice = $state('');
@@ -92,6 +99,7 @@
 	let updatingActionId = $state('');
 	let triggerTypesLoading = $state(false);
 	let triggerTypesError = $state('');
+	let triggerTypesProvider = $state<LaunchpadActionProvider | ''>('');
 	let triggerTypes = $state<ComposioTriggerType[]>([]);
 
 	const threads = useQuery(listThreadsQuery, () =>
@@ -141,6 +149,49 @@
 	const projectArtifacts = $derived(artifacts.data ?? []);
 	const projectActions = $derived(launchpadActions.data ?? []);
 	const externalActivity = $derived(projectActivityEvents.data ?? []);
+	const selectedActionPreset = $derived(
+		findLaunchpadActionPreset(selectedActionPresetId) ?? launchpadActionPresets[0]
+	);
+	const selectedActionEvent = $derived(
+		selectedActionPreset.events.find((event) => event.id === actionEventId) ??
+			selectedActionPreset.events[0]
+	);
+	const actionEventRows = $derived(
+		selectedActionPreset.events.map((event) => {
+			const providerTypes =
+				triggerTypesProvider === selectedActionPreset.provider ? triggerTypes : [];
+			return {
+				event,
+				trigger: findMatchingTriggerType(providerTypes, event)
+			};
+		})
+	);
+	const selectedActionEventAvailable = $derived(
+		actionEventRows.some((row) => row.event.id === selectedActionEvent.id && row.trigger)
+	);
+	const selectedActionTrigger = $derived(
+		actionEventRows.find((row) => row.event.id === selectedActionEvent.id)?.trigger
+	);
+	const selectedActionNeedsTeamId = $derived(
+		selectedActionPreset.sourceKind === 'linear_project' &&
+			Boolean(selectedActionTrigger && triggerRequiresConfigKey(selectedActionTrigger, 'team_id'))
+	);
+	const selectedActionNeedsBranch = $derived(
+		selectedActionPreset.sourceKind === 'github_repository' &&
+			Boolean(selectedActionTrigger && triggerRequiresConfigKey(selectedActionTrigger, 'branch'))
+	);
+	const selectedActionHasUnsupportedConfig = $derived.by(() => {
+		if (!selectedActionTrigger) return false;
+		return missingRequiredConfigKeys(selectedActionTrigger).length > 0;
+	});
+	const canCreateAction = $derived(
+		Boolean(actionSourceValue.trim()) &&
+			(!selectedActionNeedsTeamId || Boolean(actionTeamId.trim())) &&
+			(!selectedActionNeedsBranch || Boolean(actionBranch.trim())) &&
+			Boolean(selectedActionEvent) &&
+			selectedActionEventAvailable &&
+			!selectedActionHasUnsupportedConfig
+	);
 	const latestThread = $derived(projectThreads[0] ?? null);
 	const latestArtifact = $derived(projectArtifacts[0] ?? null);
 	const lastUpdated = $derived(
@@ -184,6 +235,16 @@
 		return items.sort((a, b) => b.time - a.time).slice(0, 8);
 	});
 
+	$effect(() => {
+		if (!actionEventId) actionEventId = selectedActionPreset.events[0]?.id ?? '';
+	});
+
+	$effect(() => {
+		if (!auth.isAuthenticated || !auth.token || !actionFormOpen) return;
+		if (triggerTypesProvider === selectedActionPreset.provider || triggerTypesLoading) return;
+		void loadTriggerTypes();
+	});
+
 	const formatRelativeTime = (time: number) => {
 		const diff = Date.now() - time;
 		const minutes = Math.max(1, Math.round(diff / 60000));
@@ -211,12 +272,16 @@
 		focusComposer();
 	};
 
-	function selectActionProvider(provider: LaunchpadActionProvider) {
-		actionProvider = provider;
-		actionSourceKind = provider === 'github' ? 'github_repository' : 'linear_project';
-		actionTriggerSlug = '';
-		triggerTypes = [];
-		triggerTypesError = '';
+	function selectActionPreset(presetId: LaunchpadActionPresetId) {
+		selectedActionPresetId = presetId;
+		const preset = findLaunchpadActionPreset(presetId) ?? launchpadActionPresets[0];
+		actionEventId = preset.events[0]?.id ?? '';
+		actionSourceValue = '';
+		actionSourceName = '';
+		actionTeamId = '';
+		actionBranch = '';
+		actionError = '';
+		actionNotice = '';
 	}
 
 	const submitMessage = async (message: PromptInputMessage) => {
@@ -253,7 +318,7 @@
 		triggerTypesError = '';
 		try {
 			const response = await fetch(
-				`/api/workspace/launchpad-actions?provider=${encodeURIComponent(actionProvider)}`,
+				`/api/workspace/launchpad-actions?provider=${encodeURIComponent(selectedActionPreset.provider)}`,
 				{ headers: authHeaders() }
 			);
 			const result = (await response.json().catch(() => null)) as {
@@ -266,9 +331,7 @@
 			}
 
 			triggerTypes = Array.isArray(result?.triggers) ? result.triggers.filter(isTriggerType) : [];
-			if (!actionTriggerSlug && triggerTypes[0]) {
-				actionTriggerSlug = triggerTypes[0].slug;
-			}
+			triggerTypesProvider = selectedActionPreset.provider;
 		} catch (error) {
 			console.error(error);
 			triggerTypesError =
@@ -282,6 +345,12 @@
 	async function createLaunchpadAction() {
 		if (!auth.token || isCreatingAction) return;
 
+		const validationError = validateActionForm();
+		if (validationError) {
+			actionError = validationError;
+			return;
+		}
+
 		isCreatingAction = true;
 		actionError = '';
 		actionNotice = '';
@@ -294,12 +363,12 @@
 				},
 				body: JSON.stringify({
 					projectId,
-					provider: actionProvider,
-					sourceKind: actionSourceKind,
-					sourceId: actionSourceId,
+					presetId: selectedActionPreset.id,
+					eventId: selectedActionEvent.id,
+					sourceValue: actionSourceValue,
 					sourceName: actionSourceName,
-					triggerSlug: actionTriggerSlug,
-					triggerConfig: actionTriggerConfig
+					teamId: actionTeamId,
+					branch: actionBranch
 				})
 			});
 			const result = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -308,8 +377,9 @@
 			}
 
 			actionSourceName = '';
-			actionSourceId = '';
-			actionTriggerConfig = '{\n}';
+			actionSourceValue = '';
+			actionTeamId = '';
+			actionBranch = '';
 			actionNotice = 'Launchpad Action created.';
 		} catch (error) {
 			console.error(error);
@@ -388,6 +458,76 @@
 		if (!value || typeof value !== 'object') return false;
 		const item = value as Partial<ComposioTriggerType>;
 		return typeof item.slug === 'string' && typeof item.name === 'string';
+	}
+
+	function validateActionForm() {
+		const sourceValue = actionSourceValue.trim();
+		if (!sourceValue) return `${selectedActionPreset.sourceLabel} is required.`;
+		if (selectedActionPreset.sourceKind === 'github_repository') {
+			const parts = sourceValue.split('/').map((part) => part.trim());
+			if (parts.length !== 2 || !parts[0] || !parts[1]) {
+				return 'Repository must use owner/repo format.';
+			}
+		}
+		if (selectedActionNeedsTeamId && !actionTeamId.trim()) return 'Linear team id is required.';
+		if (selectedActionNeedsBranch && !actionBranch.trim()) return 'Branch is required.';
+		if (selectedActionHasUnsupportedConfig) {
+			return 'Selected event requires configuration this setup does not support yet.';
+		}
+		if (!selectedActionEventAvailable) return 'Selected event is not available.';
+		return '';
+	}
+
+	function actionEventDisplayLabel(action: LaunchpadAction) {
+		const configured = action.triggerConfig?.launchpadEventLabel;
+		if (typeof configured === 'string' && configured.trim()) return configured;
+		const eventId = action.triggerConfig?.launchpadEventId;
+		if (typeof eventId === 'string') {
+			const label = launchpadActionEventLabel(eventId);
+			if (label) return label;
+		}
+		return action.triggerSlug;
+	}
+
+	function findMatchingTriggerType(triggers: ComposioTriggerType[], event: LaunchpadActionEvent) {
+		return triggers.find((trigger) => triggerMatchesEvent(trigger, event));
+	}
+
+	function triggerMatchesEvent(trigger: ComposioTriggerType, event: LaunchpadActionEvent) {
+		const haystack = triggerText(trigger);
+		return (
+			event.matchAll.every((term) => haystack.includes(normalizeTriggerTerm(term))) &&
+			(!event.matchAny ||
+				event.matchAny.some((term) => haystack.includes(normalizeTriggerTerm(term))))
+		);
+	}
+
+	function triggerText(trigger: ComposioTriggerType) {
+		return normalizeTriggerTerm(`${trigger.slug} ${trigger.name} ${trigger.description ?? ''}`);
+	}
+
+	function triggerRequiresConfigKey(trigger: ComposioTriggerType, key: string) {
+		const required = trigger.config?.required;
+		return Array.isArray(required) && required.includes(key);
+	}
+
+	function missingRequiredConfigKeys(trigger: ComposioTriggerType) {
+		const required = trigger.config?.required;
+		if (!Array.isArray(required)) return [];
+		const supported = [
+			'owner',
+			'repo',
+			'project_id',
+			'team_id',
+			...(selectedActionEvent.optionalConfigKeys ?? [])
+		];
+		return required.filter(
+			(key): key is string => typeof key === 'string' && !supported.includes(key)
+		);
+	}
+
+	function normalizeTriggerTerm(value: string) {
+		return value.toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 	}
 
 	function providerLabel(provider: LaunchpadActionProvider) {
@@ -668,100 +808,123 @@
 
 					{#if actionFormOpen}
 						<div class="mb-3 rounded-lg border border-border/70 bg-background/70 p-3">
-							<div class="grid gap-2 sm:grid-cols-2">
+							<div class="grid gap-2">
 								<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
-									><span>Source</span><select
-										bind:value={actionProvider}
+									><span>Action preset</span><select
+										bind:value={selectedActionPresetId}
 										class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
 										disabled={isCreatingAction}
-										onchange={() => selectActionProvider(actionProvider)}
-										><option value="github">GitHub</option><option value="linear">Linear</option
-										></select
+										onchange={() => selectActionPreset(selectedActionPresetId)}
+										>{#each launchpadActionPresets as preset (preset.id)}<option value={preset.id}
+												>{preset.label}</option
+											>{/each}</select
 									></label
 								>
-								<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
-									><span>Scope type</span><select
-										bind:value={actionSourceKind}
-										class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
-										disabled={isCreatingAction}
-										>{#if actionProvider === 'github'}<option value="github_repository"
-												>GitHub repository</option
-											>{:else}<option value="linear_project">Linear project</option><option
-												value="linear_team">Linear team</option
-											>{/if}</select
-									></label
-								>
-								<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
-									><span>Source name</span><input
-										bind:value={actionSourceName}
-										class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
-										placeholder={actionProvider === 'github' ? 'owner/repo' : 'Launchpad team'}
-										disabled={isCreatingAction}
-									/></label
-								>
-								<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
-									><span>Source id</span><input
-										bind:value={actionSourceId}
-										class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
-										placeholder={actionProvider === 'github' ? 'owner/repo' : 'Linear id or key'}
-										disabled={isCreatingAction}
-									/></label
-								>
+								<p class="text-[11px] leading-4 text-muted-foreground">
+									{selectedActionPreset.description}
+								</p>
 							</div>
-							<div class="mt-2 grid gap-2 sm:grid-cols-2">
+
+							<div class="mt-3 grid gap-2 sm:grid-cols-2">
 								<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
-									><span>Composio trigger</span>
-									<div class="flex gap-1.5">
-										<select
-											bind:value={actionTriggerSlug}
-											class="h-8 min-w-0 flex-1 rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
-											disabled={isCreatingAction || triggerTypesLoading}
-											>{#if triggerTypes.length === 0}<option value="">Trigger slug</option
-												>{:else}{#each triggerTypes as trigger (trigger.slug)}<option
-														value={trigger.slug}>{trigger.name}</option
-													>{/each}{/if}</select
-										><button
+									><span>{selectedActionPreset.sourceLabel}</span><input
+										bind:value={actionSourceValue}
+										class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
+										placeholder={selectedActionPreset.sourcePlaceholder}
+										disabled={isCreatingAction}
+									/>
+									<span class="block text-[10px] leading-4 font-normal text-muted-foreground">
+										{selectedActionPreset.sourceHelp}
+									</span></label
+								>
+								{#if selectedActionPreset.provider === 'linear'}
+									<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
+										><span>Display name</span><input
+											bind:value={actionSourceName}
+											class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
+											placeholder={selectedActionPreset.sourceKind === 'linear_team'
+												? 'Launchpad team'
+												: 'Launchpad project'}
+											disabled={isCreatingAction}
+										/>
+										<span class="block text-[10px] leading-4 font-normal text-muted-foreground">
+											Optional label shown in project activity.
+										</span></label
+									>
+								{/if}
+								{#if selectedActionNeedsBranch}
+									<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
+										><span>Branch</span><input
+											bind:value={actionBranch}
+											class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
+											placeholder="main"
+											disabled={isCreatingAction}
+										/>
+										<span class="block text-[10px] leading-4 font-normal text-muted-foreground">
+											Required by this GitHub event.
+										</span></label
+									>
+								{/if}
+								{#if selectedActionNeedsTeamId}
+									<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
+										><span>Team id</span><input
+											bind:value={actionTeamId}
+											class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
+											placeholder="team-id-or-key"
+											disabled={isCreatingAction}
+										/>
+										<span class="block text-[10px] leading-4 font-normal text-muted-foreground">
+											Required by this Linear event.
+										</span></label
+									>
+								{/if}
+							</div>
+
+							<div class="mt-3 grid gap-2">
+								<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
+									><span>Event type</span><select
+										bind:value={actionEventId}
+										class="h-8 w-full rounded-md border border-border/70 bg-background px-2 text-xs text-foreground"
+										disabled={isCreatingAction || triggerTypesLoading}
+										>{#each actionEventRows as row (row.event.id)}<option
+												value={row.event.id}
+												disabled={!row.trigger}
+												>{row.event.label}{row.trigger ? '' : ' (unavailable)'}</option
+											>{/each}</select
+									></label
+								>
+								{#if triggerTypesLoading}
+									<p class="text-[11px] text-muted-foreground">Loading available events…</p>
+								{:else if triggerTypesError}
+									<div class="flex items-center justify-between gap-2">
+										<p class="text-[11px] text-destructive">{triggerTypesError}</p>
+										<button
 											type="button"
-											class="h-8 rounded-md border border-border/70 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-											disabled={triggerTypesLoading}
-											onclick={loadTriggerTypes}>Load</button
+											class="h-7 rounded-md border border-border/70 px-2 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+											onclick={loadTriggerTypes}>Retry</button
 										>
-									</div></label
-								>
-								<label class="space-y-1 text-[11px] font-medium text-muted-foreground"
-									><span>Trigger slug</span><input
-										bind:value={actionTriggerSlug}
-										class="h-8 w-full rounded-md border border-border/70 bg-background px-2 font-mono text-xs text-foreground"
-										placeholder="GITHUB_..."
-										disabled={isCreatingAction}
-									/></label
-								>
+									</div>
+								{:else if !selectedActionEventAvailable}
+									<p class="text-[11px] leading-4 text-muted-foreground">
+										This event is not available from Composio right now.
+									</p>
+								{:else if selectedActionHasUnsupportedConfig}
+									<p class="text-[11px] leading-4 text-muted-foreground">
+										This event requires setup fields Launchpad does not support yet.
+									</p>
+								{/if}
 							</div>
-							<label class="mt-2 block space-y-1 text-[11px] font-medium text-muted-foreground"
-								><span>Trigger config JSON</span><textarea
-									bind:value={actionTriggerConfig}
-									class="min-h-20 w-full resize-y rounded-md border border-border/70 bg-background px-2 py-2 font-mono text-xs leading-5 text-foreground"
-									spellcheck="false"
-									disabled={isCreatingAction}
-								></textarea></label
-							>
+
 							<div class="mt-2 flex flex-wrap items-center justify-between gap-2">
 								<div class="min-h-4 text-[11px]">
-									{#if triggerTypesLoading}<span class="text-muted-foreground"
-											>Loading Composio triggers…</span
-										>{:else if triggerTypesError}<span class="text-destructive"
-											>{triggerTypesError}</span
-										>{:else if actionError}<span class="text-destructive">{actionError}</span
+									{#if actionError}<span class="text-destructive">{actionError}</span
 										>{:else if actionNotice}<span class="text-muted-foreground">{actionNotice}</span
 										>{/if}
 								</div>
 								<button
 									type="button"
 									class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-									disabled={isCreatingAction ||
-										!actionSourceName.trim() ||
-										!actionSourceId.trim() ||
-										!actionTriggerSlug.trim()}
+									disabled={isCreatingAction || !canCreateAction}
 									onclick={createLaunchpadAction}
 									><HugeiconsIcon
 										icon={PlayIcon}
@@ -829,7 +992,7 @@
 
 {#snippet SkeletonRows(count: number)}
 	<div class="space-y-2 px-1 py-1" aria-hidden="true">
-		{#each Array.from({ length: count }) as _, index (index)}
+		{#each Array.from({ length: count }, (_row, index) => index) as index (index)}
 			<div class="h-9 animate-pulse rounded-md bg-muted/70"></div>
 		{/each}
 	</div>
@@ -891,7 +1054,7 @@
 					>
 				</div>
 				<p class="mt-0.5 truncate text-[11px] text-muted-foreground">
-					{sourceKindLabel(action.sourceKind)} · {action.triggerSlug}
+					{sourceKindLabel(action.sourceKind)} · {actionEventDisplayLabel(action)}
 				</p>
 				{#if action.statusReason}
 					<p class="mt-1 line-clamp-2 text-[11px] text-destructive">{action.statusReason}</p>
