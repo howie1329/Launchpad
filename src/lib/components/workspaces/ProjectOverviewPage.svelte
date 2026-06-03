@@ -204,32 +204,34 @@
 	const recentActivity = $derived.by(() => {
 		const items = [
 			...externalActivity.slice(0, 8).map((event) => ({
-				kind: `${providerLabel(event.provider)} ${event.eventType}`,
-				title: activityTitle(event),
+				id: event._id,
+				kind: 'external' as const,
+				event,
 				time: event.createdAt,
-				href: event.externalUrl ?? '',
-				external: Boolean(event.externalUrl)
 			})),
 			...projectThreads.slice(0, 3).map((thread) => ({
-				kind: 'Thread updated',
+				id: thread._id,
+				kind: 'internal' as const,
+				label: 'Thread updated',
 				title: formatThreadTitleForDisplay(thread.title),
 				time: thread.updatedAt,
-				href: workspaceThreadHref(thread),
-				external: false
+				href: workspaceThreadHref(thread)
 			})),
 			...projectArtifacts.slice(0, 3).map((artifact) => ({
-				kind: 'Artifact updated',
+				id: artifact._id,
+				kind: 'internal' as const,
+				label: 'Artifact updated',
 				title: artifact.title,
 				time: artifact.updatedAt,
-				href: workspaceArtifactHref(artifact._id),
-				external: false
+				href: workspaceArtifactHref(artifact._id)
 			})),
 			{
-				kind: 'Project updated',
+				id: project._id,
+				kind: 'internal' as const,
+				label: 'Project updated',
 				title: project.name,
 				time: project.updatedAt,
-				href: '',
-				external: false
+				href: ''
 			}
 		];
 		return items.sort((a, b) => b.time - a.time).slice(0, 8);
@@ -545,8 +547,28 @@
 		return action.status === 'active' ? 'Active' : 'Paused';
 	}
 
-	function activityTitle(event: ProjectActivityEvent) {
-		return event.actor ? `${event.title} by ${event.actor}` : event.title;
+	function activityEventLabel(event: ProjectActivityEvent) {
+		return `${providerLabel(event.provider)} ${event.eventType.toLowerCase()}`.trim();
+	}
+
+	function activityDisplayTitle(event: ProjectActivityEvent) {
+		const titlePrefix = activityTitlePrefix(event);
+		if (!titlePrefix) return event.title;
+		if (event.title.toLowerCase().startsWith(titlePrefix.toLowerCase())) return event.title;
+		return `${titlePrefix}: ${event.title}`;
+	}
+
+	function activitySourceLabel(event: ProjectActivityEvent) {
+		if (!event.sourceName) return '';
+		return event.sourceKind ? `${sourceKindLabel(event.sourceKind)} · ${event.sourceName}` : event.sourceName;
+	}
+
+	function activityTitlePrefix(event: ProjectActivityEvent) {
+		const eventType = event.eventType.trim();
+		const normalized = eventType.toLowerCase();
+		if (!eventType) return '';
+		if (event.provider === 'github' && normalized === 'issue created') return 'Issue opened';
+		return eventType;
 	}
 
 	function openExternalActivity(url: string) {
@@ -962,23 +984,16 @@
 						</p>
 					{:else}
 						<div class="space-y-1">
-							{#each recentActivity as item (`${item.kind}-${item.time}-${item.title}`)}
-								{#if item.href}
-									{#if item.external}
-										<button
-											type="button"
-											class={cn(rowClass, 'w-full text-left')}
-											onclick={() => openExternalActivity(item.href)}
-											>{@render ActivityRow(item.kind, item.title, item.time)}</button
-										>
-									{:else}
-										<a class={rowClass} href={resolve(item.href as '/workspace')}
-											>{@render ActivityRow(item.kind, item.title, item.time)}</a
-										>
-									{/if}
+							{#each recentActivity as item (item.id)}
+								{#if item.kind === 'external'}
+									{@render ExternalActivityRow(item.event)}
+								{:else if item.href}
+									<a class={rowClass} href={resolve(item.href as '/workspace')}
+										>{@render ActivityRow(item.label, item.title, item.time)}</a
+									>
 								{:else}
 									<div class="px-2.5 py-2">
-										{@render ActivityRow(item.kind, item.title, item.time)}
+										{@render ActivityRow(item.label, item.title, item.time)}
 									</div>
 								{/if}
 							{/each}
@@ -1084,6 +1099,55 @@
 				>
 					Delete
 				</button>
+			</div>
+		</div>
+	</div>
+{/snippet}
+
+{#snippet ExternalActivityRow(event: ProjectActivityEvent)}
+	<div class={cn(rowClass, 'bg-background/35')}>
+		<div class="flex items-start gap-2">
+			<HugeiconsIcon
+				icon={event.provider === 'github' ? GithubIcon : LinkSquare01Icon}
+				strokeWidth={2}
+				class="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+			/>
+			<div class="min-w-0 flex-1">
+				<div class="flex min-w-0 items-start justify-between gap-2">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-[11px] font-medium text-muted-foreground">
+							{activityEventLabel(event)}
+						</p>
+						<p class="mt-0.5 line-clamp-2 text-xs font-medium">
+							{activityDisplayTitle(event)}
+						</p>
+					</div>
+					{#if event.externalUrl}
+						<button
+							type="button"
+							class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							aria-label={`Open ${providerLabel(event.provider)} activity`}
+							title={`Open ${providerLabel(event.provider)} activity`}
+							onclick={() => openExternalActivity(event.externalUrl ?? '')}
+						>
+							<HugeiconsIcon icon={LinkSquare01Icon} strokeWidth={2} class="size-3.5" />
+						</button>
+					{/if}
+				</div>
+				<div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+					<span>{formatRelativeTime(event.createdAt)}</span>
+					{#if event.actor}
+						<span>by {event.actor}</span>
+					{/if}
+					{#if activitySourceLabel(event)}
+						<span class="min-w-0 truncate">{activitySourceLabel(event)}</span>
+					{/if}
+				</div>
+				{#if event.summary}
+					<p class="mt-1.5 line-clamp-2 text-[11px] leading-4 text-muted-foreground">
+						{event.summary}
+					</p>
+				{/if}
 			</div>
 		</div>
 	</div>
