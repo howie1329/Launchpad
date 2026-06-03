@@ -11,12 +11,14 @@ import { ConvexHttpClient } from 'convex/browser';
 
 type NormalizedWebhookPayload = {
 	id?: string;
+	uuid?: string;
 	triggerSlug?: string;
 	toolkitSlug?: string;
 	payload?: unknown;
 	originalPayload?: unknown;
 	metadata?: {
 		id?: string;
+		uuid?: string;
 		triggerSlug?: string;
 		toolkitSlug?: string;
 		connectedAccount?: {
@@ -49,7 +51,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			rawString(raw, ['type']) || incoming.triggerSlug || 'composio.trigger.message';
 		const triggerId = triggerIdFromPayload(incoming, raw);
 
-		if (!isAcceptedEventType(eventType)) {
+		if (!isAcceptedEventType(eventType, triggerId)) {
 			return json({ ok: true, status: 'ignored' });
 		}
 
@@ -101,11 +103,12 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 };
 
-function isAcceptedEventType(eventType: string) {
+function isAcceptedEventType(eventType: string, triggerId: string) {
 	return (
 		eventType === 'composio.trigger.message' ||
 		eventType === 'composio.connected_account.expired' ||
-		eventType === 'composio.trigger.disabled'
+		eventType === 'composio.trigger.disabled' ||
+		Boolean(triggerId)
 	);
 }
 
@@ -118,8 +121,11 @@ function composioWebhookSecret() {
 function triggerIdFromPayload(incoming: NormalizedWebhookPayload, raw: unknown) {
 	return (
 		incoming.metadata?.id ||
+		incoming.metadata?.uuid ||
 		incoming.id ||
+		incoming.uuid ||
 		rawString(raw, ['metadata', 'trigger_id']) ||
+		rawString(raw, ['metadata', 'trigger_nano_id']) ||
 		rawString(raw, ['data', 'trigger_nano_id']) ||
 		rawString(raw, ['data', 'trigger_id'])
 	);
