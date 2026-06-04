@@ -155,20 +155,23 @@ Before marking work complete:
 
 Set local values in `.env.local` or the deployment environment. Never document or commit real secret values.
 
-| Variable                  | Required         | Purpose                                                                                    |
-| ------------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
-| `PUBLIC_CONVEX_URL`       | Yes              | Convex deployment URL used by browser clients and SvelteKit server routes                  |
-| `AI_GATEWAY_API_KEY`      | Yes              | Vercel AI Gateway key for default workspace AI workflows                                   |
-| `OPENROUTER_API_KEY`      | Optional         | Enables OpenRouter model catalog entries                                                   |
-| `GROQ_API_KEY`            | Optional         | Enables Groq model catalog entries                                                         |
-| `NIM_API_KEY`             | Optional         | Enables NVIDIA NIM model catalog entries                                                   |
-| `TAVILY_API_KEY`          | Optional         | Enables workspace web search and page extraction                                           |
-| `SUPERMEMORY_API_KEY`     | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                      |
-| `COMPOSIO_API_KEY`        | Optional         | Enables selected external app tools in workspace chat through Composio                     |
-| `COMPOSIO_WEBHOOK_SECRET` | Optional         | Verifies Composio webhooks for project Launchpad Actions; set in SvelteKit and Convex envs |
-| `CONVEX_SITE_URL`         | Deployment       | Convex Auth site URL for deployed auth configuration                                       |
-| `PUBLIC_CONVEX_SITE_URL`  | Optional         | Public Convex site URL when client-facing site routes need it                              |
-| `CONVEX_DEPLOYMENT`       | Local Convex dev | Convex deployment identifier managed by `convex dev`                                       |
+| Variable                     | Required         | Purpose                                                                                    |
+| ---------------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
+| `PUBLIC_CONVEX_URL`          | Yes              | Convex deployment URL used by browser clients and SvelteKit server routes                  |
+| `AI_GATEWAY_API_KEY`         | Yes              | Vercel AI Gateway key for default workspace AI workflows                                   |
+| `OPENROUTER_API_KEY`         | Optional         | Enables OpenRouter model catalog entries                                                   |
+| `GROQ_API_KEY`               | Optional         | Enables Groq model catalog entries                                                         |
+| `NIM_API_KEY`                | Optional         | Enables NVIDIA NIM model catalog entries                                                   |
+| `TAVILY_API_KEY`             | Optional         | Enables workspace web search and page extraction                                           |
+| `SUPERMEMORY_API_KEY`        | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                      |
+| `COMPOSIO_API_KEY`           | Optional         | Enables selected external app tools in workspace chat through Composio                     |
+| `COMPOSIO_WEBHOOK_SECRET`    | Optional         | Verifies Composio webhooks for project Launchpad Actions; set in SvelteKit and Convex envs |
+| `BRAINTRUST_API_KEY`         | Optional         | Braintrust API key for workspace chat tracing (engineering observability)                  |
+| `BRAINTRUST_TRACING_ENABLED` | Optional         | Set to `true` with `BRAINTRUST_API_KEY` to trace workspace chat in Braintrust              |
+| `BRAINTRUST_PROJECT_NAME`    | Optional         | Braintrust project name (defaults to `Launchpad Workspace Chat`)                           |
+| `CONVEX_SITE_URL`            | Deployment       | Convex Auth site URL for deployed auth configuration                                       |
+| `PUBLIC_CONVEX_SITE_URL`     | Optional         | Public Convex site URL when client-facing site routes need it                              |
+| `CONVEX_DEPLOYMENT`          | Local Convex dev | Convex deployment identifier managed by `convex dev`                                       |
 
 Never commit API keys, tokens, private keys, or local `.env` values. Keep secrets in environment variables or the project-approved secret store.
 

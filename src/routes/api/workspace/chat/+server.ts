@@ -19,6 +19,7 @@ import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
+import { getWorkspaceChatAi } from '$lib/server/braintrust';
 import {
 	GroqNotConfiguredError,
 	NIMNotConfiguredError,
@@ -52,14 +53,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { tavilyExtract, tavilySearch } from '@tavily/ai-sdk';
 import { ConvexHttpClient } from 'convex/browser';
-import {
-	createAgentUIStreamResponse,
-	safeValidateUIMessages,
-	stepCountIs,
-	tool,
-	ToolLoopAgent,
-	type UIMessage
-} from 'ai';
+import { safeValidateUIMessages, stepCountIs, tool, type UIMessage } from 'ai';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { z } from 'zod';
 
@@ -256,6 +250,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 			throw e;
 		}
+
+		const { ToolLoopAgent, createAgentUIStreamResponse } = getWorkspaceChatAi();
 
 		const agent = new ToolLoopAgent({
 			model: languageModel,
