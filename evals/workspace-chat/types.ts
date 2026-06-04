@@ -1,4 +1,4 @@
-import type { AllowedComposioToolkit } from '../../src/lib/server/composio.ts';
+import type { AllowedComposioToolkit } from '../../src/lib/composio-toolkits.ts';
 import type { IdeaAiModelId } from '../../src/lib/idea-ai-models.ts';
 
 export type WorkspaceChatEvalFixture = 'general' | 'project';

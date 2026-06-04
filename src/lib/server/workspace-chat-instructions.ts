@@ -1,4 +1,8 @@
-import { ALLOWED_COMPOSIO_TOOLKITS, type AllowedComposioToolkit } from '$lib/server/composio';
+import {
+	ALLOWED_COMPOSIO_TOOLKITS,
+	composioToolkitLabel,
+	type AllowedComposioToolkit
+} from '$lib/composio-toolkits';
 
 export const workspaceChatBaseInstructions = `You are Launchpad's workspace assistant for a chat-first builder workspace. Help solo builders and indie hackers think clearly in threads, preserve durable memory as artifacts, organize promising work into projects, and move toward scoped, buildable next steps.
 
@@ -85,21 +89,6 @@ function workspaceInstructionsForProject(project: WorkspaceChatProjectContext): 
 	return `${workspaceChatBaseInstructions}
 
 ${projectContext}`;
-}
-
-function composioToolkitLabel(toolkit: AllowedComposioToolkit) {
-	const names: Record<AllowedComposioToolkit, string> = {
-		github: 'GitHub',
-		linear: 'Linear',
-		slack: 'Slack',
-		gmail: 'Gmail',
-		notion: 'Notion',
-		googledrive: 'Google Drive',
-		googledocs: 'Google Docs',
-		googlecalendar: 'Google Calendar',
-		googlesheets: 'Google Sheets'
-	};
-	return names[toolkit];
 }
 
 export function composioInstructions(

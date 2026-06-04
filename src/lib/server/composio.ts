@@ -1,5 +1,12 @@
 import { env } from '$env/dynamic/private';
 import { setThreadComposioSessionIdMutation, type SavedChatThread } from '$lib/chat';
+import {
+	ALLOWED_COMPOSIO_TOOLKITS,
+	composioToolkitLabel,
+	isAllowedComposioToolkit,
+	type AllowedComposioToolkit,
+	type LaunchpadActionToolkit
+} from '$lib/composio-toolkits';
 import { Composio } from '@composio/core';
 import type { VerifyWebhookResult } from '@composio/core';
 import { VercelProvider } from '@composio/vercel';
@@ -7,20 +14,12 @@ import type { ToolSet } from 'ai';
 import type { ConvexHttpClient } from 'convex/browser';
 import type { Id } from '../../convex/_generated/dataModel';
 
-export const ALLOWED_COMPOSIO_TOOLKITS = [
-	'github',
-	'linear',
-	'slack',
-	'gmail',
-	'notion',
-	'googledrive',
-	'googledocs',
-	'googlecalendar',
-	'googlesheets'
-] as const;
-
-export type AllowedComposioToolkit = (typeof ALLOWED_COMPOSIO_TOOLKITS)[number];
-export type LaunchpadActionToolkit = Extract<AllowedComposioToolkit, 'github' | 'linear'>;
+export {
+	ALLOWED_COMPOSIO_TOOLKITS,
+	isAllowedComposioToolkit,
+	type AllowedComposioToolkit,
+	type LaunchpadActionToolkit
+};
 
 export type ComposioToolkitStatus = {
 	slug: AllowedComposioToolkit;
@@ -103,7 +102,7 @@ export async function getComposioToolkitStatusesForThread({
 			const item = bySlug.get(slug);
 			return {
 				slug,
-				name: item?.name ?? fallbackToolkitName(slug),
+				name: item?.name ?? composioToolkitLabel(slug),
 				...(item?.logo ? { logo: item.logo } : {}),
 				connected: item?.connection?.isActive === true,
 				...(item?.connection?.connectedAccount?.status
@@ -168,7 +167,7 @@ export async function getComposioAppStatusesForUser({
 			if (!account) {
 				return {
 					slug,
-					name: fallbackToolkitName(slug),
+					name: composioToolkitLabel(slug),
 					connected: false,
 					status: 'NOT_CONNECTED',
 					connectable: true
@@ -186,7 +185,7 @@ export async function getComposioAppStatusesForUser({
 
 			return {
 				slug,
-				name: fallbackToolkitName(slug),
+				name: composioToolkitLabel(slug),
 				connected,
 				status: account.isDisabled ? 'INACTIVE' : account.status,
 				...(account.statusReason ? { statusReason: account.statusReason } : {}),
@@ -301,7 +300,7 @@ export async function createComposioTriggerForLaunchpadAction({
 
 	const account = await getActiveConnectedAccountForUser(composio, ownerId, toolkit);
 	if (!account) {
-		throw new Error(`${fallbackToolkitName(toolkit)} is not connected`);
+		throw new Error(`${composioToolkitLabel(toolkit)} is not connected`);
 	}
 
 	const result = await composio.triggers.create(ownerId, triggerSlug, {
@@ -429,7 +428,7 @@ async function resolveAuthConfigId(composio: ComposioClient, toolkit: AllowedCom
 
 	const created = await composio.authConfigs.create(toolkit, {
 		type: 'use_composio_managed_auth',
-		name: `${fallbackToolkitName(toolkit)} Auth Config`
+		name: `${composioToolkitLabel(toolkit)} Auth Config`
 	});
 	return created.id;
 }
@@ -438,32 +437,10 @@ function composioApiKey() {
 	return env.COMPOSIO_API_KEY?.trim() ?? '';
 }
 
-function isAllowedComposioToolkit(value: unknown): value is AllowedComposioToolkit {
-	return (
-		typeof value === 'string' &&
-		ALLOWED_COMPOSIO_TOOLKITS.includes(value.toLowerCase() as AllowedComposioToolkit)
-	);
-}
-
-function fallbackToolkitName(slug: AllowedComposioToolkit) {
-	const names: Record<AllowedComposioToolkit, string> = {
-		github: 'GitHub',
-		linear: 'Linear',
-		slack: 'Slack',
-		gmail: 'Gmail',
-		notion: 'Notion',
-		googledrive: 'Google Drive',
-		googledocs: 'Google Docs',
-		googlecalendar: 'Google Calendar',
-		googlesheets: 'Google Sheets'
-	};
-	return names[slug];
-}
-
 function unavailableComposioApps(): ComposioAppStatus[] {
 	return ALLOWED_COMPOSIO_TOOLKITS.map((slug) => ({
 		slug,
-		name: fallbackToolkitName(slug),
+		name: composioToolkitLabel(slug),
 		connected: false,
 		status: 'UNAVAILABLE',
 		connectable: false

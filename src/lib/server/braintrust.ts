@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/private';
-import type { AllowedComposioToolkit } from '$lib/server/composio';
+import type { AllowedComposioToolkit } from '$lib/composio-toolkits';
 import type { ChatScopeType } from '$lib/chat';
 import type { IdeaAiModelId } from '$lib/idea-ai-models';
 import * as ai from 'ai';
