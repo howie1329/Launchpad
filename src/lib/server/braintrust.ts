@@ -1,8 +1,23 @@
 import { env } from '$env/dynamic/private';
+import type { AllowedComposioToolkit } from '$lib/server/composio';
+import type { ChatScopeType } from '$lib/chat';
+import type { IdeaAiModelId } from '$lib/idea-ai-models';
 import * as ai from 'ai';
-import { initLogger, wrapAISDK } from 'braintrust';
+import { initLogger, traced, wrapAISDK } from 'braintrust';
+import type { Id } from '../../convex/_generated/dataModel';
 
 const DEFAULT_PROJECT_NAME = 'Launchpad Workspace Chat';
+
+export type WorkspaceChatTraceMetadata = {
+	threadId: Id<'chatThreads'>;
+	modelId: IdeaAiModelId;
+	scopeType: ChatScopeType;
+	projectId?: Id<'projects'>;
+	webSearchRequested: boolean;
+	composioToolkits: AllowedComposioToolkit[];
+	hasReferencedArtifacts: boolean;
+	composioAvailable: boolean;
+};
 
 /** True when Braintrust workspace chat tracing is configured and explicitly enabled. */
 export function isBraintrustTracingEnabled(): boolean {
@@ -22,6 +37,25 @@ function ensureBraintrustLogger(): void {
 		projectName: env.BRAINTRUST_PROJECT_NAME?.trim() || DEFAULT_PROJECT_NAME
 	});
 	loggerInitialized = true;
+}
+
+/**
+ * Runs workspace chat agent work inside a Braintrust parent span when tracing is enabled.
+ * Attaches low-PII metadata only (no instructions, messages, or artifact content).
+ */
+export function traceWorkspaceChatRun<R>(metadata: WorkspaceChatTraceMetadata, run: () => R): R {
+	if (!isBraintrustTracingEnabled()) {
+		return run();
+	}
+
+	ensureBraintrustLogger();
+	return traced(
+		(span) => {
+			span.log({ metadata });
+			return run();
+		},
+		{ name: 'workspace-chat' }
+	);
 }
 
 /**

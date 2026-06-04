@@ -19,7 +19,7 @@ import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
-import { getWorkspaceChatAi } from '$lib/server/braintrust';
+import { getWorkspaceChatAi, traceWorkspaceChatRun } from '$lib/server/braintrust';
 import {
 	GroqNotConfiguredError,
 	NIMNotConfiguredError,
@@ -251,71 +251,85 @@ export const POST: RequestHandler = async ({ request }) => {
 			throw e;
 		}
 
-		const { ToolLoopAgent, createAgentUIStreamResponse } = getWorkspaceChatAi();
+		return traceWorkspaceChatRun(
+			{
+				threadId: thread._id,
+				modelId: body.modelId,
+				scopeType: thread.scopeType,
+				...(thread.projectId ? { projectId: thread.projectId } : {}),
+				webSearchRequested,
+				composioToolkits: selectedComposioToolkits,
+				hasReferencedArtifacts: referenced.block.length > 0,
+				composioAvailable
+			},
+			() => {
+				const { ToolLoopAgent, createAgentUIStreamResponse } = getWorkspaceChatAi();
 
-		const agent = new ToolLoopAgent({
-			model: languageModel,
-			instructions,
-			tools,
-			stopWhen: stepCountIs(8)
-		});
+				const agent = new ToolLoopAgent({
+					model: languageModel,
+					instructions,
+					tools,
+					stopWhen: stepCountIs(8)
+				});
 
-		const accumulatedUsage = {
-			inputTokens: 0,
-			outputTokens: 0,
-			reasoningTokens: 0,
-			cachedInputTokens: 0
-		};
-		let hasUsage = false;
-		let didRecordUsage = false;
-		let didCreateChatNotification = false;
+				const accumulatedUsage = {
+					inputTokens: 0,
+					outputTokens: 0,
+					reasoningTokens: 0,
+					cachedInputTokens: 0
+				};
+				let hasUsage = false;
+				let didRecordUsage = false;
+				let didCreateChatNotification = false;
 
-		return await createAgentUIStreamResponse({
-			agent,
-			uiMessages: validatedMessages.data,
-			onStepFinish: async (step) => {
-				const usage = step.usage ?? {};
+				return createAgentUIStreamResponse({
+					agent,
+					uiMessages: validatedMessages.data,
+					onStepFinish: async (step) => {
+						const usage = step.usage ?? {};
 
-				const inputTokens = usage.inputTokens ?? 0;
-				const outputTokens = usage.outputTokens ?? 0;
-				const reasoningTokens =
-					usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0;
-				const cachedInputTokens =
-					usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0;
+						const inputTokens = usage.inputTokens ?? 0;
+						const outputTokens = usage.outputTokens ?? 0;
+						const reasoningTokens =
+							usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0;
+						const cachedInputTokens =
+							usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0;
 
-				accumulatedUsage.inputTokens += inputTokens;
-				accumulatedUsage.outputTokens += outputTokens;
-				accumulatedUsage.reasoningTokens += reasoningTokens;
-				accumulatedUsage.cachedInputTokens += cachedInputTokens;
+						accumulatedUsage.inputTokens += inputTokens;
+						accumulatedUsage.outputTokens += outputTokens;
+						accumulatedUsage.reasoningTokens += reasoningTokens;
+						accumulatedUsage.cachedInputTokens += cachedInputTokens;
 
-				if (
-					usage.inputTokens !== undefined ||
-					usage.outputTokens !== undefined ||
-					usage.reasoningTokens !== undefined ||
-					usage.cachedInputTokens !== undefined
-				) {
-					hasUsage = true;
-				}
+						if (
+							usage.inputTokens !== undefined ||
+							usage.outputTokens !== undefined ||
+							usage.reasoningTokens !== undefined ||
+							usage.cachedInputTokens !== undefined
+						) {
+							hasUsage = true;
+						}
 
-				const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7;
-				if (!isFinalStep) return;
+						const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7;
+						if (!isFinalStep) return;
 
-				if (!didRecordUsage && hasUsage) {
-					didRecordUsage = true;
-					await convex.mutation(recordAiRunMutation, {
-						threadId: thread._id,
-						modelId: body.modelId,
-						occurredAt: Date.now(),
-						usage: accumulatedUsage
-					});
-				}
+						if (!didRecordUsage && hasUsage) {
+							didRecordUsage = true;
+							await convex.mutation(recordAiRunMutation, {
+								threadId: thread._id,
+								modelId: body.modelId,
+								occurredAt: Date.now(),
+								usage: accumulatedUsage
+							});
+						}
 
-				if (!didCreateChatNotification) {
-					didCreateChatNotification = true;
-					await createChatCompletionNotification(convex, thread._id);
-				}
+						if (!didCreateChatNotification) {
+							didCreateChatNotification = true;
+							await createChatCompletionNotification(convex, thread._id);
+						}
+					}
+				});
 			}
-		});
+		);
 	} catch (error) {
 		console.error(error);
 		return json({ error: 'Error generating workspace chat response' }, { status: 500 });

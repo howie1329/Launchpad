@@ -1,6 +1,6 @@
 # Implementation brief: Braintrust for workspace chat
 
-**Status:** Phase 1 implemented  
+**Status:** Phases 1–2 implemented  
 **Scope:** Main AI chat only — `src/routes/api/workspace/chat/+server.ts`  
 **Out of scope:** Title generation, promotion readiness, external context import synthesis, Convex-side `generateText` calls
 
@@ -128,9 +128,9 @@ npm install braintrust
 - With tracing **on**: sending a workspace chat message produces a trace in Braintrust with agent steps and tool spans.
 - Convex usage still recorded on final step; budget 429 unchanged.
 
-### Phase 2 — Parent span metadata (recommended)
+### Phase 2 — Parent span metadata (implemented)
 
-Wrap the agent creation + `createAgentUIStreamResponse` call in `traced()` so traces are filterable by `threadId` / `modelId` in Braintrust without searching full prompt text.
+`traceWorkspaceChatRun()` in `src/lib/server/braintrust.ts` wraps agent creation + `createAgentUIStreamResponse` in a `workspace-chat` parent span when tracing is enabled. Metadata allowlist: `threadId`, `modelId`, `scopeType`, optional `projectId`, `webSearchRequested`, `composioToolkits`, `hasReferencedArtifacts`, `composioAvailable` (no instructions or message content).
 
 **Acceptance criteria**
 
@@ -237,9 +237,9 @@ Manual (tracing off):
 ## Rough task checklist (for implementation PR)
 
 - [ ] Approve `braintrust` dependency
-- [ ] Add `src/lib/server/braintrust.ts`
-- [ ] Wire chat `+server.ts` to wrapped exports
-- [ ] (Optional) Parent `traced()` span with thread/model metadata
+- [x] Add `src/lib/server/braintrust.ts`
+- [x] Wire chat `+server.ts` to wrapped exports
+- [x] Parent `traced()` span with thread/model metadata
 - [ ] Document env vars
 - [ ] Manual trace verification on / off
 - [ ] `npm run check && npm run lint && npm run build`
