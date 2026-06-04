@@ -3,7 +3,7 @@ import { wrapAISDK } from 'braintrust';
 import * as ai from 'ai';
 import { stepCountIs } from 'ai';
 import { fixtureContext } from './fixtures.ts';
-import { resolveEvalLanguageModel } from './resolve-eval-model.ts';
+import { resolveEvalLanguageModel } from './eval-provider.ts';
 import { createWorkspaceChatStubTools } from './stub-tools.ts';
 import type {
 	WorkspaceChatEvalInput,

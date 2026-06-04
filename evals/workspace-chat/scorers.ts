@@ -1,4 +1,5 @@
-import { createGateway, generateText } from 'ai';
+import { generateText } from 'ai';
+import { resolveEvalJudgeLanguageModel } from './eval-provider.ts';
 import type { WorkspaceChatEvalCase, WorkspaceChatEvalOutput } from './types.ts';
 
 type ScorerArgs = {
@@ -109,20 +110,21 @@ export async function proactivityJudgeScorer({ input, output, expected }: Scorer
 		return { name: 'proactivity_judge', score: null };
 	}
 
-	const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
-	if (!apiKey) {
+	let judgeModel;
+	try {
+		judgeModel = resolveEvalJudgeLanguageModel();
+	} catch (error) {
 		return {
 			name: 'proactivity_judge',
 			score: null,
-			metadata: { skipped: 'no AI_GATEWAY_API_KEY' }
+			metadata: {
+				skipped: error instanceof Error ? error.message : 'judge model unavailable'
+			}
 		};
 	}
 
-	const gateway = createGateway({ apiKey });
-	const modelId = process.env.WORKSPACE_CHAT_EVAL_JUDGE_MODEL ?? 'openai/gpt-5.4-nano';
-
 	const { text } = await generateText({
-		model: gateway(modelId),
+		model: judgeModel,
 		prompt: `You grade assistant proactivity for a builder workspace chat.
 
 User message:
