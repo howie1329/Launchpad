@@ -65,6 +65,8 @@ External app connections are managed from workspace settings. Chat-time app tool
 
 Convex artifacts remain canonical workspace memory. Supermemory is derived recall infrastructure and must not replace Convex state. Composio may act on external services, but Launchpad workspace state should still be saved through Convex artifacts and thread tools.
 
+Workspace chat system instructions are assembled in `src/lib/server/workspace-chat-instructions.ts`. Policy evals live under `evals/workspace-chat/` (`npm run eval:chat`; requires `AI_GATEWAY_API_KEY` and `BRAINTRUST_API_KEY`).
+
 Optional Braintrust tracing for workspace chat (engineering only, not product usage metrics): set `BRAINTRUST_API_KEY` and `BRAINTRUST_TRACING_ENABLED=true` in the SvelteKit server environment. Wiring lives in `src/lib/server/braintrust.ts` and applies only to `src/routes/api/workspace/chat/+server.ts`. Each traced request gets a parent `workspace-chat` span with filterable metadata (`threadId`, `modelId`, `scopeType`, optional `projectId`, web search and Composio flags) and child spans from the AI SDK wrapper. Leave tracing disabled in production unless you have a data-handling policy; traces may include user messages, artifacts, and tool I/O.
 
 ## Artifact Rules

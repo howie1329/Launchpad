@@ -1,6 +1,6 @@
 # Implementation brief: Braintrust for workspace chat
 
-**Status:** Phases 1–2 implemented  
+**Status:** Phases 1–5 implemented  
 **Scope:** Main AI chat only — `src/routes/api/workspace/chat/+server.ts`  
 **Out of scope:** Title generation, promotion readiness, external context import synthesis, Convex-side `generateText` calls
 
@@ -158,15 +158,13 @@ Only if needed:
 
 **Default recommendation:** keep production tracing off until evals or incident response justify it.
 
-### Phase 5 — Evals (optional follow-up, not v1)
+### Phase 5 — Evals (implemented)
 
-If prompt regression becomes painful:
+- `src/lib/server/workspace-chat-instructions.ts` — shared prompt assembly for live chat and evals
+- `evals/workspace-chat/` — dataset (12 cases), stub tools, code scorers, optional LLM proactivity judge
+- Run: `npm run eval:chat` (loads `.env.local` when present; requires `AI_GATEWAY_API_KEY` + `BRAINTRUST_API_KEY`)
 
-- Export golden scenarios from real (anonymized) threads into Braintrust datasets
-- Add scorers for policy rules (e.g. must call `requestUserChoice` instead of prose multiple-choice)
-- Run `braintrust eval` or GitHub Action in CI
-
-Defer until Phase 1–3 prove daily value.
+Compare prompt variants by editing `workspaceChatBaseInstructions`, re-running evals, and reviewing experiments in Braintrust. Optional: `WORKSPACE_CHAT_EVAL_EXPERIMENT` to name runs.
 
 ## Files to touch
 

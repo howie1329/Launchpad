@@ -14,7 +14,8 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"dev:frontend": "vite dev",
-		"dev:backend": "convex dev"
+		"dev:backend": "convex dev",
+		"eval:chat": "braintrust eval evals/workspace-chat/workspace-chat.eval.ts"
 	},
 	"devDependencies": {
 		"@ai-sdk/svelte": "^4.0.158",
