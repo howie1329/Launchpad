@@ -161,8 +161,12 @@ Only if needed:
 ### Phase 5 — Evals (implemented)
 
 - `src/lib/server/workspace-chat-instructions.ts` — shared prompt assembly for live chat and evals
-- `evals/workspace-chat/` — dataset (12 cases), stub tools, code scorers, optional LLM proactivity judge
+- `evals/workspace-chat/` — dataset (26 cases), stub tools, code scorers, optional LLM judges (proactivity + casual conversation)
 - Run: `npm run eval:chat` (loads `.env.local` when present; requires `AI_GATEWAY_API_KEY` + `BRAINTRUST_API_KEY`)
+
+Dataset categories include: `choice-card`, `choice-card-negative`, `artifact-suggest-only`, `artifact-search`, `artifact-list`, `artifact-explicit-create`, `artifact-explicit-prd`, `project-promotion`, `project-promotion-confirm`, `project-thread`, `project-artifacts`, `memory-preference`, `memory-transparency`, `proactivity`, `proactivity-preferences`, and `casual-conversation`.
+
+Multi-turn eval inputs use optional `priorMessages` on `WorkspaceChatEvalInput` (array of `{ role, content }` turns before the final `userMessage`). Casual-conversation cases are scored by `casual_conversation_judge` when `WORKSPACE_CHAT_EVAL_LLM_JUDGE=true`; otherwise that scorer returns null.
 
 Compare prompt variants by editing `workspaceChatBaseInstructions`, re-running evals, and reviewing experiments in Braintrust. Optional: `WORKSPACE_CHAT_EVAL_EXPERIMENT` to name runs.
 

@@ -171,7 +171,7 @@ Set local values in `.env.local` or the deployment environment. Never document o
 | `BRAINTRUST_PROJECT_NAME`         | Optional         | Braintrust project name (defaults to `Launchpad Workspace Chat`)                           |
 | `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` for `npm run eval:chat`                                |
 | `WORKSPACE_CHAT_EVAL_MODEL_ID`    | Optional         | Catalog model id for evals; must match provider (defaults per provider)                    |
-| `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional         | Set to `true` to run the LLM proactivity judge scorer (extra tokens/scores)                |
+| `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional         | Set to `true` to run LLM judge scorers for proactivity and casual-conversation eval cases  |
 | `WORKSPACE_CHAT_EVAL_JUDGE_MODEL` | Optional         | Catalog model id for judge scorer (defaults to eval model for active provider)             |
 | `CONVEX_SITE_URL`                 | Deployment       | Convex Auth site URL for deployed auth configuration                                       |
 | `PUBLIC_CONVEX_SITE_URL`          | Optional         | Public Convex site URL when client-facing site routes need it                              |

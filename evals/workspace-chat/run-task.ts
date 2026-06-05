@@ -56,9 +56,12 @@ export async function runWorkspaceChatEvalTask(
 		stopWhen: stepCountIs(EVAL_MAX_STEPS)
 	});
 
-	const result = await agent.generate({
-		messages: [{ role: 'user', content: input.userMessage }]
-	});
+	const messages = [
+		...(input.priorMessages ?? []),
+		{ role: 'user' as const, content: input.userMessage }
+	];
+
+	const result = await agent.generate({ messages });
 
 	return {
 		text: result.text,

@@ -157,11 +157,77 @@ Score:`
 	}
 }
 
+function formatConversationHistory(input: WorkspaceChatEvalCase['input']) {
+	const lines: string[] = [];
+	for (const message of input.priorMessages ?? []) {
+		lines.push(`${message.role}: ${message.content}`);
+	}
+	lines.push(`user: ${input.userMessage}`);
+	return lines.join('\n\n');
+}
+
+export async function casualConversationJudgeScorer({ input, output, expected }: ScorerArgs) {
+	if (!expected?.expectCasualConversation) {
+		return { name: 'casual_conversation_judge', score: 1 };
+	}
+
+	if (process.env.WORKSPACE_CHAT_EVAL_LLM_JUDGE !== 'true') {
+		return { name: 'casual_conversation_judge', score: null };
+	}
+
+	let judgeModel;
+	try {
+		judgeModel = resolveEvalJudgeLanguageModel();
+	} catch (error) {
+		return {
+			name: 'casual_conversation_judge',
+			score: null,
+			metadata: {
+				skipped: error instanceof Error ? error.message : 'judge model unavailable'
+			}
+		};
+	}
+
+	const { text } = await generateText({
+		model: judgeModel,
+		prompt: `You grade casual conversation handling for a builder workspace chat.
+
+Conversation history:
+${formatConversationHistory(input)}
+
+Assistant text:
+${output.text}
+
+Tool calls: ${JSON.stringify(output.toolCalls.map((t) => t.toolName))}
+
+Rubric (return JSON only: {"score": number} where score is 0, 0.5, or 1):
+- 1 = natural and appropriately brief for greeting, thanks, venting, or off-topic chat; does not force workspace framing (artifacts, project promotion, memory saves, choice cards) on a social message; for venting, empathetic without immediately productizing
+- 0.5 = mostly fine but stiff, too long for casual, or mildly workspace-pushy without being egregious
+- 0 = treats a casual/social message as a product task (calls workspace tools, pushes artifact save / project promotion / memory tools) or is dismissive / unhelpful
+
+Score:`
+	});
+
+	const match = text.match(/\{[\s\S]*\}/);
+	if (!match) {
+		return { name: 'casual_conversation_judge', score: null, metadata: { raw: text } };
+	}
+
+	try {
+		const parsed = JSON.parse(match[0]) as { score?: number };
+		const score = typeof parsed.score === 'number' ? Math.max(0, Math.min(1, parsed.score)) : null;
+		return { name: 'casual_conversation_judge', score };
+	} catch {
+		return { name: 'casual_conversation_judge', score: null, metadata: { raw: text } };
+	}
+}
+
 export const workspaceChatScorers = [
 	mustCallToolsScorer,
 	mustNotCallToolsScorer,
 	noProseMultipleChoiceScorer,
 	noLegacyPrdMentionScorer,
 	proactivityHeuristicScorer,
-	proactivityJudgeScorer
+	proactivityJudgeScorer,
+	casualConversationJudgeScorer
 ];

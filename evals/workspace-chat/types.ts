@@ -3,6 +3,11 @@ import type { IdeaAiModelId } from '../../src/lib/idea-ai-models.ts';
 
 export type WorkspaceChatEvalFixture = 'general' | 'project';
 
+export type WorkspaceChatEvalMessage = {
+	role: 'user' | 'assistant';
+	content: string;
+};
+
 export type WorkspaceChatEvalInput = {
 	userMessage: string;
 	fixture: WorkspaceChatEvalFixture;
@@ -13,12 +18,14 @@ export type WorkspaceChatEvalInput = {
 	profileBlock?: string;
 	memoryBlock?: string;
 	userBehaviorMarkdown?: string;
+	priorMessages?: WorkspaceChatEvalMessage[];
 };
 
 export type WorkspaceChatEvalExpected = {
 	mustCallTools?: string[];
 	mustNotCallTools?: string[];
 	expectProactiveDraft?: boolean;
+	expectCasualConversation?: boolean;
 };
 
 export type WorkspaceChatEvalMetadata = {

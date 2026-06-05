@@ -81,6 +81,33 @@ export function createWorkspaceChatStubTools(record: WorkspaceChatToolCallRecord
 				category: z.string().min(1)
 			}),
 			execute: log('rememberProjectDecision')
+		}),
+		listProjectArtifacts: tool({
+			description:
+				'List project artifacts when the user asks to find or import project memory. Only works in project chats.',
+			inputSchema: z.object({}),
+			execute: log('listProjectArtifacts')
+		}),
+		searchArtifacts: tool({
+			description:
+				'Search workspace artifacts by title, type, or markdown content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
+			inputSchema: z.object({
+				query: z.string().optional(),
+				type: z.string().nullable().optional(),
+				projectScope: z.enum(['all', 'none', 'project']).default('all'),
+				updatedAfter: z.number().nullable().optional(),
+				limit: z.number().int().min(1).max(25).default(10)
+			}),
+			execute: log('searchArtifacts')
+		}),
+		listRelevantMemory: tool({
+			description:
+				'List or search relevant memory for transparency. With a query, returns semantic search results; without a query, lists scoped memories separated by user and project.',
+			inputSchema: z.object({
+				query: z.string().optional(),
+				limit: z.number().int().min(1).max(20).default(10)
+			}),
+			execute: log('listRelevantMemory')
 		})
 	};
 }
