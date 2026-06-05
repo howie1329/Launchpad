@@ -83,11 +83,27 @@ export function resolveEvalLanguageModel(modelId?: IdeaAiModelId) {
 	return openrouter.chat(entry.openRouterModel);
 }
 
+/** Catalog id for judge scorers; optional WORKSPACE_CHAT_EVAL_JUDGE_MODEL, else same as chat model. */
+export function resolveEvalJudgeModelId(provider?: WorkspaceChatEvalProvider): IdeaAiModelId {
+	const judgeId = process.env.WORKSPACE_CHAT_EVAL_JUDGE_MODEL?.trim();
+	if (judgeId) {
+		if (!isIdeaAiModelId(judgeId)) {
+			throw new Error(`WORKSPACE_CHAT_EVAL_JUDGE_MODEL is not a known catalog id: ${judgeId}`);
+		}
+		const activeProvider = provider ?? resolveWorkspaceChatEvalProvider();
+		const entry = getIdeaAiModelById(judgeId);
+		if (entry.provider !== activeProvider) {
+			throw new Error(
+				`WORKSPACE_CHAT_EVAL_JUDGE_MODEL "${judgeId}" uses provider "${entry.provider}" but WORKSPACE_CHAT_EVAL_PROVIDER is "${activeProvider}".`
+			);
+		}
+		return judgeId;
+	}
+
+	return resolveEvalModelId(provider);
+}
+
 /** Judge scorer model; uses same provider, optional WORKSPACE_CHAT_EVAL_JUDGE_MODEL catalog id. */
 export function resolveEvalJudgeLanguageModel() {
-	const judgeId = process.env.WORKSPACE_CHAT_EVAL_JUDGE_MODEL?.trim();
-	if (judgeId && isIdeaAiModelId(judgeId)) {
-		return resolveEvalLanguageModel(judgeId);
-	}
-	return resolveEvalLanguageModel();
+	return resolveEvalLanguageModel(resolveEvalJudgeModelId());
 }
