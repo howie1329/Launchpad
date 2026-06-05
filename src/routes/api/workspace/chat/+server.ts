@@ -22,8 +22,6 @@ import { uiMessageText } from '$lib/workspace-chat-message-actions';
 import { getWorkspaceChatAi, traceWorkspaceChatRun } from '$lib/server/braintrust';
 import { buildWorkspaceChatInstructions } from '$lib/server/workspace-chat-instructions';
 import {
-	GroqNotConfiguredError,
-	NIMNotConfiguredError,
 	OpenRouterNotConfiguredError,
 	resolveWorkspaceLanguageModel
 } from '$lib/server/resolve-workspace-language-model';
@@ -187,11 +185,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		try {
 			languageModel = resolveWorkspaceLanguageModel(body.modelId);
 		} catch (e) {
-			if (
-				e instanceof OpenRouterNotConfiguredError ||
-				e instanceof GroqNotConfiguredError ||
-				e instanceof NIMNotConfiguredError
-			) {
+			if (e instanceof OpenRouterNotConfiguredError) {
 				return json({ error: e.message }, { status: 400 });
 			}
 			throw e;

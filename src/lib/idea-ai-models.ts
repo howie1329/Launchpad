@@ -1,4 +1,4 @@
-export type IdeaAiModelProvider = 'gateway' | 'openrouter' | 'groq' | 'nim';
+export type IdeaAiModelProvider = 'gateway' | 'openrouter';
 
 type BaseIdeaModel = {
 	label: string;
@@ -23,23 +23,7 @@ type OpenRouterIdeaModel = BaseIdeaModel & {
 	openRouterModel: string;
 };
 
-type GroqIdeaModel = BaseIdeaModel & {
-	provider: 'groq';
-	/** Stable catalog id; avoids collisions with gateway model ids. */
-	id: `gq:${string}`;
-	/** Groq API model slug (e.g. llama-3.3-70b-versatile). */
-	groqModel: string;
-};
-
-type NimIdeaModel = BaseIdeaModel & {
-	provider: 'nim';
-	/** Stable catalog id; avoids collisions with other providers. */
-	id: `nm:${string}`;
-	/** NVIDIA NIM API model slug (e.g. deepseek-ai/deepseek-r1). */
-	nimModel: string;
-};
-
-export type IdeaAiModel = GatewayIdeaModel | OpenRouterIdeaModel | GroqIdeaModel | NimIdeaModel;
+export type IdeaAiModel = GatewayIdeaModel | OpenRouterIdeaModel;
 
 export const ideaAiModels: readonly IdeaAiModel[] = [
 	{
@@ -76,7 +60,7 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		openRouterModel: 'x-ai/grok-4.3',
 		maxContextTokens: 100_000_000,
 		inputCostPerMillionTokens: 1.25,
-		outputCostPerMillionTokens: 2.50
+		outputCostPerMillionTokens: 2.5
 	},
 	{
 		id: 'or:moonshotai/kimi-k2.6',
@@ -158,33 +142,6 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		maxContextTokens: 196_000,
 		inputCostPerMillionTokens: 0.0,
 		outputCostPerMillionTokens: 0.0
-	},
-	{
-		id: 'gq:llama-3.3-70b-versatile',
-		label: 'Llama 3.3 70B',
-		provider: 'groq',
-		groqModel: 'llama-3.3-70b-versatile',
-		maxContextTokens: 128_000,
-		inputCostPerMillionTokens: 0.59,
-		outputCostPerMillionTokens: 0.79
-	},
-	{
-		id: 'gq:llama-3.1-8b-instant',
-		label: 'Llama 3.1 8B Instant',
-		provider: 'groq',
-		groqModel: 'llama-3.1-8b-instant',
-		maxContextTokens: 128_000,
-		inputCostPerMillionTokens: 0.05,
-		outputCostPerMillionTokens: 0.08
-	},
-	{
-		id: 'nm:moonshotai/kimi-k2-thinking',
-		label: 'NIM Kimi K2 Thinking',
-		provider: 'nim',
-		nimModel: 'moonshotai/kimi-k2-thinking',
-		maxContextTokens: 128_000,
-		inputCostPerMillionTokens: 0.8,
-		outputCostPerMillionTokens: 2.4
 	}
 ] as const satisfies readonly IdeaAiModel[];
 
@@ -208,29 +165,15 @@ export function isOpenRouterIdeaModel(model: IdeaAiModel): model is OpenRouterId
 	return model.provider === 'openrouter';
 }
 
-export function isGroqIdeaModel(model: IdeaAiModel): model is GroqIdeaModel {
-	return model.provider === 'groq';
-}
-
-export function isNimIdeaModel(model: IdeaAiModel): model is NimIdeaModel {
-	return model.provider === 'nim';
-}
-
-export function getModelSelectorLogoProvider(
-	model: IdeaAiModel
-): 'vercel' | 'openrouter' | 'groq' | 'nvidia' {
+export function getModelSelectorLogoProvider(model: IdeaAiModel): 'vercel' | 'openrouter' {
 	if (model.provider === 'openrouter') return 'openrouter';
-	if (model.provider === 'groq') return 'groq';
-	if (model.provider === 'nim') return 'nvidia';
 	return 'vercel';
 }
 
 /** For UI: section lists and labels. */
 export const ideaAiModelProviderCopy: Record<IdeaAiModelProvider, string> = {
 	gateway: 'Vercel AI Gateway',
-	openrouter: 'OpenRouter',
-	groq: 'Groq',
-	nim: 'NVIDIA NIM'
+	openrouter: 'OpenRouter'
 };
 
 export function listIdeaModelsByProvider(provider: IdeaAiModelProvider): readonly IdeaAiModel[] {

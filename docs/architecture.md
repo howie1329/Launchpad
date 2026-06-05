@@ -51,8 +51,6 @@ Supported provider paths:
 
 - Vercel AI Gateway via `AI_GATEWAY_API_KEY`
 - OpenRouter via `OPENROUTER_API_KEY`
-- Groq via `GROQ_API_KEY`
-- NVIDIA NIM via `NIM_API_KEY`
 
 Optional AI context and integrations:
 
@@ -90,8 +88,6 @@ Launchpad Actions are project-scoped external activity listeners backed by Compo
 | `PUBLIC_CONVEX_URL`       | Convex deployment URL for browser and server HTTP clients                                |
 | `AI_GATEWAY_API_KEY`      | Vercel AI Gateway key for default AI workflows                                           |
 | `OPENROUTER_API_KEY`      | Optional OpenRouter provider key                                                         |
-| `GROQ_API_KEY`            | Optional Groq provider key                                                               |
-| `NIM_API_KEY`             | Optional NVIDIA NIM provider key                                                         |
 | `TAVILY_API_KEY`          | Optional web search/page extraction key                                                  |
 | `SUPERMEMORY_API_KEY`     | Optional Supermemory key                                                                 |
 | `COMPOSIO_API_KEY`        | Optional Composio key for selected external app tools and Launchpad Actions              |

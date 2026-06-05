@@ -72,8 +72,6 @@ Set values in `.env.local` for local development and in the deployment environme
 | `PUBLIC_CONVEX_URL`       | Yes              | Convex deployment URL for browser clients and SvelteKit server routes                        |
 | `AI_GATEWAY_API_KEY`      | Yes              | Vercel AI Gateway key for default AI workflows                                               |
 | `OPENROUTER_API_KEY`      | Optional         | Enables OpenRouter models                                                                    |
-| `GROQ_API_KEY`            | Optional         | Enables Groq models                                                                          |
-| `NIM_API_KEY`             | Optional         | Enables NVIDIA NIM models                                                                    |
 | `TAVILY_API_KEY`          | Optional         | Enables web search and page extraction                                                       |
 | `SUPERMEMORY_API_KEY`     | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                        |
 | `COMPOSIO_API_KEY`        | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |

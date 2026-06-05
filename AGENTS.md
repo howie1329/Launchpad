@@ -160,8 +160,6 @@ Set local values in `.env.local` or the deployment environment. Never document o
 | `PUBLIC_CONVEX_URL`               | Yes              | Convex deployment URL used by browser clients and SvelteKit server routes                  |
 | `AI_GATEWAY_API_KEY`              | Yes              | Vercel AI Gateway key for default workspace AI workflows                                   |
 | `OPENROUTER_API_KEY`              | Optional         | Enables OpenRouter model catalog entries                                                   |
-| `GROQ_API_KEY`                    | Optional         | Enables Groq model catalog entries                                                         |
-| `NIM_API_KEY`                     | Optional         | Enables NVIDIA NIM model catalog entries                                                   |
 | `TAVILY_API_KEY`                  | Optional         | Enables workspace web search and page extraction                                           |
 | `SUPERMEMORY_API_KEY`             | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                      |
 | `COMPOSIO_API_KEY`                | Optional         | Enables selected external app tools in workspace chat through Composio                     |
@@ -186,7 +184,7 @@ Agents must read `docs/STACK.md` before changing stack-specific code.
 - Primary framework: SvelteKit with Svelte 5
 - Language/runtime: TypeScript on Node/Vite
 - Backend/data layer: Convex queries, mutations, realtime data, HTTP actions, and Convex Auth
-- AI: Vercel AI SDK with Vercel AI Gateway, OpenRouter, Groq, NVIDIA NIM, Tavily, and optional Supermemory
+- AI: Vercel AI SDK with Vercel AI Gateway, OpenRouter, Tavily, and optional Supermemory
 - Styling system: Tailwind CSS v4 with shadcn-svelte/Bits UI primitives and project CSS in `src/routes/layout.css`
 - Test/check tools: `svelte-check`, SvelteKit sync, Vite build
 - Lint/format tools: ESLint, Prettier, `prettier-plugin-svelte`, `prettier-plugin-tailwindcss`

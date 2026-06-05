@@ -61,17 +61,17 @@ Workspace APIs live under `/api/workspace/*`:
 
 ## Stack
 
-| Layer         | Technology                                                                             |
-| ------------- | -------------------------------------------------------------------------------------- |
-| App           | SvelteKit, Svelte 5, TypeScript                                                        |
-| UI            | Tailwind CSS v4, shadcn-svelte/Bits UI primitives, Hugeicons                           |
-| Backend       | Convex queries, mutations, realtime data, and Convex Auth                              |
-| Client data   | `convex-svelte`                                                                        |
-| AI            | Vercel AI SDK with Vercel AI Gateway, OpenRouter, Groq, and NVIDIA NIM catalog entries |
-| Search        | Tavily for optional web search/page extraction                                         |
-| External apps | Composio for selected chat app tools and Launchpad Actions                             |
-| Memory        | Supermemory for optional derived recall                                                |
-| Artifacts     | CodeMirror, Streamdown, `@pierre/diffs`                                                |
+| Layer         | Technology                                                          |
+| ------------- | ------------------------------------------------------------------- |
+| App           | SvelteKit, Svelte 5, TypeScript                                     |
+| UI            | Tailwind CSS v4, shadcn-svelte/Bits UI primitives, Hugeicons        |
+| Backend       | Convex queries, mutations, realtime data, and Convex Auth           |
+| Client data   | `convex-svelte`                                                     |
+| AI            | Vercel AI SDK with Vercel AI Gateway and OpenRouter catalog entries |
+| Search        | Tavily for optional web search/page extraction                      |
+| External apps | Composio for selected chat app tools and Launchpad Actions          |
+| Memory        | Supermemory for optional derived recall                             |
+| Artifacts     | CodeMirror, Streamdown, `@pierre/diffs`                             |
 
 ## Documentation
 
@@ -119,8 +119,6 @@ Set local values in `.env.local` or the deployment environment.
 | `PUBLIC_CONVEX_URL`       | Yes              | Convex deployment URL for browser and server HTTP clients                                    |
 | `AI_GATEWAY_API_KEY`      | Yes              | Vercel AI Gateway key for default workspace chat, title generation, and promotion readiness  |
 | `OPENROUTER_API_KEY`      | Optional         | Enables OpenRouter catalog models                                                            |
-| `GROQ_API_KEY`            | Optional         | Enables Groq catalog models                                                                  |
-| `NIM_API_KEY`             | Optional         | Enables NVIDIA NIM catalog models                                                            |
 | `TAVILY_API_KEY`          | Optional         | Enables workspace chat web search and page extraction                                        |
 | `SUPERMEMORY_API_KEY`     | Optional         | Enables Supermemory retrieval, profile context, and artifact memory sync                     |
 | `COMPOSIO_API_KEY`        | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |
