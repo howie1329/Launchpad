@@ -4,7 +4,7 @@ import {
 	type IdeaAiModelProvider
 } from '$lib/idea-ai-models';
 
-export type IdeaAiModelLogoProvider = 'vercel' | 'openrouter' | 'groq' | 'nvidia';
+export type IdeaAiModelLogoProvider = 'vercel' | 'openrouter';
 
 export type IdeaAiModelProviderGroup = {
 	provider: IdeaAiModelProvider;
@@ -12,17 +12,11 @@ export type IdeaAiModelProviderGroup = {
 	logoProvider: IdeaAiModelLogoProvider;
 };
 
-const ideaAiModelProviderOrder: readonly IdeaAiModelProvider[] = [
-	'gateway',
-	'openrouter',
-	'groq',
-	'nim'
-];
+const ideaAiModelProviderOrder: readonly IdeaAiModelProvider[] = ['gateway', 'openrouter'];
 
 function logoProviderFor(provider: IdeaAiModelProvider): IdeaAiModelLogoProvider {
 	if (provider === 'gateway') return 'vercel';
-	if (provider === 'nim') return 'nvidia';
-	return provider;
+	return 'openrouter';
 }
 
 export const ideaAiModelProviderGroups: readonly IdeaAiModelProviderGroup[] =

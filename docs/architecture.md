@@ -51,8 +51,6 @@ Supported provider paths:
 
 - Vercel AI Gateway via `AI_GATEWAY_API_KEY`
 - OpenRouter via `OPENROUTER_API_KEY`
-- Groq via `GROQ_API_KEY`
-- NVIDIA NIM via `NIM_API_KEY`
 
 Optional AI context and integrations:
 
@@ -64,6 +62,10 @@ Optional AI context and integrations:
 External app connections are managed from workspace settings. Chat-time app tools are selected per thread/request, while Launchpad Actions are configured from a project and currently target GitHub and Linear sources. Composio webhook deliveries are verified before recording project activity or marking an action as needing attention.
 
 Convex artifacts remain canonical workspace memory. Supermemory is derived recall infrastructure and must not replace Convex state. Composio may act on external services, but Launchpad workspace state should still be saved through Convex artifacts and thread tools.
+
+Workspace chat system instructions are assembled in `src/lib/server/workspace-chat-instructions.ts`. Policy evals live under `evals/workspace-chat/` (`npm run eval:chat`; requires `BRAINTRUST_API_KEY` and either `AI_GATEWAY_API_KEY` with `WORKSPACE_CHAT_EVAL_PROVIDER=gateway` or `OPENROUTER_API_KEY` with `WORKSPACE_CHAT_EVAL_PROVIDER=openrouter`). Provider wiring is in `evals/workspace-chat/eval-provider.ts`.
+
+Optional Braintrust tracing for workspace chat (engineering only, not product usage metrics): set `BRAINTRUST_API_KEY` and `BRAINTRUST_TRACING_ENABLED=true` in the SvelteKit server environment. Wiring lives in `src/lib/server/braintrust.ts` and applies only to `src/routes/api/workspace/chat/+server.ts`. Each traced request gets a parent `workspace-chat` span with filterable metadata (`threadId`, `modelId`, `scopeType`, optional `projectId`, web search and Composio flags) and child spans from the AI SDK wrapper. Leave tracing disabled in production unless you have a data-handling policy; traces may include user messages, artifacts, and tool I/O.
 
 ## Artifact Rules
 
@@ -86,8 +88,6 @@ Launchpad Actions are project-scoped external activity listeners backed by Compo
 | `PUBLIC_CONVEX_URL`       | Convex deployment URL for browser and server HTTP clients                                |
 | `AI_GATEWAY_API_KEY`      | Vercel AI Gateway key for default AI workflows                                           |
 | `OPENROUTER_API_KEY`      | Optional OpenRouter provider key                                                         |
-| `GROQ_API_KEY`            | Optional Groq provider key                                                               |
-| `NIM_API_KEY`             | Optional NVIDIA NIM provider key                                                         |
 | `TAVILY_API_KEY`          | Optional web search/page extraction key                                                  |
 | `SUPERMEMORY_API_KEY`     | Optional Supermemory key                                                                 |
 | `COMPOSIO_API_KEY`        | Optional Composio key for selected external app tools and Launchpad Actions              |
