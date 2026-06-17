@@ -15,7 +15,11 @@ import { parseArtifactMentionIds } from '$lib/artifact-mention-tokens';
 import { artifactPreview } from '$lib/artifact-display';
 import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { getProjectQuery } from '$lib/projects';
-import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
+import {
+	recordAiRunMutation,
+	releaseAiBudgetReservationMutation,
+	reserveAiBudgetMutation
+} from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
@@ -96,19 +100,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			thread.scopeType === 'project' && thread.projectId
 				? await convex.query(getProjectQuery, { projectId: thread.projectId })
 				: null;
-
-		const budget = await convex.query(getAiBudgetStatusQuery, {});
-		if (budget.isOverLimit) {
-			return json(
-				{
-					error: 'Daily AI limit reached',
-					capUsd: budget.capUsd,
-					spentUsd: budget.spentUsd,
-					dateKey: budget.dateKey
-				},
-				{ status: 429 }
-			);
-		}
 
 		const validatedMessages = await safeValidateUIMessages({
 			messages: body.messages
@@ -191,85 +182,110 @@ export const POST: RequestHandler = async ({ request }) => {
 			throw e;
 		}
 
-		return traceWorkspaceChatRun(
-			{
-				threadId: thread._id,
-				modelId: body.modelId,
-				scopeType: thread.scopeType,
-				...(thread.projectId ? { projectId: thread.projectId } : {}),
-				webSearchRequested,
-				composioToolkits: selectedComposioToolkits,
-				hasReferencedArtifacts: referenced.block.length > 0,
-				composioAvailable
-			},
-			() => {
-				const { ToolLoopAgent, createAgentUIStreamResponse } = getWorkspaceChatAi();
+		const reservation = await convex.mutation(reserveAiBudgetMutation, {
+			sourceKind: 'chatThread',
+			sourceId: thread._id,
+			modelId: body.modelId
+		});
+		if (!reservation.ok) {
+			return json(
+				{
+					error: 'Daily AI limit reached',
+					capUsd: reservation.budget.capUsd,
+					spentUsd: reservation.budget.spentUsd,
+					dateKey: reservation.budget.dateKey
+				},
+				{ status: 429 }
+			);
+		}
 
-				const agent = new ToolLoopAgent({
-					model: languageModel,
-					instructions,
-					tools,
-					stopWhen: stepCountIs(8)
-				});
+		try {
+			return traceWorkspaceChatRun(
+				{
+					threadId: thread._id,
+					modelId: body.modelId,
+					scopeType: thread.scopeType,
+					...(thread.projectId ? { projectId: thread.projectId } : {}),
+					webSearchRequested,
+					composioToolkits: selectedComposioToolkits,
+					hasReferencedArtifacts: referenced.block.length > 0,
+					composioAvailable
+				},
+				() => {
+					const { ToolLoopAgent, createAgentUIStreamResponse } = getWorkspaceChatAi();
 
-				const accumulatedUsage = {
-					inputTokens: 0,
-					outputTokens: 0,
-					reasoningTokens: 0,
-					cachedInputTokens: 0
-				};
-				let hasUsage = false;
-				let didRecordUsage = false;
-				let didCreateChatNotification = false;
+					const agent = new ToolLoopAgent({
+						model: languageModel,
+						instructions,
+						tools,
+						stopWhen: stepCountIs(8)
+					});
 
-				return createAgentUIStreamResponse({
-					agent,
-					uiMessages: validatedMessages.data,
-					onStepFinish: async (step) => {
-						const usage = step.usage ?? {};
+					const accumulatedUsage = {
+						inputTokens: 0,
+						outputTokens: 0,
+						reasoningTokens: 0,
+						cachedInputTokens: 0
+					};
+					let hasUsage = false;
+					let didRecordUsage = false;
+					let didCreateChatNotification = false;
 
-						const inputTokens = usage.inputTokens ?? 0;
-						const outputTokens = usage.outputTokens ?? 0;
-						const reasoningTokens =
-							usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0;
-						const cachedInputTokens =
-							usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0;
+					return createAgentUIStreamResponse({
+						agent,
+						uiMessages: validatedMessages.data,
+						onStepFinish: async (step) => {
+							const usage = step.usage ?? {};
 
-						accumulatedUsage.inputTokens += inputTokens;
-						accumulatedUsage.outputTokens += outputTokens;
-						accumulatedUsage.reasoningTokens += reasoningTokens;
-						accumulatedUsage.cachedInputTokens += cachedInputTokens;
+							const inputTokens = usage.inputTokens ?? 0;
+							const outputTokens = usage.outputTokens ?? 0;
+							const reasoningTokens =
+								usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0;
+							const cachedInputTokens =
+								usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0;
 
-						if (
-							usage.inputTokens !== undefined ||
-							usage.outputTokens !== undefined ||
-							usage.reasoningTokens !== undefined ||
-							usage.cachedInputTokens !== undefined
-						) {
-							hasUsage = true;
+							accumulatedUsage.inputTokens += inputTokens;
+							accumulatedUsage.outputTokens += outputTokens;
+							accumulatedUsage.reasoningTokens += reasoningTokens;
+							accumulatedUsage.cachedInputTokens += cachedInputTokens;
+
+							if (
+								usage.inputTokens !== undefined ||
+								usage.outputTokens !== undefined ||
+								usage.reasoningTokens !== undefined ||
+								usage.cachedInputTokens !== undefined
+							) {
+								hasUsage = true;
+							}
+
+							const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7;
+							if (!isFinalStep) return;
+
+							if (!didRecordUsage && hasUsage) {
+								didRecordUsage = true;
+								await convex.mutation(recordAiRunMutation, {
+									threadId: thread._id,
+									modelId: body.modelId,
+									occurredAt: Date.now(),
+									usage: accumulatedUsage,
+									reservationId: reservation.reservationId
+								});
+							}
+
+							if (!didCreateChatNotification) {
+								didCreateChatNotification = true;
+								await createChatCompletionNotification(convex, thread._id);
+							}
 						}
-
-						const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7;
-						if (!isFinalStep) return;
-
-						if (!didRecordUsage && hasUsage) {
-							didRecordUsage = true;
-							await convex.mutation(recordAiRunMutation, {
-								threadId: thread._id,
-								modelId: body.modelId,
-								occurredAt: Date.now(),
-								usage: accumulatedUsage
-							});
-						}
-
-						if (!didCreateChatNotification) {
-							didCreateChatNotification = true;
-							await createChatCompletionNotification(convex, thread._id);
-						}
-					}
-				});
-			}
-		);
+					});
+				}
+			);
+		} catch (error) {
+			await convex.mutation(releaseAiBudgetReservationMutation, {
+				reservationId: reservation.reservationId
+			});
+			throw error;
+		}
 	} catch (error) {
 		console.error(error);
 		return json({ error: 'Error generating workspace chat response' }, { status: 500 });

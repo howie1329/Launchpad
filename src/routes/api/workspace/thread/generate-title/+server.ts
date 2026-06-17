@@ -3,7 +3,11 @@ import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { getThreadQuery, listMessagesQuery, setThreadGeneratedTitleMutation } from '$lib/chat';
 import { defaultIdeaAiModelId } from '$lib/idea-ai-models';
 import { normalizeGeneratedThreadTitle, PLACEHOLDER_THREAD_TITLE } from '$lib/thread-title';
-import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
+import {
+	recordAiRunMutation,
+	releaseAiBudgetReservationMutation,
+	reserveAiBudgetMutation
+} from '$lib/usage';
 import { ConvexHttpClient } from 'convex/browser';
 import { createGateway, generateText } from 'ai';
 import type { RequestHandler } from '@sveltejs/kit';
@@ -37,19 +41,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const convex = new ConvexHttpClient(PUBLIC_CONVEX_URL);
 		convex.setAuth(token);
-
-		const budget = await convex.query(getAiBudgetStatusQuery, {});
-		if (budget.isOverLimit) {
-			return json(
-				{
-					error: 'Daily AI limit reached',
-					capUsd: budget.capUsd,
-					spentUsd: budget.spentUsd,
-					dateKey: budget.dateKey
-				},
-				{ status: 429 }
-			);
-		}
 
 		const thread = await convex.query(getThreadQuery, {
 			threadId: threadId as Id<'chatThreads'>
@@ -89,51 +80,86 @@ ${transcript}
 
 Reply with ONLY the title, nothing else.`;
 
-		const result = await generateText({
-			model: gateway(TITLE_MODEL_ID),
-			prompt,
-			maxOutputTokens: 64,
-			temperature: 0.3
+		const reservation = await convex.mutation(reserveAiBudgetMutation, {
+			sourceKind: 'chatThread',
+			sourceId: thread._id,
+			modelId: TITLE_MODEL_ID
 		});
-
-		const normalized = normalizeGeneratedThreadTitle(result.text);
-		if (!normalized) {
-			return json({ error: 'Could not produce a title' }, { status: 422 });
+		if (!reservation.ok) {
+			return json(
+				{
+					error: 'Daily AI limit reached',
+					capUsd: reservation.budget.capUsd,
+					spentUsd: reservation.budget.spentUsd,
+					dateKey: reservation.budget.dateKey
+				},
+				{ status: 429 }
+			);
 		}
 
-		const occurredAt = Date.now();
-		const patchResult = await convex.mutation(setThreadGeneratedTitleMutation, {
-			threadId: threadId as Id<'chatThreads'>,
-			title: normalized,
-			titleGeneratedAt: occurredAt
-		});
-
-		if (!patchResult.updated) {
-			return json({ ok: true, skipped: 'race_or_guard' });
-		}
-
-		const usage = result.usage;
-		if (
-			usage &&
-			((usage.inputTokens ?? 0) > 0 ||
-				(usage.outputTokens ?? 0) > 0 ||
-				(usage.reasoningTokens ?? 0) > 0 ||
-				(usage.cachedInputTokens ?? 0) > 0)
-		) {
-			await convex.mutation(recordAiRunMutation, {
-				threadId: threadId as Id<'chatThreads'>,
-				modelId: TITLE_MODEL_ID,
-				occurredAt,
-				usage: {
-					inputTokens: usage.inputTokens,
-					outputTokens: usage.outputTokens,
-					reasoningTokens: usage.reasoningTokens,
-					cachedInputTokens: usage.cachedInputTokens
-				}
+		try {
+			const result = await generateText({
+				model: gateway(TITLE_MODEL_ID),
+				prompt,
+				maxOutputTokens: 64,
+				temperature: 0.3
 			});
-		}
 
-		return json({ ok: true, title: normalized });
+			const normalized = normalizeGeneratedThreadTitle(result.text);
+			if (!normalized) {
+				await convex.mutation(releaseAiBudgetReservationMutation, {
+					reservationId: reservation.reservationId
+				});
+				return json({ error: 'Could not produce a title' }, { status: 422 });
+			}
+
+			const occurredAt = Date.now();
+			const patchResult = await convex.mutation(setThreadGeneratedTitleMutation, {
+				threadId: threadId as Id<'chatThreads'>,
+				title: normalized,
+				titleGeneratedAt: occurredAt
+			});
+
+			if (!patchResult.updated) {
+				await convex.mutation(releaseAiBudgetReservationMutation, {
+					reservationId: reservation.reservationId
+				});
+				return json({ ok: true, skipped: 'race_or_guard' });
+			}
+
+			const usage = result.usage;
+			if (
+				usage &&
+				((usage.inputTokens ?? 0) > 0 ||
+					(usage.outputTokens ?? 0) > 0 ||
+					(usage.reasoningTokens ?? 0) > 0 ||
+					(usage.cachedInputTokens ?? 0) > 0)
+			) {
+				await convex.mutation(recordAiRunMutation, {
+					threadId: threadId as Id<'chatThreads'>,
+					modelId: TITLE_MODEL_ID,
+					occurredAt,
+					usage: {
+						inputTokens: usage.inputTokens,
+						outputTokens: usage.outputTokens,
+						reasoningTokens: usage.reasoningTokens,
+						cachedInputTokens: usage.cachedInputTokens
+					},
+					reservationId: reservation.reservationId
+				});
+			} else {
+				await convex.mutation(releaseAiBudgetReservationMutation, {
+					reservationId: reservation.reservationId
+				});
+			}
+
+			return json({ ok: true, title: normalized });
+		} catch (error) {
+			await convex.mutation(releaseAiBudgetReservationMutation, {
+				reservationId: reservation.reservationId
+			});
+			throw error;
+		}
 	} catch (error) {
 		console.error(error);
 		return json({ error: 'Error generating thread title' }, { status: 500 });
