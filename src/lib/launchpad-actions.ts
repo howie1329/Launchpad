@@ -86,6 +86,12 @@ export const setLaunchpadActionStatusMutation = makeFunctionReference<
 	{ ok: true }
 >('launchpadActions:setActionStatus');
 
+export const markLaunchpadActionNeedsAttentionMutation = makeFunctionReference<
+	'mutation',
+	{ actionId: Id<'launchpadActions'>; reason: string },
+	{ ok: true }
+>('launchpadActions:markActionNeedsAttention');
+
 export const deleteLaunchpadActionMutation = makeFunctionReference<
 	'mutation',
 	{ actionId: Id<'launchpadActions'> },

@@ -136,6 +136,27 @@ export const setActionStatus = mutation({
 	}
 });
 
+export const markActionNeedsAttention = mutation({
+	args: {
+		actionId: v.id('launchpadActions'),
+		reason: v.string()
+	},
+	handler: async (ctx, args) => {
+		const ownerId = await requireAuthUserId(ctx);
+		const action = await getOwnedAction(ctx, args.actionId, ownerId);
+		const now = Date.now();
+		const reason = args.reason.trim() || 'This Launchpad Action needs attention.';
+
+		await ctx.db.patch(action._id, {
+			status: 'needs_attention',
+			statusReason: reason,
+			updatedAt: now
+		});
+
+		return { ok: true as const };
+	}
+});
+
 export const deleteAction = mutation({
 	args: {
 		actionId: v.id('launchpadActions')
