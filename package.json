@@ -11,6 +11,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "vitest run",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"dev:frontend": "vite dev",
@@ -56,6 +57,7 @@
 		"typescript": "^6.0.2",
 		"typescript-eslint": "^8.58.1",
 		"vite": "^8.0.7",
+		"vitest": "^4.1.9",
 		"zod": "^4.3.6"
 	},
 	"dependencies": {
