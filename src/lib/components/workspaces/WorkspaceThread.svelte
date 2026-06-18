@@ -22,9 +22,9 @@
 		listMessagesQuery,
 		saveMessagesMutation
 	} from '$lib/chat';
-	import IdeaChatChoiceCard from '$lib/components/idea-chat/IdeaChatChoiceCard.svelte';
 	import IdeaChatPromotionCard from '$lib/components/idea-chat/IdeaChatPromotionCard.svelte';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
+	import OpenUIResponse from '$lib/openui/OpenUIResponse.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
 	import {
 		Context,
@@ -987,31 +987,29 @@
 										<MessageContent>
 											{#if message.role === 'assistant'}
 												{@const segments = buildAssistantSegments(message)}
+												{@const assistantText = uiMessageText(message, '')}
 												{#if assistantSegmentsHaveContent(segments)}
-													<!-- gap-2: prose vs tools within one assistant turn; message gap-5 separates turns -->
+													<!-- Tool state stays explicit; final assistant text is one progressively rendered OpenUI document. -->
 													<div class="flex w-full min-w-0 flex-col gap-2">
 														{#each segments as segment, segmentIndex (segmentIndex)}
-															{#if segment.kind === 'text'}
-																<MessageResponse
-																	content={segment.text}
-																	class="text-xs leading-relaxed"
-																/>
-															{:else}
+															{#if segment.kind !== 'text'}
 																<div class="border-l border-border/40 pl-4 sm:pl-5">
 																	{#if segment.kind === 'tools'}
 																		<IdeaChatToolSteps tools={segment.tools} />
-																	{:else if segment.kind === 'choice'}
-																		<IdeaChatChoiceCard
-																			choice={segment.choice}
-																			disabled={isChatBusy}
-																			onAnswer={submitChoiceAnswer}
-																		/>
 																	{:else}
 																		<IdeaChatPromotionCard proposal={segment.proposal} />
 																	{/if}
 																</div>
 															{/if}
 														{/each}
+														{#if assistantText}
+															<OpenUIResponse
+																response={assistantText}
+																isStreaming={messageIndex === chat.messages.length - 1 &&
+																	(chat.status === 'submitted' || chat.status === 'streaming')}
+																onSend={submitChoiceAnswer}
+															/>
+														{/if}
 													</div>
 												{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages)}
 													<MessageResponse

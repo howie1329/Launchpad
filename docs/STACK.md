@@ -35,6 +35,12 @@ Prefer Svelte 5 runes and existing `.svelte.ts` state helpers when touching inte
 ## AI, Search, And Memory
 
 - Workspace chat streams through `src/routes/api/workspace/chat/+server.ts`.
+- Final assistant text is OpenUI Lang rendered by the official Svelte runtime. The generated
+  component prompt lives under `src/lib/openui/generated` and is refreshed by
+  `npm run generate:openui` before development and production builds.
+- OpenUI components may collect local form state and continue the conversation, but they do not
+  receive a client-side tool provider. Workspace and external writes remain in the authenticated
+  server-side AI tool loop.
 - Model catalog and provider resolution live in `src/lib/idea-ai-models.ts` and `src/lib/server/resolve-workspace-language-model.ts`.
 - Convex artifacts are canonical workspace memory. Supermemory is optional derived recall and sync infrastructure.
 - Tavily search/page extraction and external AI providers should remain optional when their keys are absent unless the feature explicitly requires them.

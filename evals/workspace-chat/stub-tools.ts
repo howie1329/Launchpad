@@ -49,23 +49,6 @@ export function createWorkspaceChatStubTools(record: WorkspaceChatToolCallRecord
 			}),
 			execute: log('prepareProjectPromotion')
 		}),
-		requestUserChoice: tool({
-			description:
-				'Canonical UI tool for asking the user one compact decision. Use instead of prose multiple-choice questions.',
-			inputSchema: z.object({
-				question: z.string().min(1),
-				options: z
-					.array(
-						z.object({
-							label: z.string().min(1),
-							answer: z.string().min(1)
-						})
-					)
-					.min(2)
-					.max(3)
-			}),
-			execute: log('requestUserChoice')
-		}),
 		rememberUserPreference: tool({
 			description: 'Save a durable global user preference.',
 			inputSchema: z.object({

@@ -24,7 +24,7 @@ import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
 import { getWorkspaceChatAi, traceWorkspaceChatRun } from '$lib/server/braintrust';
-import { buildWorkspaceChatInstructions } from '$lib/server/workspace-chat-instructions';
+import { buildFullWorkspaceChatInstructions } from '$lib/server/workspace-chat-instructions';
 import {
 	OpenRouterNotConfiguredError,
 	resolveWorkspaceLanguageModel
@@ -137,7 +137,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		const webSearchApiKey = env.TAVILY_API_KEY?.trim() ?? '';
 		const webSearchAvailable = Boolean(webSearchApiKey);
 		const userSettingsRow = await convex.query(getMyUserSettingsQuery, {});
-		const instructions = buildWorkspaceChatInstructions({
+		const instructions = buildFullWorkspaceChatInstructions({
 			project: project ? { name: project.name, summary: project.summary } : null,
 			referencedBlock: referenced.block,
 			profileBlock,
@@ -562,37 +562,6 @@ function workspaceTools({
 					title,
 					versionNumber: result.versionNumber,
 					summary: summary?.trim() || 'Updated artifact.'
-				};
-			}
-		}),
-		requestUserChoice: tool({
-			description:
-				'Canonical UI tool for asking the user one compact decision or clarification. Use instead of prose like “pick one”, “reply with 1/2/3”, “which option”, or “do you want quick/balanced/thorough”.',
-			inputSchema: z.object({
-				question: z.string().min(1),
-				context: z.string().optional(),
-				options: z
-					.array(
-						z.object({
-							label: z.string().min(1),
-							answer: z.string().min(1),
-							description: z.string().optional()
-						})
-					)
-					.min(2)
-					.max(3),
-				customPlaceholder: z.string().optional()
-			}),
-			execute: async ({ question, context, options, customPlaceholder }) => {
-				return {
-					question: question.trim(),
-					...(context?.trim() ? { context: context.trim() } : {}),
-					options: options.map((option) => ({
-						label: option.label.trim(),
-						answer: option.answer.trim(),
-						...(option.description?.trim() ? { description: option.description.trim() } : {})
-					})),
-					customPlaceholder: customPlaceholder?.trim() || 'Write a custom answer...'
 				};
 			}
 		}),

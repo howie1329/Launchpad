@@ -16,14 +16,14 @@ export const workspaceChatDataset: WorkspaceChatEvalCase[] = [
 		input: defaultEvalInput({
 			userMessage: 'Do you want quick, balanced, or thorough planning for this feature?'
 		}),
-		expected: { mustCallTools: ['requestUserChoice'] },
+		expected: { mustRenderOpenUIChoice: true },
 		metadata: { category: 'choice-card' }
 	},
 	{
 		input: defaultEvalInput({
 			userMessage: 'Which direction should we take: community-first, content-first, or tool-first?'
 		}),
-		expected: { mustCallTools: ['requestUserChoice'] },
+		expected: { mustRenderOpenUIChoice: true },
 		metadata: { category: 'choice-card' }
 	},
 	{
@@ -79,7 +79,7 @@ export const workspaceChatDataset: WorkspaceChatEvalCase[] = [
 		input: defaultEvalInput({
 			userMessage: 'Pick one: support KB, runbooks, or research wiki as the first content pillar.'
 		}),
-		expected: { mustCallTools: ['requestUserChoice'] },
+		expected: { mustRenderOpenUIChoice: true },
 		metadata: { category: 'choice-card' }
 	},
 	{
@@ -110,7 +110,7 @@ export const workspaceChatDataset: WorkspaceChatEvalCase[] = [
 		input: defaultEvalInput({
 			userMessage: 'Should we brainstorm, research, or write a spec next?'
 		}),
-		expected: { mustCallTools: ['requestUserChoice'] },
+		expected: { mustRenderOpenUIChoice: true },
 		metadata: { category: 'choice-card' }
 	},
 	{
@@ -118,7 +118,7 @@ export const workspaceChatDataset: WorkspaceChatEvalCase[] = [
 			userMessage:
 				'What tone should we use for landing page copy: casual, professional, or technical?'
 		}),
-		expected: { mustCallTools: ['requestUserChoice'] },
+		expected: { mustRenderOpenUIChoice: true },
 		metadata: { category: 'choice-card' }
 	},
 	{
@@ -132,7 +132,7 @@ export const workspaceChatDataset: WorkspaceChatEvalCase[] = [
 		input: defaultEvalInput({
 			userMessage: "What's the target user for this habit tracker?"
 		}),
-		expected: { mustNotCallTools: ['requestUserChoice'] },
+		expected: { mustNotRenderOpenUIChoice: true },
 		metadata: { category: 'choice-card-negative' }
 	},
 	{

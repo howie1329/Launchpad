@@ -24,6 +24,8 @@ export type WorkspaceChatEvalInput = {
 export type WorkspaceChatEvalExpected = {
 	mustCallTools?: string[];
 	mustNotCallTools?: string[];
+	mustRenderOpenUIChoice?: boolean;
+	mustNotRenderOpenUIChoice?: boolean;
 	expectProactiveDraft?: boolean;
 	expectCasualConversation?: boolean;
 };

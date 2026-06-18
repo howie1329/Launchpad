@@ -59,12 +59,15 @@ export function mustNotCallToolsScorer({ output, expected }: ScorerArgs) {
 	};
 }
 
+function hasOpenUIChoice(text: string): boolean {
+	return /Choice\s*\(/.test(text);
+}
+
 export function noProseMultipleChoiceScorer({ output }: ScorerArgs) {
 	const text = output.text ?? '';
 	const hit = PROSE_CHOICE_PATTERNS.find((pattern) => pattern.test(text));
-	const usedChoiceTool = toolNames(output).has('requestUserChoice');
 
-	if (usedChoiceTool) {
+	if (hasOpenUIChoice(text)) {
 		return { name: 'no_prose_multiple_choice', score: 1 };
 	}
 
@@ -72,6 +75,32 @@ export function noProseMultipleChoiceScorer({ output }: ScorerArgs) {
 		name: 'no_prose_multiple_choice',
 		score: hit ? 0 : 1,
 		metadata: hit ? { pattern: hit.source } : undefined
+	};
+}
+
+export function mustRenderOpenUIChoiceScorer({ output, expected }: ScorerArgs) {
+	if (!expected?.mustRenderOpenUIChoice) {
+		return { name: 'must_render_openui_choice', score: 1 };
+	}
+
+	const hasChoice = hasOpenUIChoice(output.text ?? '');
+	return {
+		name: 'must_render_openui_choice',
+		score: hasChoice ? 1 : 0,
+		metadata: { hasChoice }
+	};
+}
+
+export function mustNotRenderOpenUIChoiceScorer({ output, expected }: ScorerArgs) {
+	if (!expected?.mustNotRenderOpenUIChoice) {
+		return { name: 'must_not_render_openui_choice', score: 1 };
+	}
+
+	const hasChoice = hasOpenUIChoice(output.text ?? '');
+	return {
+		name: 'must_not_render_openui_choice',
+		score: hasChoice ? 0 : 1,
+		metadata: { hasChoice }
 	};
 }
 
@@ -226,6 +255,8 @@ export const workspaceChatScorers = [
 	mustCallToolsScorer,
 	mustNotCallToolsScorer,
 	noProseMultipleChoiceScorer,
+	mustRenderOpenUIChoiceScorer,
+	mustNotRenderOpenUIChoiceScorer,
 	noLegacyPrdMentionScorer,
 	proactivityHeuristicScorer,
 	proactivityJudgeScorer,

@@ -47,6 +47,13 @@ Ownership is consistently represented with `ownerId`. Server-side Convex functio
 
 Workspace chat streams through `src/routes/api/workspace/chat/+server.ts` with the Vercel AI SDK. Model selection is catalog-driven in `src/lib/idea-ai-models.ts` and resolved in `src/lib/server/resolve-workspace-language-model.ts`.
 
+Assistant final responses use OpenUI Lang. A Launchpad-owned Svelte component library defines the
+allowed generated interface, while the OpenUI CLI produces a deterministic system prompt before
+development and builds. AI SDK tool parts remain explicit execution status; final text parts are
+joined and progressively rendered as one OpenUI document. Existing markdown messages and invalid
+OpenUI output fall back to the existing markdown renderer. Generated UI may only manage local form
+state and send a follow-up chat message. It has no direct tool, URL, Convex, or external-app access.
+
 Supported provider paths:
 
 - Vercel AI Gateway via `AI_GATEWAY_API_KEY`
