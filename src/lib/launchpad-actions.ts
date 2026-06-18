@@ -38,6 +38,8 @@ export type ProjectActivityEvent = {
 	title: string;
 	externalUrl?: string;
 	summary?: string;
+	sourceKind?: LaunchpadActionSourceKind;
+	sourceName?: string;
 	metadata?: Record<string, unknown>;
 	createdAt: number;
 };

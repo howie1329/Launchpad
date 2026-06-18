@@ -44,11 +44,26 @@ export const listProjectActivity = query({
 		await getOwnedProject(ctx, args.projectId, ownerId);
 		const limit = Math.max(1, Math.min(100, Math.floor(args.limit ?? 25)));
 
-		return await ctx.db
+		const events = await ctx.db
 			.query('projectActivityEvents')
 			.withIndex('by_projectId_and_createdAt', (q) => q.eq('projectId', args.projectId))
 			.order('desc')
 			.take(limit);
+
+		return await Promise.all(
+			events.map(async (event) => {
+				if (!event.actionId) return event;
+
+				const action = await ctx.db.get(event.actionId);
+				if (!action || action.ownerId !== ownerId || action.projectId !== args.projectId) return event;
+
+				return {
+					...event,
+					sourceKind: action.sourceKind,
+					sourceName: action.sourceName
+				};
+			})
+		);
 	}
 });
 
