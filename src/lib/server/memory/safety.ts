@@ -1,4 +1,5 @@
 import type { SavedArtifact } from '$lib/artifacts';
+import { isCodeArtifactFormat } from '$lib/artifacts';
 
 export const MAX_ARTIFACT_MEMORY_CHARS = 60_000;
 export const MAX_USER_MEMORY_TEXT_CHARS = 4_000;
@@ -19,7 +20,9 @@ export function textContainsSensitivePatterns(text: string) {
 }
 
 export function validateArtifactForMemory(artifact: SavedArtifact) {
-	const content = `${artifact.title}\n${artifact.contentMarkdown}`;
+	const content = isCodeArtifactFormat(artifact.contentFormat)
+		? `${artifact.title}\n${artifact.type}\n${artifact.contentFormat}`
+		: `${artifact.title}\n${artifact.content}`;
 
 	if (content.length > MAX_ARTIFACT_MEMORY_CHARS) {
 		return { ok: false as const, reason: 'Artifact is too large for automatic memory sync.' };

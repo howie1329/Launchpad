@@ -71,7 +71,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		title: artifact.title,
 		type: artifact.type,
 		reason: link.reason,
-		preview: artifactPreview(artifact.contentMarkdown)
+		preview: artifactPreview(artifact.content)
 	}));
 	const fallback = deterministicReadiness(thread.title, includedArtifacts);
 

@@ -1,5 +1,8 @@
 <script lang="ts">
 	import ArtifactCodeEditor from '$lib/components/workspaces/ArtifactCodeEditor.svelte';
+	import ArtifactSandboxPreview from '$lib/components/workspaces/ArtifactSandboxPreview.svelte';
+	import type { ArtifactContentFormat } from '$lib/artifacts';
+	import { isCodeArtifactFormat } from '$lib/artifacts';
 	import { getArtifactPreviewStreamdownTheme } from '$lib/streamdown/artifactPreviewTheme';
 	import { cn } from '$lib/utils';
 	import minDark from '@shikijs/themes/min-dark';
@@ -19,6 +22,7 @@
 	let {
 		artifactId,
 		value,
+		contentFormat = 'markdown',
 		compact = false,
 		readMode,
 		saveError = '',
@@ -26,6 +30,7 @@
 	}: {
 		artifactId: string;
 		value: string;
+		contentFormat?: ArtifactContentFormat;
 		compact?: boolean;
 		readMode: 'editor' | 'preview';
 		saveError?: string;
@@ -43,11 +48,18 @@
 
 	const previewStreamdownTheme = $derived(getArtifactPreviewStreamdownTheme(compact));
 
+	const formatLabel = $derived(
+		contentFormat === 'markdown' ? 'Markdown' : contentFormat === 'html' ? 'HTML' : 'SVG'
+	);
+
 	let headings = $state<MarkdownHeading[]>([]);
 	let outlineOpen = $state(true);
 	let scrollToLine = $state<number | null>(null);
 
-	const showOutline = $derived(readMode === 'editor' && headings.length > 1 && !compact);
+	const showOutline = $derived(
+		contentFormat === 'markdown' && readMode === 'editor' && headings.length > 1 && !compact
+	);
+
 	function jumpToHeading(line: number) {
 		scrollToLine = line;
 		requestAnimationFrame(() => {
@@ -60,9 +72,8 @@
 	{#if readMode === 'editor'}
 		<div class="flex items-center justify-between gap-3 px-1">
 			<p class="text-xs leading-5 text-muted-foreground">
-				Edit the markdown source. Use <kbd
-					class="rounded border border-border px-1 py-0.5 font-mono text-[10px]">Cmd</kbd
-				>
+				Edit the {formatLabel.toLowerCase()} source. Use
+				<kbd class="rounded border border-border px-1 py-0.5 font-mono text-[10px]">Cmd</kbd>
 				or <kbd class="rounded border border-border px-1 py-0.5 font-mono text-[10px]">Ctrl</kbd> +
 				<kbd class="rounded border border-border px-1 py-0.5 font-mono text-[10px]">S</kbd> to save.
 			</p>
@@ -81,9 +92,10 @@
 			class={cn('grid min-h-0 gap-4', showOutline && outlineOpen ? 'lg:grid-cols-[1fr_14rem]' : '')}
 		>
 			<div class={compact ? 'min-h-[12rem]' : 'min-h-[calc(100vh-17rem)]'}>
-				{#key artifactId}
+				{#key `${artifactId}-${contentFormat}`}
 					<ArtifactCodeEditor
 						{value}
+						{contentFormat}
 						readOnly={false}
 						{compact}
 						{scrollToLine}
@@ -112,6 +124,31 @@
 				</aside>
 			{/if}
 		</div>
+	{:else if isCodeArtifactFormat(contentFormat)}
+		{#if value.trim().length === 0}
+			<div
+				class={cn(
+					'flex items-center justify-center rounded-lg border border-border/70 bg-background text-center',
+					compact ? 'min-h-[12rem] px-4 py-3' : 'min-h-[calc(100vh-16rem)] px-5 py-6'
+				)}
+			>
+				<div>
+					<p class="text-sm font-medium text-foreground">Nothing to preview yet</p>
+					<p class="mt-1 text-xs leading-5 text-muted-foreground">
+						Switch to Edit and add {formatLabel} to build this artifact.
+					</p>
+				</div>
+			</div>
+		{:else}
+			{#key `${artifactId}-${contentFormat}`}
+				<ArtifactSandboxPreview
+					content={value}
+					{contentFormat}
+					{compact}
+					title={`${formatLabel} preview`}
+				/>
+			{/key}
+		{/if}
 	{:else}
 		<div
 			class={cn(

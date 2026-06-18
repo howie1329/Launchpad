@@ -1047,7 +1047,7 @@
 					>
 				</div>
 				<p class="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
-					{artifact.contentMarkdown.trim().slice(0, 140) || 'No preview available.'}
+					{artifact.content.trim().slice(0, 140) || 'No preview available.'}
 				</p>
 			</div>
 		</div>

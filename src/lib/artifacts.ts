@@ -1,7 +1,7 @@
 import { makeFunctionReference } from 'convex/server';
 import type { Id } from '../convex/_generated/dataModel';
 
-export type ArtifactContentFormat = 'markdown';
+export type ArtifactContentFormat = 'markdown' | 'html' | 'svg';
 export type ArtifactLinkReason = 'created' | 'referenced' | 'imported';
 export type ArtifactMetadata = Record<string, unknown>;
 export type ArtifactVersionActor = 'user' | 'ai';
@@ -13,7 +13,7 @@ export type SavedArtifact = {
 	ownerId: Id<'users'>;
 	type: string;
 	title: string;
-	contentMarkdown: string;
+	content: string;
 	contentFormat: ArtifactContentFormat;
 	revision: number;
 	metadata?: ArtifactMetadata;
@@ -30,7 +30,7 @@ export type ArtifactVersion = {
 	artifactId: Id<'artifacts'>;
 	versionNumber: number;
 	title: string;
-	contentMarkdown: string;
+	content: string;
 	actor: ArtifactVersionActor;
 	source: ArtifactVersionSource;
 	summary?: string;
@@ -73,7 +73,8 @@ export type ArtifactSearchArgs = {
 export type CreateArtifactArgs = {
 	type: string;
 	title: string;
-	contentMarkdown: string;
+	content: string;
+	contentFormat: ArtifactContentFormat;
 	metadata?: ArtifactMetadata;
 	projectId?: Id<'projects'>;
 	sourceThreadId?: Id<'chatThreads'>;
@@ -89,7 +90,7 @@ export type CreateArtifactResult = {
 export type UpdateArtifactArgs = {
 	artifactId: Id<'artifacts'>;
 	title?: string;
-	contentMarkdown?: string;
+	content?: string;
 	metadata?: ArtifactMetadata | null;
 	projectId?: Id<'projects'> | null;
 };
@@ -98,7 +99,7 @@ export type UpdateThreadArtifactArgs = {
 	threadId: Id<'chatThreads'>;
 	artifactId: Id<'artifacts'>;
 	title: string;
-	contentMarkdown: string;
+	content: string;
 	summary?: string;
 };
 
@@ -191,3 +192,24 @@ export const linkArtifactToThreadMutation = makeFunctionReference<
 	LinkArtifactToThreadArgs,
 	{ ok: true }
 >('artifacts:linkArtifactToThread');
+
+export function isCodeArtifactFormat(
+	format: ArtifactContentFormat
+): format is Exclude<ArtifactContentFormat, 'markdown'> {
+	return format === 'html' || format === 'svg';
+}
+
+export function artifactDiffLang(format: ArtifactContentFormat): 'markdown' | 'html' {
+	return format === 'markdown' ? 'markdown' : 'html';
+}
+
+export function artifactDiffFileName(format: ArtifactContentFormat): string {
+	switch (format) {
+		case 'html':
+			return 'artifact.html';
+		case 'svg':
+			return 'artifact.svg';
+		default:
+			return 'artifact.md';
+	}
+}

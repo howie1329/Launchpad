@@ -320,14 +320,16 @@ function workspaceTools({
 			}
 		}),
 		readThreadArtifact: tool({
-			description: 'Read the full markdown for an artifact already linked to the active thread.',
+			description:
+				'Read the full source for a thread-linked artifact (markdown, HTML, or SVG). Returns contentFormat and content.',
 			inputSchema: artifactIdSchema,
 			execute: async ({ artifactId }) => {
 				const { artifact, reason } = await getThreadArtifact(convex, threadId, artifactId);
 
 				return {
 					...artifactSummary(artifact, reason),
-					contentMarkdown: artifact.contentMarkdown
+					contentFormat: artifact.contentFormat,
+					content: artifact.content
 				};
 			}
 		}),
@@ -349,7 +351,7 @@ function workspaceTools({
 		}),
 		searchArtifacts: tool({
 			description:
-				'Search workspace artifacts by title, type, or markdown content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
+				'Search workspace artifacts by title, type, or content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
 			inputSchema: z.object({
 				query: z.string().optional().describe('Search text for artifact title, type, or content.'),
 				type: z.string().nullable().optional().describe('Optional exact artifact type filter.'),
@@ -415,16 +417,17 @@ function workspaceTools({
 		}),
 		createIdeaArtifact: tool({
 			description:
-				'Create a loose idea artifact linked to the active thread. Use only after the user asks or confirms.',
+				'Create a markdown idea artifact linked to the active thread. Use only after the user asks or confirms.',
 			inputSchema: z.object({
 				title: z.string().min(1),
-				contentMarkdown: z.string().min(1)
+				content: z.string().min(1)
 			}),
-			execute: async ({ title, contentMarkdown }) => {
+			execute: async ({ title, content }) => {
 				const result = await convex.mutation(createArtifactMutation, {
 					type: 'idea',
 					title,
-					contentMarkdown,
+					content,
+					contentFormat: 'markdown',
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' },
 					versionActor: 'ai',
@@ -442,7 +445,7 @@ function workspaceTools({
 		}),
 		createPrdArtifact: tool({
 			description:
-				'Create a PRD artifact linked to the active thread. Use only after the user asks or confirms.',
+				'Create a markdown PRD artifact linked to the active thread. Use only after the user asks or confirms.',
 			inputSchema: z.object({
 				title: z.string().min(1),
 				problem: z.string().min(1),
@@ -454,11 +457,12 @@ function workspaceTools({
 				researchPlan: z.string().default('')
 			}),
 			execute: async (input) => {
-				const contentMarkdown = formatPrdMarkdown(input);
+				const content = formatPrdMarkdown(input);
 				const result = await convex.mutation(createArtifactMutation, {
 					type: 'prd',
 					title: input.title,
-					contentMarkdown,
+					content,
+					contentFormat: 'markdown',
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' },
 					versionActor: 'ai',
@@ -471,7 +475,43 @@ function workspaceTools({
 					type: 'prd',
 					title: input.title,
 					summary: 'Created PRD artifact.',
-					contentMarkdown
+					content
+				};
+			}
+		}),
+		createVisualArtifact: tool({
+			description:
+				'Create an HTML or SVG visual artifact linked to the active thread. Use when the user wants an interactive page, layout, diagram, or illustration saved as a durable artifact. Use only after the user asks or confirms.',
+			inputSchema: z.object({
+				title: z.string().min(1),
+				type: z.string().min(1).describe('Artifact category such as prototype, diagram, or notes.'),
+				contentFormat: z.enum(['html', 'svg']),
+				content: z
+					.string()
+					.min(1)
+					.describe(
+						'Self-contained HTML or SVG source. No external CDN, fetch, or network requests. Inline styles and scripts only for HTML.'
+					)
+			}),
+			execute: async ({ title, type, contentFormat, content }) => {
+				const result = await convex.mutation(createArtifactMutation, {
+					type: type.trim().toLowerCase(),
+					title,
+					content,
+					contentFormat,
+					sourceThreadId: threadId,
+					metadata: { source: 'workspace-chat-tool' },
+					versionActor: 'ai',
+					versionSource: 'chat'
+				});
+				await syncArtifactMemoryForTool(convex, result.artifactId);
+
+				return {
+					artifactId: result.artifactId,
+					type: type.trim().toLowerCase(),
+					contentFormat,
+					title,
+					summary: `Created ${contentFormat.toUpperCase()} artifact.`
 				};
 			}
 		}),
@@ -508,20 +548,20 @@ function workspaceTools({
 		}),
 		updateThreadArtifact: tool({
 			description:
-				'Update a thread-linked artifact directly after the user explicitly asks for that artifact to be revised.',
+				'Update a thread-linked artifact (markdown, HTML, or SVG) after the user explicitly asks for that artifact to be revised.',
 			inputSchema: z.object({
 				artifactId: z.string(),
 				title: z.string().min(1),
-				contentMarkdown: z.string().min(1),
+				content: z.string().min(1),
 				summary: z.string().optional()
 			}),
-			execute: async ({ artifactId, title, contentMarkdown, summary }) => {
+			execute: async ({ artifactId, title, content, summary }) => {
 				const { artifact } = await getThreadArtifact(convex, threadId, artifactId);
 				const result = await convex.mutation(updateThreadArtifactMutation, {
 					threadId,
 					artifactId: artifact._id,
 					title,
-					contentMarkdown,
+					content,
 					...(summary?.trim() ? { summary: summary.trim() } : {})
 				});
 				await syncArtifactMemoryForTool(convex, artifact._id);
@@ -739,8 +779,9 @@ function artifactSummary(artifact: SavedArtifact, reason?: string) {
 		artifactId: artifact._id,
 		type: artifact.type,
 		title: artifact.title,
+		contentFormat: artifact.contentFormat,
 		reason,
-		preview: artifactPreview(artifact.contentMarkdown),
+		preview: artifactPreview(artifact.content),
 		updatedAt: artifact.updatedAt
 	};
 }
@@ -787,15 +828,15 @@ async function buildReferencedArtifactInstructions(
 	for (const id of ids) {
 		try {
 			const artifact = await getReferencedArtifact(convex, threadId, projectId, id);
-			let md = artifact.contentMarkdown;
+			let body = artifact.content;
 			let truncated = false;
-			if (md.length > MAX_REFERENCED_ARTIFACT_CHARS) {
-				md = md.slice(0, MAX_REFERENCED_ARTIFACT_CHARS);
+			if (body.length > MAX_REFERENCED_ARTIFACT_CHARS) {
+				body = body.slice(0, MAX_REFERENCED_ARTIFACT_CHARS);
 				truncated = true;
 			}
-			let block = `#### ${artifact.title}\nArtifact id: \`${artifact._id}\`\n\n${md}`;
+			let block = `#### ${artifact.title}\nArtifact id: \`${artifact._id}\`\nFormat: ${artifact.contentFormat}\n\n${body}`;
 			if (truncated) {
-				block += `\n\n_[Content truncated for length. Use the readThreadArtifact tool with this artifact id for the full markdown.]_`;
+				block += `\n\n_[Content truncated for length. Use the readThreadArtifact tool with this artifact id for the full source.]_`;
 			}
 			sections.push(block);
 		} catch {
@@ -808,7 +849,7 @@ async function buildReferencedArtifactInstructions(
 
 	const block = [
 		'### Explicitly referenced thread artifacts',
-		'The user included @artifact: tokens in their latest message. Treat the following markdown as primary context for this turn (in addition to any tools you call).',
+		'The user included @artifact: tokens in their latest message. Treat the following artifact source as primary context for this turn (in addition to any tools you call).',
 		'',
 		sections.join('\n\n---\n\n')
 	].join('\n');

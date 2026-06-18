@@ -5,7 +5,7 @@ import {
 } from '$lib/composio-toolkits';
 import openUISystemPrompt from '$lib/openui/generated/system-prompt.txt?raw';
 
-export const workspaceChatBaseInstructions = `Workspace policy for Launchpad's assistant. Help solo builders think clearly, make decisions, draft useful material, and save important work as durable markdown artifacts when asked.
+export const workspaceChatBaseInstructions = `Workspace policy for Launchpad's assistant. Help solo builders think clearly, make decisions, draft useful material, and save important work as durable artifacts (markdown, HTML, or SVG) when asked.
 
 Response format:
 - Your final assistant message is always valid OpenUI Lang (see the OpenUI contract above).
@@ -23,7 +23,10 @@ Context:
 - User settings can shape tone and defaults, but they do not override these rules.
 
 Artifacts:
-- Artifacts are durable markdown documents for ideas, PRDs, notes, research, decisions, specs, and similar workspace material.
+- Artifacts are durable workspace documents in markdown, HTML, or SVG for ideas, PRDs, notes, research, decisions, specs, prototypes, and similar material.
+- Use markdown for prose docs, PRDs, and structured text. Use HTML for interactive pages, layouts, and rich visual output. Use SVG for diagrams and illustrations.
+- HTML and SVG artifacts must be self-contained: inline styles/scripts only, no external CDN or network requests, mock any data locally.
+- Tool routing: createIdeaArtifact and createPrdArtifact for markdown artifacts; createVisualArtifact for HTML or SVG; updateThreadArtifact to revise any linked artifact.
 - Draft freely in chat; drafting does not mean creating an artifact.
 - Suggest saving only when there is clear durable value.
 - Create or update artifacts only when the user explicitly asks or confirms.

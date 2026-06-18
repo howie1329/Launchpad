@@ -21,12 +21,18 @@ const artifactProjectScopeValue = v.union(
 );
 const artifactSearchLimitMax = 50;
 const artifactSearchCandidateLimit = 100;
+const artifactContentFormatValue = v.union(
+	v.literal('markdown'),
+	v.literal('html'),
+	v.literal('svg')
+);
 
 export const createArtifact = mutation({
 	args: {
 		type: v.string(),
 		title: v.string(),
-		contentMarkdown: v.string(),
+		content: v.string(),
+		contentFormat: artifactContentFormatValue,
 		metadata: v.optional(metadataValue),
 		projectId: v.optional(v.id('projects')),
 		sourceThreadId: v.optional(v.id('chatThreads')),
@@ -38,12 +44,12 @@ export const createArtifact = mutation({
 		const ownerId = await requireAuthUserId(ctx);
 		const type = args.type.trim();
 		const title = args.title.trim();
-		const contentMarkdown = args.contentMarkdown;
+		const content = args.content;
 		const versionSummary = args.versionSummary?.trim();
 
 		if (!type) throw new Error('Artifact type is required');
 		if (!title) throw new Error('Artifact title is required');
-		if (!contentMarkdown.trim()) throw new Error('Artifact content is required');
+		if (!content.trim()) throw new Error('Artifact content is required');
 
 		const sourceThread = args.sourceThreadId
 			? await getOwnedThread(ctx, args.sourceThreadId, ownerId)
@@ -54,8 +60,8 @@ export const createArtifact = mutation({
 			ownerId,
 			type,
 			title,
-			contentMarkdown,
-			contentFormat: 'markdown',
+			content,
+			contentFormat: args.contentFormat,
 			revision: 1,
 			...(args.metadata ? { metadata: args.metadata } : {}),
 			...(projectId ? { projectId } : {}),
@@ -69,7 +75,7 @@ export const createArtifact = mutation({
 			artifactId,
 			versionNumber: 1,
 			title,
-			contentMarkdown,
+			content,
 			actor: args.versionActor ?? 'user',
 			source: args.versionSource ?? 'editor',
 			summary: versionSummary,
@@ -176,8 +182,8 @@ export const searchArtifacts = query({
 			.take(artifactSearchCandidateLimit);
 		const contentMatches = await ctx.db
 			.query('artifacts')
-			.withSearchIndex('search_contentMarkdown', (q) =>
-				q.search('contentMarkdown', queryText).eq('ownerId', ownerId)
+			.withSearchIndex('search_content', (q) =>
+				q.search('content', queryText).eq('ownerId', ownerId)
 			)
 			.take(artifactSearchCandidateLimit);
 
@@ -322,7 +328,7 @@ export const updateArtifact = mutation({
 	args: {
 		artifactId: v.id('artifacts'),
 		title: v.optional(v.string()),
-		contentMarkdown: v.optional(v.string()),
+		content: v.optional(v.string()),
 		metadata: v.optional(v.union(metadataValue, v.null())),
 		projectId: v.optional(v.union(v.id('projects'), v.null()))
 	},
@@ -335,7 +341,7 @@ export const updateArtifact = mutation({
 		if (args.title !== undefined && !title) {
 			throw new Error('Artifact title is required');
 		}
-		if (args.contentMarkdown !== undefined && !args.contentMarkdown.trim()) {
+		if (args.content !== undefined && !args.content.trim()) {
 			throw new Error('Artifact content is required');
 		}
 		if (args.projectId) {
@@ -347,7 +353,7 @@ export const updateArtifact = mutation({
 			ownerId,
 			now,
 			title,
-			contentMarkdown: args.contentMarkdown,
+			content: args.content,
 			metadata: args.metadata,
 			projectId: args.projectId,
 			actor: 'user',
@@ -367,7 +373,7 @@ export const updateThreadArtifact = mutation({
 		threadId: v.id('chatThreads'),
 		artifactId: v.id('artifacts'),
 		title: v.string(),
-		contentMarkdown: v.string(),
+		content: v.string(),
 		summary: v.optional(v.string())
 	},
 	handler: async (ctx, args) => {
@@ -378,7 +384,7 @@ export const updateThreadArtifact = mutation({
 		const title = args.title.trim();
 
 		if (!title) throw new Error('Artifact title is required');
-		if (!args.contentMarkdown.trim()) throw new Error('Artifact content is required');
+		if (!args.content.trim()) throw new Error('Artifact content is required');
 
 		await requireArtifactLinkedToThread(ctx, thread._id, artifact._id);
 
@@ -388,7 +394,7 @@ export const updateThreadArtifact = mutation({
 			ownerId,
 			now,
 			title,
-			contentMarkdown: args.contentMarkdown,
+			content: args.content,
 			actor: 'ai',
 			source: 'chat',
 			summary
@@ -414,11 +420,11 @@ export const restoreArtifactVersion = mutation({
 		const artifact = await getOwnedArtifact(ctx, version.artifactId, ownerId);
 		const now = Date.now();
 
-		if (artifact.title === version.title && artifact.contentMarkdown === version.contentMarkdown) {
+		if (artifact.title === version.title && artifact.content === version.content) {
 			return {
 				ok: true as const,
 				restored: false as const,
-				versionNumber: getArtifactRevision(artifact)
+				versionNumber: artifact.revision
 			};
 		}
 
@@ -427,7 +433,7 @@ export const restoreArtifactVersion = mutation({
 			ownerId,
 			now,
 			title: version.title,
-			contentMarkdown: version.contentMarkdown,
+			content: version.content,
 			actor: 'user',
 			source: 'editor',
 			summary: `Restored version ${version.versionNumber}`
@@ -550,7 +556,7 @@ async function writeArtifactAndMaybeVersion(
 		ownerId,
 		now,
 		title,
-		contentMarkdown,
+		content,
 		metadata,
 		projectId,
 		actor,
@@ -561,7 +567,7 @@ async function writeArtifactAndMaybeVersion(
 		ownerId: Id<'users'>;
 		now: number;
 		title?: string;
-		contentMarkdown?: string;
+		content?: string;
 		metadata?: Record<string, unknown> | null;
 		projectId?: Id<'projects'> | null;
 		actor: ArtifactVersionActor;
@@ -570,17 +576,16 @@ async function writeArtifactAndMaybeVersion(
 	}
 ) {
 	const nextTitle = title ?? artifact.title;
-	const nextContentMarkdown = contentMarkdown ?? artifact.contentMarkdown;
-	const contentChanged =
-		nextTitle !== artifact.title || nextContentMarkdown !== artifact.contentMarkdown;
+	const nextContentMarkdown = content ?? artifact.content;
+	const contentChanged = nextTitle !== artifact.title || nextContentMarkdown !== artifact.content;
 
 	const patch: Partial<Doc<'artifacts'>> = { updatedAt: now };
 	if (title !== undefined) patch.title = nextTitle;
-	if (contentMarkdown !== undefined) patch.contentMarkdown = nextContentMarkdown;
+	if (content !== undefined) patch.content = nextContentMarkdown;
 	if (metadata !== undefined) patch.metadata = metadata ?? undefined;
 	if (projectId !== undefined) patch.projectId = projectId ?? undefined;
 
-	let versionNumber = getArtifactRevision(artifact);
+	let versionNumber = artifact.revision;
 	if (contentChanged) {
 		versionNumber += 1;
 		patch.revision = versionNumber;
@@ -594,7 +599,7 @@ async function writeArtifactAndMaybeVersion(
 			artifactId: artifact._id,
 			versionNumber,
 			title: nextTitle,
-			contentMarkdown: nextContentMarkdown,
+			content: nextContentMarkdown,
 			actor,
 			source,
 			summary,
@@ -625,7 +630,7 @@ async function insertArtifactVersion(
 		artifactId,
 		versionNumber,
 		title,
-		contentMarkdown,
+		content,
 		actor,
 		source,
 		summary,
@@ -635,7 +640,7 @@ async function insertArtifactVersion(
 		artifactId: Id<'artifacts'>;
 		versionNumber: number;
 		title: string;
-		contentMarkdown: string;
+		content: string;
 		actor: ArtifactVersionActor;
 		source: ArtifactVersionSource;
 		summary?: string;
@@ -647,17 +652,13 @@ async function insertArtifactVersion(
 		artifactId,
 		versionNumber,
 		title,
-		contentMarkdown,
+		content,
 		actor,
 		source,
 		...(summary ? { summary } : {}),
 		createdAt: now,
 		updatedAt: now
 	});
-}
-
-function getArtifactRevision(artifact: Doc<'artifacts'>) {
-	return artifact.revision ?? 1;
 }
 
 async function requireArtifactLinkedToThread(

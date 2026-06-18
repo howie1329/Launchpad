@@ -5,7 +5,7 @@ import { workspaceTabEntry } from './workspaceTabValidators';
 
 const chatThreadScopeType = v.union(v.literal('general'), v.literal('project'));
 const chatMessageRole = v.union(v.literal('system'), v.literal('user'), v.literal('assistant'));
-const artifactContentFormat = v.literal('markdown');
+const artifactContentFormat = v.union(v.literal('markdown'), v.literal('html'), v.literal('svg'));
 const artifactMetadata = v.record(v.string(), v.any());
 const threadArtifactLinkReason = v.union(
 	v.literal('created'),
@@ -252,9 +252,9 @@ export default defineSchema({
 		ownerId: v.string(),
 		type: v.string(),
 		title: v.string(),
-		contentMarkdown: v.string(),
+		content: v.string(),
 		contentFormat: artifactContentFormat,
-		revision: v.optional(v.number()),
+		revision: v.number(),
 		metadata: v.optional(artifactMetadata),
 		projectId: v.optional(v.id('projects')),
 		sourceThreadId: v.optional(v.id('chatThreads')),
@@ -267,8 +267,8 @@ export default defineSchema({
 		.index('by_ownerId_and_type_and_updatedAt', ['ownerId', 'type', 'updatedAt'])
 		.searchIndex('search_title', { searchField: 'title', filterFields: ['ownerId'] })
 		.searchIndex('search_type', { searchField: 'type', filterFields: ['ownerId'] })
-		.searchIndex('search_contentMarkdown', {
-			searchField: 'contentMarkdown',
+		.searchIndex('search_content', {
+			searchField: 'content',
 			filterFields: ['ownerId']
 		}),
 	threadArtifactLinks: defineTable({
@@ -287,7 +287,7 @@ export default defineSchema({
 		artifactId: v.id('artifacts'),
 		versionNumber: v.number(),
 		title: v.string(),
-		contentMarkdown: v.string(),
+		content: v.string(),
 		actor: artifactVersionActor,
 		source: artifactVersionSource,
 		summary: v.optional(v.string()),

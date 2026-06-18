@@ -39,6 +39,7 @@ const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = 
 	},
 	createIdeaArtifact: { title: 'Save idea artifact', running: 'Saving idea artifact…' },
 	createPrdArtifact: { title: 'Save PRD artifact', running: 'Saving PRD artifact…' },
+	createVisualArtifact: { title: 'Save visual artifact', running: 'Saving visual artifact…' },
 	prepareProjectPromotion: {
 		title: 'Prepare project promotion',
 		running: 'Reviewing project readiness…'
