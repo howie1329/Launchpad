@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs';
 import { library, promptOptions } from './prompt-library';
 import {
 	classifyOpenUIResponse,
+	extractFallbackReadableText,
+	getOpenUIFallbackReason,
+	isValidOpenUIResponse,
 	MAX_OPENUI_RESPONSE_CHARS,
 	openUIActionMessage,
 	openUIVisibleText
@@ -19,26 +22,46 @@ describe('OpenUI response handling', () => {
 		const source = 'root = Root([answer])\nanswer = Text("A focused answer")';
 		expect(classifyOpenUIResponse(source).kind).toBe('openui');
 		expect(openUIVisibleText(source)).toBe('A focused answer');
+		expect(isValidOpenUIResponse(source)).toBe(true);
 	});
 
 	it('keeps a root-first partial response in OpenUI mode while streaming', () => {
 		const source = 'root = Root([answer])\nanswer = Text("Still';
-		expect(classifyOpenUIResponse(source, { isStreaming: true }).kind).not.toBe('markdown');
+		const kind = classifyOpenUIResponse(source, { isStreaming: true }).kind;
+		expect(kind).not.toBe('markdown');
+		expect(kind).not.toBe('fallback');
 	});
 
-	it('falls back for markdown, malformed output, and unsafe data calls', () => {
+	it('classifies genuine markdown separately from OpenUI fallback', () => {
 		expect(classifyOpenUIResponse('## Existing markdown').kind).toBe('markdown');
-		expect(classifyOpenUIResponse('root = Root([missing])').kind).toBe('markdown');
-		expect(
-			classifyOpenUIResponse(
-				'root = Root([answer])\nanswer = Text("No")\ndata = Query("workspace", {}, {})'
-			).kind
-		).toBe('markdown');
+		expect(getOpenUIFallbackReason('## Existing markdown')).toBeNull();
 	});
 
-	it('rejects oversized responses', () => {
+	it('falls back for malformed Lang with readable extraction', () => {
+		const source = 'root = Root([missing])';
+		expect(classifyOpenUIResponse(source).kind).toBe('fallback');
+		expect(getOpenUIFallbackReason(source)).toBe('unresolved_refs');
+		expect(extractFallbackReadableText(source)).toBe('');
+	});
+
+	it('extracts Text literals from fallback Lang without assignments', () => {
+		const source =
+			'root = Root([answer, extra])\nanswer = Text("Partial answer")\nextra = MissingRef';
+		expect(classifyOpenUIResponse(source).kind).toBe('fallback');
+		expect(extractFallbackReadableText(source)).toBe('Partial answer');
+	});
+
+	it('falls back for unsafe data calls', () => {
+		const source =
+			'root = Root([answer])\nanswer = Text("No")\ndata = Query("workspace", {}, {})';
+		expect(classifyOpenUIResponse(source).kind).toBe('fallback');
+		expect(getOpenUIFallbackReason(source)).toBe('unsafe_statements');
+	});
+
+	it('rejects oversized responses as fallback', () => {
 		const source = `root = Root([answer])\nanswer = Text("${'x'.repeat(MAX_OPENUI_RESPONSE_CHARS)}")`;
-		expect(classifyOpenUIResponse(source).kind).toBe('markdown');
+		expect(classifyOpenUIResponse(source).kind).toBe('fallback');
+		expect(getOpenUIFallbackReason(source)).toBe('oversized');
 	});
 
 	it('allows only bounded continue-conversation actions', () => {

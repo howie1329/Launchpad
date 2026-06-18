@@ -1,17 +1,27 @@
 <script lang="ts">
 	import { MessageResponse } from '$lib/components/ai-elements/new-message';
 	import { Renderer, type ActionEvent } from '@openuidev/svelte-lang';
+	import OpenUIFallbackPanel from './OpenUIFallbackPanel.svelte';
+	import OpenUIStreamingShell from './OpenUIStreamingShell.svelte';
 	import { library } from './library';
-	import { classifyOpenUIResponse, openUIActionMessage } from './response';
+	import {
+		classifyOpenUIResponse,
+		extractFallbackReadableText,
+		openUIActionMessage
+	} from './response';
 
 	let {
 		response,
 		isStreaming = false,
-		onSend
+		onSend,
+		onRetry,
+		reducedMotion = false
 	}: {
 		response: string;
 		isStreaming?: boolean;
 		onSend: (message: string) => void | Promise<void>;
+		onRetry?: () => void | Promise<void>;
+		reducedMotion?: boolean;
 	} = $props();
 
 	const classification = $derived(classifyOpenUIResponse(response, { isStreaming }));
@@ -27,9 +37,14 @@
 		<Renderer {response} {library} {isStreaming} onAction={handleAction} />
 	</div>
 {:else if classification.kind === 'openui-pending'}
-	<p class="text-xs leading-relaxed text-muted-foreground" aria-live="polite">
-		Building response...
-	</p>
+	<OpenUIStreamingShell {reducedMotion} />
+{:else if classification.kind === 'fallback'}
+	<OpenUIFallbackPanel
+		reason={classification.fallbackReason ?? 'parse_failed'}
+		readableText={extractFallbackReadableText(response)}
+		source={response}
+		{onRetry}
+	/>
 {:else if classification.kind === 'markdown'}
 	<MessageResponse content={response} class="text-xs leading-relaxed" />
 {/if}

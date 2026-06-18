@@ -25,7 +25,6 @@ export type PromotionProposalView = {
 };
 
 export type AssistantSegment =
-	| { kind: 'text'; text: string }
 	| { kind: 'tools'; tools: ToolStepView[] }
 	| { kind: 'promotionProposal'; proposal: PromotionProposalView };
 
@@ -45,6 +44,7 @@ const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = 
 		running: 'Reviewing project readiness…'
 	},
 	updateThreadArtifact: { title: 'Update artifact', running: 'Updating artifact…' },
+	requestUserChoice: { title: 'Past choice', running: 'Past choice card…' },
 	tavilySearch: { title: 'Search web', running: 'Searching the web…' },
 	tavilyExtract: { title: 'Read web pages', running: 'Reading source pages…' }
 };
@@ -212,6 +212,11 @@ function summarizeWorkspaceTool(
 						}
 					: {})
 			};
+		case 'requestUserChoice':
+			return {
+				summary: 'Past choice card (no longer interactive).',
+				detailJson
+			};
 		default:
 			return { summary: 'Finished.', detailJson };
 	}
@@ -287,22 +292,11 @@ function isToolLikePart(part: { type?: unknown }): boolean {
 	return t.startsWith('tool-') || t === 'dynamic-tool';
 }
 
-function flushTextBuffer(buf: string[]): string | null {
-	const text = buf.join('').trim();
-	buf.length = 0;
-	return text.length ? text : null;
-}
-
-/** Ordered segments: merged text runs, grouped consecutive tool invocations. */
+/** Tool and promotion segments from assistant message parts (OpenUI text is handled separately). */
 export function buildAssistantSegments(message: UIMessage): AssistantSegment[] {
 	if (message.role !== 'assistant') return [];
 
 	const out: AssistantSegment[] = [];
-	const textBuf: string[] = [];
-
-	const pushText = (text: string) => {
-		out.push({ kind: 'text', text });
-	};
 
 	const appendTool = (step: ToolStepView) => {
 		const last = out[out.length - 1];
@@ -315,37 +309,23 @@ export function buildAssistantSegments(message: UIMessage): AssistantSegment[] {
 
 	for (const part of message.parts) {
 		if (!part || typeof part !== 'object') continue;
-		const typed = part as { type?: string; text?: string };
-
-		if (typed.type === 'text' && typeof typed.text === 'string') {
-			textBuf.push(typed.text);
-			continue;
-		}
+		const typed = part as { type?: string };
 
 		if (isToolLikePart(typed)) {
-			const flushed = flushTextBuffer(textBuf);
-			if (flushed) pushText(flushed);
 			const promotionProposal = toolPartToPromotionProposal(part);
 			if (promotionProposal) {
 				out.push({ kind: 'promotionProposal', proposal: promotionProposal });
 			}
-			// Promotion proposals intentionally render both a prominent card and the
-			// collapsed technical tool row, so keep falling through to toolPartToView.
 			const view = toolPartToView(part);
 			if (view) appendTool(view);
-			continue;
 		}
 	}
-
-	const tail = flushTextBuffer(textBuf);
-	if (tail) pushText(tail);
 
 	return out;
 }
 
 export function assistantSegmentsHaveContent(segments: AssistantSegment[]): boolean {
 	for (const seg of segments) {
-		if (seg.kind === 'text' && seg.text.trim()) return true;
 		if (seg.kind === 'tools' && seg.tools.length > 0) return true;
 		if (seg.kind === 'promotionProposal') return true;
 	}

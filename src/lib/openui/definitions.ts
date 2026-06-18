@@ -141,6 +141,30 @@ export const openUIComponentDefinitions: readonly OpenUIComponentDefinition[] = 
 			formName: z.string().optional(),
 			variant: z.enum(['primary', 'secondary']).optional()
 		})
+	},
+	{
+		name: 'Separator',
+		description: 'Visual break between sections inside a Stack.',
+		props: z.object({ orientation: z.enum(['horizontal', 'vertical']).optional() })
+	},
+	{
+		name: 'Timeline',
+		description: 'Vertical phased plan or milestone list for roadmaps and next steps.',
+		props: z.object({
+			items: z.array(
+				z.object({
+					title: z.string(),
+					description: z.string().optional(),
+					date: z.string().optional(),
+					status: z.enum(['completed', 'current', 'upcoming']).optional()
+				})
+			)
+		})
+	},
+	{
+		name: 'Accordion',
+		description: 'Single collapsible section for optional detail. Default closed.',
+		props: z.object({ title: z.string(), children: children.optional() })
 	}
 ];
 
@@ -165,6 +189,8 @@ export const promptOptions: PromptOptions = {
 		'root = Root([answer])\nanswer = Text("Good morning. What are you working through today?")',
 		'root = Root([heading, options])\nheading = Text("The smallest useful version has three parts:")\noptions = List(["Capture the idea", "Test the riskiest assumption", "Save the decision"], true)',
 		'root = Root([choice])\nchoice = Choice("Which direction should we use?", [{label: "Focused MVP", answer: "Use the focused MVP", description: "Ship one complete workflow."}, {label: "Broader beta", answer: "Use the broader beta", description: "Include the supporting workflows."}], "The first option keeps the scope smallest.")',
-		'root = Root([summary, facts, table])\nsummary = Text("Here is a compact comparison of the three options.")\nfacts = Metadata([{label: "Recommended", value: "Option B"}, {label: "Risk", value: "Medium"}])\ntable = Table(["Option", "Effort", "Upside"], [["A", "Low", "Small"], ["B", "Medium", "Strong"], ["C", "High", "Largest"]])'
+		'root = Root([summary, facts, table])\nsummary = Text("Here is a compact comparison of the three options.")\nfacts = Metadata([{label: "Recommended", value: "Option B"}, {label: "Risk", value: "Medium"}])\ntable = Table(["Option", "Effort", "Upside"], [["A", "Low", "Small"], ["B", "Medium", "Strong"], ["C", "High", "Largest"]])',
+		'root = Root([intro, timeline])\nintro = Text("Here is a phased rollout plan.")\ntimeline = Timeline([{title: "Validate the problem", description: "Talk to 5 target users", status: "completed"}, {title: "Ship the MVP", description: "One complete workflow", status: "current"}, {title: "Expand scope", description: "Add supporting workflows", status: "upcoming"}])',
+		'root = Root([choice, form])\nchoice = Choice("Which audience should we target first?", [{label: "Solo builders", answer: "Target solo builders first"}, {label: "Small teams", answer: "Target small teams first"}])\nform = Form("custom-audience", [otherInput, submitBtn], "Or describe another audience")\notherInput = TextInput("Other audience", "audience", "Tell me more...")\nsubmitBtn = Button("Other — tell me more", "I want to target a different audience", "custom-audience")'
 	]
 };

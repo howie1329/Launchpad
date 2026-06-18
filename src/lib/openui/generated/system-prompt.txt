@@ -32,6 +32,9 @@ Form(name: string, children: any[], title?: string) — Groups text inputs and a
 TextInput(label: string, name: string, placeholder?: string, value?: string, multiline?: boolean) — Text field inside a Form. Values are sent only when the user presses a Button.
 Choice(question: string, options: {label: string, answer: string, description?: string}[], context?: string) — Two or three selectable answers. Selecting one sends its answer to the assistant.
 Button(label: string, message: string, formName?: string, variant?: "primary" | "secondary") — Sends an allowlisted follow-up message to the assistant. It never calls tools directly.
+Separator(orientation?: "horizontal" | "vertical") — Visual break between sections inside a Stack.
+Timeline(items: {title: string, description?: string, date?: string, status?: "completed" | "current" | "upcoming"}[]) — Vertical phased plan or milestone list for roadmaps and next steps.
+Accordion(title: string, children?: any[]) — Single collapsible section for optional detail. Default closed.
 
 ## Hoisting & Streaming (CRITICAL)
 
@@ -62,6 +65,16 @@ root = Root([summary, facts, table])
 summary = Text("Here is a compact comparison of the three options.")
 facts = Metadata([{label: "Recommended", value: "Option B"}, {label: "Risk", value: "Medium"}])
 table = Table(["Option", "Effort", "Upside"], [["A", "Low", "Small"], ["B", "Medium", "Strong"], ["C", "High", "Largest"]])
+
+root = Root([intro, timeline])
+intro = Text("Here is a phased rollout plan.")
+timeline = Timeline([{title: "Validate the problem", description: "Talk to 5 target users", status: "completed"}, {title: "Ship the MVP", description: "One complete workflow", status: "current"}, {title: "Expand scope", description: "Add supporting workflows", status: "upcoming"}])
+
+root = Root([choice, form])
+choice = Choice("Which audience should we target first?", [{label: "Solo builders", answer: "Target solo builders first"}, {label: "Small teams", answer: "Target small teams first"}])
+form = Form("custom-audience", [otherInput, submitBtn], "Or describe another audience")
+otherInput = TextInput("Other audience", "audience", "Tell me more...")
+submitBtn = Button("Other — tell me more", "I want to target a different audience", "custom-audience")
 
 ## Important Rules
 - When asked about data, generate realistic/plausible data

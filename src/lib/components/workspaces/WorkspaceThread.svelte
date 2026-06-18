@@ -79,17 +79,16 @@
 		type IdeaAiModelId
 	} from '$lib/idea-ai-models';
 	import { ideaAiModelProviderGroups } from '$lib/idea-ai-model-selector';
-	import {
-		assistantSegmentsHaveContent,
-		buildAssistantSegments
-	} from '$lib/idea-chat-assistant-parts';
+	import { buildAssistantSegments } from '$lib/idea-chat-assistant-parts';
 	import WorkspaceMessageActions from '$lib/components/workspaces/WorkspaceMessageActions.svelte';
 	import {
+		assistantMessageHasVisibleContent,
 		buildAssistantMessageCopyText,
 		buildUserMessageCopyText,
 		truncateMessagesAfterUserMessage,
 		uiMessageText
 	} from '$lib/workspace-chat-message-actions';
+	import { logOpenUIFallbackIfNeeded } from '$lib/openui/response';
 	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
 	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
 	import {
@@ -746,6 +745,10 @@
 			}),
 			onFinish: ({ messages, isError }) => {
 				if (isError) return;
+				const last = messages.at(-1);
+				if (last?.role === 'assistant') {
+					logOpenUIFallbackIfNeeded(uiMessageText(last, ''), threadId);
+				}
 				void persistMessages(threadId, messages).then((saved) => {
 					if (saved) void requestThreadTitleGeneration(threadId);
 				});
@@ -899,7 +902,7 @@
 		if (message.role !== 'assistant') return false;
 		if (messageIndex !== messages.length - 1) return false;
 		if (chat?.status !== 'submitted' && chat?.status !== 'streaming') return false;
-		return !assistantSegmentsHaveContent(buildAssistantSegments(message));
+		return !assistantMessageHasVisibleContent(message);
 	}
 
 	const threadStateFade = $derived({
@@ -991,19 +994,20 @@
 											{#if message.role === 'assistant'}
 												{@const segments = buildAssistantSegments(message)}
 												{@const assistantText = uiMessageText(message, '')}
-												{#if assistantSegmentsHaveContent(segments)}
+												{#if assistantMessageHasVisibleContent(message)}
 													<!-- Tool state stays explicit; final assistant text is one progressively rendered OpenUI document. -->
 													<div class="flex w-full min-w-0 flex-col gap-2">
 														{#each segments as segment, segmentIndex (segmentIndex)}
-															{#if segment.kind !== 'text'}
-																<div class="border-l border-border/40 pl-4 sm:pl-5">
-																	{#if segment.kind === 'tools'}
-																		<IdeaChatToolSteps tools={segment.tools} />
-																	{:else}
-																		<IdeaChatPromotionCard proposal={segment.proposal} />
-																	{/if}
-																</div>
-															{/if}
+															<div class="border-l border-border/40 pl-4 sm:pl-5">
+																{#if segment.kind === 'tools'}
+																	<IdeaChatToolSteps
+																		tools={segment.tools}
+																		deemphasized={Boolean(assistantText)}
+																	/>
+																{:else}
+																	<IdeaChatPromotionCard proposal={segment.proposal} />
+																{/if}
+															</div>
 														{/each}
 														{#if assistantText}
 															<OpenUIResponse
@@ -1011,6 +1015,8 @@
 																isStreaming={messageIndex === chat.messages.length - 1 &&
 																	(chat.status === 'submitted' || chat.status === 'streaming')}
 																onSend={submitChoiceAnswer}
+																onRetry={() => void retryAssistantRequest()}
+																reducedMotion={prefersReducedMotion.current}
 															/>
 														{/if}
 													</div>

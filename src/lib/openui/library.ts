@@ -1,4 +1,5 @@
 import { createLibrary, defineComponent, type ComponentRenderer } from '@openuidev/svelte-lang';
+import OpenUIAccordion from './components/OpenUIAccordion.svelte';
 import OpenUIBadge from './components/OpenUIBadge.svelte';
 import OpenUIBarChart from './components/OpenUIBarChart.svelte';
 import OpenUIButton from './components/OpenUIButton.svelte';
@@ -12,10 +13,12 @@ import OpenUIList from './components/OpenUIList.svelte';
 import OpenUIMetadata from './components/OpenUIMetadata.svelte';
 import OpenUIProgress from './components/OpenUIProgress.svelte';
 import OpenUIRoot from './components/OpenUIRoot.svelte';
+import OpenUISeparator from './components/OpenUISeparator.svelte';
 import OpenUIStack from './components/OpenUIStack.svelte';
 import OpenUITable from './components/OpenUITable.svelte';
 import OpenUIText from './components/OpenUIText.svelte';
 import OpenUITextInput from './components/OpenUITextInput.svelte';
+import OpenUITimeline from './components/OpenUITimeline.svelte';
 import { openUIComponentDefinitions } from './definitions';
 
 const renderers: Record<string, ComponentRenderer<never>> = {
@@ -35,7 +38,10 @@ const renderers: Record<string, ComponentRenderer<never>> = {
 	Form: OpenUIForm,
 	TextInput: OpenUITextInput,
 	Choice: OpenUIChoice,
-	Button: OpenUIButton
+	Button: OpenUIButton,
+	Separator: OpenUISeparator,
+	Timeline: OpenUITimeline,
+	Accordion: OpenUIAccordion
 };
 
 export const library = createLibrary({

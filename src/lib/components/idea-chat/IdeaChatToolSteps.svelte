@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { Steps, StepsContent, StepsItem, StepsTrigger } from '$lib/components/prompt-kit/steps';
 	import type { ToolStepView } from '$lib/idea-chat-assistant-parts';
+	import { cn } from '$lib/utils';
 	import {
 		AlertCircleIcon,
 		Loading03Icon,
@@ -9,7 +10,10 @@
 		Tick02Icon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
-	let { tools }: { tools: ToolStepView[] } = $props();
+	let {
+		tools,
+		deemphasized = false
+	}: { tools: ToolStepView[]; deemphasized?: boolean } = $props();
 
 	let open = $state(false);
 
@@ -73,13 +77,22 @@
 	</span>
 {/snippet}
 
-<div role="region" aria-label="Assistant tool activity" class="max-w-full min-w-0">
+<div
+	role="region"
+	aria-label="Assistant tool activity"
+	class={cn('max-w-full min-w-0', deemphasized && 'opacity-80')}
+>
 	<Steps bind:open class="min-w-0">
 		<StepsTrigger
-			class="px-0 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+			class={cn(
+				'px-0 py-1.5 text-muted-foreground hover:text-foreground',
+				deemphasized ? 'text-[11px]' : 'text-xs'
+			)}
 			leftIcon={triggerLeftIcon}
 		>
-			<span class="font-medium text-foreground">{triggerLabel}</span>
+			<span class={cn('font-medium text-foreground', deemphasized && 'font-normal')}
+				>{triggerLabel}</span
+			>
 		</StepsTrigger>
 		<StepsContent class="px-0 pt-0.5 pb-1">
 			{#each tools as tool (tool.id)}

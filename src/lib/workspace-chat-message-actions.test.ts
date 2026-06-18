@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { UIMessage } from 'ai';
-import { buildAssistantMessageCopyText } from './workspace-chat-message-actions';
+import {
+	assistantMessageHasVisibleContent,
+	buildAssistantMessageCopyText
+} from './workspace-chat-message-actions';
 
 describe('assistant message copy text', () => {
 	it('copies visible OpenUI content instead of source code', () => {
@@ -28,5 +31,42 @@ describe('assistant message copy text', () => {
 		};
 
 		expect(buildAssistantMessageCopyText(message)).toBe('A legacy **markdown** answer.');
+	});
+});
+
+describe('assistantMessageHasVisibleContent', () => {
+	it('returns true when assistant text is streaming', () => {
+		const message: UIMessage = {
+			id: 'assistant-stream',
+			role: 'assistant',
+			parts: [{ type: 'text', text: 'root = Root([answer])\nanswer = Text("Hi' }]
+		};
+		expect(assistantMessageHasVisibleContent(message)).toBe(true);
+	});
+
+	it('returns true for tool-only assistant messages', () => {
+		const message: UIMessage = {
+			id: 'assistant-tools',
+			role: 'assistant',
+			parts: [
+				{
+					type: 'tool-tavilySearch',
+					toolCallId: 'call-1',
+					state: 'output-available',
+					input: { query: 'launchpad' },
+					output: { results: [] }
+				}
+			]
+		};
+		expect(assistantMessageHasVisibleContent(message)).toBe(true);
+	});
+
+	it('returns false for empty assistant messages', () => {
+		const message: UIMessage = {
+			id: 'assistant-empty',
+			role: 'assistant',
+			parts: []
+		};
+		expect(assistantMessageHasVisibleContent(message)).toBe(false);
 	});
 });
