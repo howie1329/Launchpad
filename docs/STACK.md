@@ -58,14 +58,17 @@ Prefer Svelte 5 runes and existing `.svelte.ts` state helpers when touching inte
 
 ## Project Commands
 
-| Command               | Purpose                                         |
-| --------------------- | ----------------------------------------------- |
-| `npm run dev`         | Start the SvelteKit frontend development server |
-| `npm run dev:backend` | Start Convex dev                                |
-| `npm run dev:all`     | Start SvelteKit and Convex together             |
-| `npm run check`       | Run SvelteKit sync and `svelte-check`           |
-| `npm run lint`        | Run Prettier check and ESLint                   |
-| `npm run build`       | Build the SvelteKit app                         |
+| Command                   | Purpose                                                                  |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `npm run dev`             | Generate the OpenUI prompt, then start the SvelteKit frontend dev server |
+| `npm run dev:backend`     | Start Convex dev                                                         |
+| `npm run dev:all`         | Generate the OpenUI prompt, then start SvelteKit and Convex together     |
+| `npm run generate:openui` | Refresh the generated OpenUI component system prompt                     |
+| `npm run check`           | Run SvelteKit sync and `svelte-check`                                    |
+| `npm run lint`            | Run Prettier check and ESLint                                            |
+| `npm run test`            | Run Vitest unit tests                                                    |
+| `npm run eval:chat`       | Run optional Braintrust workspace chat policy evals                      |
+| `npm run build`           | Generate the OpenUI prompt, then build the SvelteKit app                 |
 
 Run the narrowest useful command for the change. For docs-only edits, placeholder search and diff review are enough.
 
@@ -73,18 +76,25 @@ Run the narrowest useful command for the change. For docs-only edits, placeholde
 
 Set values in `.env.local` for local development and in the deployment environment for hosted builds. Never commit real API keys or tokens.
 
-| Variable                  | Required         | Purpose                                                                                      |
-| ------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
-| `PUBLIC_CONVEX_URL`       | Yes              | Convex deployment URL for browser clients and SvelteKit server routes                        |
-| `AI_GATEWAY_API_KEY`      | Yes              | Vercel AI Gateway key for default AI workflows                                               |
-| `OPENROUTER_API_KEY`      | Optional         | Enables OpenRouter models                                                                    |
-| `TAVILY_API_KEY`          | Optional         | Enables web search and page extraction                                                       |
-| `SUPERMEMORY_API_KEY`     | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                        |
-| `COMPOSIO_API_KEY`        | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |
-| `COMPOSIO_WEBHOOK_SECRET` | Optional         | Verifies Composio webhook deliveries for Launchpad Actions; set in SvelteKit and Convex envs |
-| `CONVEX_SITE_URL`         | Deployment       | Convex Auth site URL for deployed auth configuration                                         |
-| `PUBLIC_CONVEX_SITE_URL`  | Optional         | Public Convex site URL when client-facing site routes need it                                |
-| `CONVEX_DEPLOYMENT`       | Local Convex dev | Convex deployment identifier managed by `convex dev`                                         |
+| Variable                          | Required         | Purpose                                                                                      |
+| --------------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`               | Yes              | Convex deployment URL for browser clients and SvelteKit server routes                        |
+| `AI_GATEWAY_API_KEY`              | Yes              | Vercel AI Gateway key for default AI workflows                                               |
+| `OPENROUTER_API_KEY`              | Optional         | Enables OpenRouter models                                                                    |
+| `TAVILY_API_KEY`                  | Optional         | Enables web search and page extraction                                                       |
+| `SUPERMEMORY_API_KEY`             | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                        |
+| `COMPOSIO_API_KEY`                | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |
+| `COMPOSIO_WEBHOOK_SECRET`         | Optional         | Verifies Composio webhook deliveries for Launchpad Actions; set in SvelteKit and Convex envs |
+| `BRAINTRUST_API_KEY`              | Optional         | Enables workspace chat tracing and Braintrust evals                                          |
+| `BRAINTRUST_TRACING_ENABLED`      | Optional         | Set to `true` with `BRAINTRUST_API_KEY` to trace workspace chat requests                     |
+| `BRAINTRUST_PROJECT_NAME`         | Optional         | Braintrust project name for tracing; defaults to `Launchpad Workspace Chat`                  |
+| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` provider for `npm run eval:chat`                         |
+| `WORKSPACE_CHAT_EVAL_MODEL_ID`    | Optional         | Catalog model id for workspace chat evals                                                    |
+| `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional         | Set to `true` to enable LLM judge scorers for selected eval cases                            |
+| `WORKSPACE_CHAT_EVAL_JUDGE_MODEL` | Optional         | Catalog model id for eval judge scoring                                                      |
+| `CONVEX_SITE_URL`                 | Deployment       | Convex Auth site URL for deployed auth configuration                                         |
+| `PUBLIC_CONVEX_SITE_URL`          | Optional         | Public Convex site URL when client-facing site routes need it                                |
+| `CONVEX_DEPLOYMENT`               | Local Convex dev | Convex deployment identifier managed by `convex dev`                                         |
 
 ## Quality Bar
 

@@ -142,14 +142,17 @@ Before marking work complete:
 
 ## Project Commands
 
-| Command               | Description                                     |
-| --------------------- | ----------------------------------------------- |
-| `npm run dev`         | Start the SvelteKit frontend development server |
-| `npm run dev:backend` | Start Convex dev                                |
-| `npm run dev:all`     | Start SvelteKit and Convex together             |
-| `npm run check`       | Run SvelteKit sync and `svelte-check`           |
-| `npm run lint`        | Run Prettier check and ESLint                   |
-| `npm run build`       | Build the project                               |
+| Command                   | Description                                                              |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `npm run dev`             | Generate the OpenUI prompt, then start the SvelteKit frontend dev server |
+| `npm run dev:backend`     | Start Convex dev                                                         |
+| `npm run dev:all`         | Generate the OpenUI prompt, then start SvelteKit and Convex together     |
+| `npm run generate:openui` | Refresh the generated OpenUI component system prompt                     |
+| `npm run check`           | Run SvelteKit sync and `svelte-check`                                    |
+| `npm run lint`            | Run Prettier check and ESLint                                            |
+| `npm run test`            | Run Vitest unit tests                                                    |
+| `npm run eval:chat`       | Run optional Braintrust workspace chat policy evals                      |
+| `npm run build`           | Generate the OpenUI prompt, then build the project                       |
 
 ## Environment
 
