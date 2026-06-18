@@ -218,65 +218,34 @@ export const POST: RequestHandler = async ({ request }) => {
 						model: languageModel,
 						instructions,
 						tools,
-						stopWhen: stepCountIs(8)
-					});
-
-					const accumulatedUsage = {
-						inputTokens: 0,
-						outputTokens: 0,
-						reasoningTokens: 0,
-						cachedInputTokens: 0
-					};
-					let hasUsage = false;
-					let didRecordUsage = false;
-					let didCreateChatNotification = false;
-
-					return createAgentUIStreamResponse({
-						agent,
-						uiMessages: validatedMessages.data,
-						onStepFinish: async (step) => {
-							const usage = step.usage ?? {};
-
-							const inputTokens = usage.inputTokens ?? 0;
-							const outputTokens = usage.outputTokens ?? 0;
-							const reasoningTokens =
-								usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0;
-							const cachedInputTokens =
-								usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0;
-
-							accumulatedUsage.inputTokens += inputTokens;
-							accumulatedUsage.outputTokens += outputTokens;
-							accumulatedUsage.reasoningTokens += reasoningTokens;
-							accumulatedUsage.cachedInputTokens += cachedInputTokens;
-
-							if (
-								usage.inputTokens !== undefined ||
-								usage.outputTokens !== undefined ||
-								usage.reasoningTokens !== undefined ||
-								usage.cachedInputTokens !== undefined
-							) {
-								hasUsage = true;
-							}
-
-							const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7;
-							if (!isFinalStep) return;
-
-							if (!didRecordUsage && hasUsage) {
-								didRecordUsage = true;
+						stopWhen: stepCountIs(8),
+						onFinish: async ({ totalUsage }) => {
+							if ((totalUsage.inputTokens ?? 0) > 0 || (totalUsage.outputTokens ?? 0) > 0) {
 								await convex.mutation(recordAiRunMutation, {
 									threadId: thread._id,
 									modelId: body.modelId,
 									occurredAt: Date.now(),
-									usage: accumulatedUsage,
+									usage: {
+										inputTokens: totalUsage.inputTokens,
+										outputTokens: totalUsage.outputTokens,
+										reasoningTokens: totalUsage.outputTokenDetails?.reasoningTokens,
+										cachedInputTokens: totalUsage.inputTokenDetails?.cacheReadTokens
+									},
+									reservationId: reservation.reservationId
+								});
+							} else {
+								await convex.mutation(releaseAiBudgetReservationMutation, {
 									reservationId: reservation.reservationId
 								});
 							}
 
-							if (!didCreateChatNotification) {
-								didCreateChatNotification = true;
-								await createChatCompletionNotification(convex, thread._id);
-							}
+							await createChatCompletionNotification(convex, thread._id);
 						}
+					});
+
+					return createAgentUIStreamResponse({
+						agent,
+						uiMessages: validatedMessages.data
 					});
 				}
 			);

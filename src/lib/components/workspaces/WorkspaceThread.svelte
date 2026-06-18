@@ -746,8 +746,9 @@
 			}),
 			onFinish: ({ messages, isError }) => {
 				if (isError) return;
-				void persistMessages(threadId, messages);
-				void requestThreadTitleGeneration(threadId);
+				void persistMessages(threadId, messages).then((saved) => {
+					if (saved) void requestThreadTitleGeneration(threadId);
+				});
 			}
 		});
 	}
@@ -880,9 +881,11 @@
 				},
 				body: JSON.stringify({ threadId })
 			});
-			if (response.ok) {
-				void invalidateAll();
+			if (!response.ok) {
+				console.error('Could not generate thread title', response.status, await response.text());
+				return;
 			}
+			void invalidateAll();
 		} catch {
 			// Non-blocking; sidebar keeps placeholder until next visit or retry.
 		}

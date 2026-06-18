@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
 	applyAiReservationToBudget,
+	estimateAiUsageCostUsd,
 	estimateReservationCostUsd,
 	settleReservedCostDelta
 } from './usage';
 
 describe('AI usage reservations', () => {
+	it('does not add cached and reasoning detail tokens to SDK totals twice', () => {
+		const cost = estimateAiUsageCostUsd({
+			modelId: 'openai/gpt-5.4-nano',
+			inputTokens: 1_000_000,
+			outputTokens: 1_000_000,
+			cachedInputTokens: 800_000,
+			reasoningTokens: 700_000
+		});
+
+		expect(cost).toBeCloseTo(1.45);
+	});
+
 	it('allows an under-cap reservation', () => {
 		const result = applyAiReservationToBudget({
 			spentUsd: 0.1,

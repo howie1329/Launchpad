@@ -1,7 +1,7 @@
 import { AI_GATEWAY_API_KEY } from '$env/static/private';
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
 import { getThreadQuery, listMessagesQuery, setThreadGeneratedTitleMutation } from '$lib/chat';
-import { defaultIdeaAiModelId } from '$lib/idea-ai-models';
+import { utilityAiModelId } from '$lib/idea-ai-models';
 import { normalizeGeneratedThreadTitle, PLACEHOLDER_THREAD_TITLE } from '$lib/thread-title';
 import {
 	recordAiRunMutation,
@@ -14,7 +14,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import type { Id } from '../../../../../convex/_generated/dataModel';
 
-const TITLE_MODEL_ID = defaultIdeaAiModelId;
+const TITLE_MODEL_ID = utilityAiModelId;
 
 const gateway = createGateway({
 	apiKey: AI_GATEWAY_API_KEY
