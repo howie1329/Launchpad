@@ -40,7 +40,7 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		label: 'Claude Opus 4.8',
 		provider: 'openrouter',
 		openRouterModel: 'anthropic/claude-opus-4.8',
-		maxContextTokens: 100_000_000,
+		maxContextTokens: 1_000_000,
 		inputCostPerMillionTokens: 5.0,
 		outputCostPerMillionTokens: 25.0
 	},
@@ -49,7 +49,7 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		label: 'DeepSeek V4 Pro',
 		provider: 'openrouter',
 		openRouterModel: 'deepseek/deepseek-v4-pro',
-		maxContextTokens: 100_000_000,
+		maxContextTokens: 1_000_000,
 		inputCostPerMillionTokens: 0.435,
 		outputCostPerMillionTokens: 0.87
 	},
@@ -58,7 +58,7 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		label: 'Grok 4.3',
 		provider: 'openrouter',
 		openRouterModel: 'x-ai/grok-4.3',
-		maxContextTokens: 100_000_000,
+		maxContextTokens: 1_000_000,
 		inputCostPerMillionTokens: 1.25,
 		outputCostPerMillionTokens: 2.5
 	},
@@ -67,9 +67,9 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 		label: 'Kimi K2.6',
 		provider: 'openrouter',
 		openRouterModel: 'moonshotai/kimi-k2.6',
-		maxContextTokens: 100_000_000,
-		inputCostPerMillionTokens: 0.684,
-		outputCostPerMillionTokens: 3.42
+		maxContextTokens: 262_144,
+		inputCostPerMillionTokens: 0.67,
+		outputCostPerMillionTokens: 3.5
 	},
 	{
 		id: 'openai/gpt-5.4-nano',
