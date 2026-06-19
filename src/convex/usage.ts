@@ -41,7 +41,7 @@ const modelCostsPerMillionTokens = Object.fromEntries(
 	])
 );
 
-function estimateCostUsd(params: {
+export function estimateAiUsageCostUsd(params: {
 	modelId: string;
 	inputTokens?: number;
 	outputTokens?: number;
@@ -51,20 +51,15 @@ function estimateCostUsd(params: {
 	const cost = modelCostsPerMillionTokens[params.modelId];
 	if (!cost) return 0;
 
-	const inputTokens = params.inputTokens ?? 0;
-	const outputTokens = params.outputTokens ?? 0;
-	const reasoningTokens = params.reasoningTokens ?? 0;
-	const cachedInputTokens = params.cachedInputTokens ?? 0;
-
-	// Conservative: charge cache reads at input price and reasoning at output price.
-	const input = inputTokens + cachedInputTokens;
-	const output = outputTokens + reasoningTokens;
+	// AI SDK totals already include cached input and reasoning output tokens.
+	const input = params.inputTokens ?? 0;
+	const output = params.outputTokens ?? 0;
 
 	return (input / 1_000_000) * cost.input + (output / 1_000_000) * cost.output;
 }
 
 export function estimateReservationCostUsd(modelId: string) {
-	const estimated = estimateCostUsd({
+	const estimated = estimateAiUsageCostUsd({
 		modelId,
 		inputTokens: RESERVATION_INPUT_TOKEN_CEILING,
 		outputTokens: RESERVATION_OUTPUT_TOKEN_CEILING
@@ -215,69 +210,95 @@ export const reserveAiBudget = mutation({
 	},
 	handler: async (ctx, args) => {
 		const ownerId = await requireAuthUserId(ctx);
-		const now = args.atMs ?? Date.now();
-		let budget = await getAiBudgetStatusForOwnerImpl(ctx, ownerId, now);
-		const releasedExpired = await releaseExpiredAiBudgetReservations(ctx, {
-			ownerId,
-			dateKey: budget.dateKey,
-			now
-		});
-		if (releasedExpired > 0) {
-			budget = await getAiBudgetStatusForOwnerImpl(ctx, ownerId, now);
-		}
-		const reservedCostUsd = estimateReservationCostUsd(args.modelId);
-		const reservation = applyAiReservationToBudget({
-			spentUsd: budget.spentUsd,
-			capUsd: budget.capUsd,
-			reservedCostUsd
-		});
-
-		if (!reservation.allowed) {
-			return {
-				ok: false as const,
-				budget: {
-					...budget,
-					remainingUsd: reservation.remainingUsd,
-					isOverLimit: true
-				}
-			};
-		}
-
-		const reservationId = await ctx.db.insert('aiUsageReservations', {
-			ownerId,
-			dateKey: budget.dateKey,
-			sourceKind: args.sourceKind,
-			sourceId: args.sourceId,
-			modelId: args.modelId,
-			reservedCostUsd,
-			status: 'pending',
-			createdAt: now,
-			updatedAt: now
-		});
-
-		await addDailyUsageCost(ctx, {
-			ownerId,
-			dateKey: budget.dateKey,
-			costUsdDelta: reservedCostUsd,
-			now
-		});
-
-		const spentUsd = reservation.projectedSpentUsd;
-		const updatedBudget = {
-			...budget,
-			spentUsd,
-			remainingUsd: Math.max(0, budget.capUsd - spentUsd),
-			isOverLimit: spentUsd >= budget.capUsd
-		};
-
-		return {
-			ok: true as const,
-			reservationId,
-			reservedCostUsd,
-			budget: updatedBudget
-		};
+		return await reserveAiBudgetForOwnerImpl(ctx, ownerId, args);
 	}
 });
+
+export const reserveAiBudgetForOwner = internalMutation({
+	args: {
+		ownerId: v.id('users'),
+		sourceKind: aiUsageSourceKindValue,
+		sourceId: v.string(),
+		modelId: v.string(),
+		atMs: v.optional(v.number())
+	},
+	handler: async (ctx, args) => {
+		return await reserveAiBudgetForOwnerImpl(ctx, args.ownerId, args);
+	}
+});
+
+async function reserveAiBudgetForOwnerImpl(
+	ctx: MutationCtx,
+	ownerId: Id<'users'>,
+	args: {
+		sourceKind: AiUsageSourceKind;
+		sourceId: string;
+		modelId: string;
+		atMs?: number;
+	}
+) {
+	const now = args.atMs ?? Date.now();
+	let budget = await getAiBudgetStatusForOwnerImpl(ctx, ownerId, now);
+	const releasedExpired = await releaseExpiredAiBudgetReservations(ctx, {
+		ownerId,
+		dateKey: budget.dateKey,
+		now
+	});
+	if (releasedExpired > 0) {
+		budget = await getAiBudgetStatusForOwnerImpl(ctx, ownerId, now);
+	}
+	const reservedCostUsd = estimateReservationCostUsd(args.modelId);
+	const reservation = applyAiReservationToBudget({
+		spentUsd: budget.spentUsd,
+		capUsd: budget.capUsd,
+		reservedCostUsd
+	});
+
+	if (!reservation.allowed) {
+		return {
+			ok: false as const,
+			budget: {
+				...budget,
+				remainingUsd: reservation.remainingUsd,
+				isOverLimit: true
+			}
+		};
+	}
+
+	const reservationId = await ctx.db.insert('aiUsageReservations', {
+		ownerId,
+		dateKey: budget.dateKey,
+		sourceKind: args.sourceKind,
+		sourceId: args.sourceId,
+		modelId: args.modelId,
+		reservedCostUsd,
+		status: 'pending',
+		createdAt: now,
+		updatedAt: now
+	});
+
+	await addDailyUsageCost(ctx, {
+		ownerId,
+		dateKey: budget.dateKey,
+		costUsdDelta: reservedCostUsd,
+		now
+	});
+
+	const spentUsd = reservation.projectedSpentUsd;
+	const updatedBudget = {
+		...budget,
+		spentUsd,
+		remainingUsd: Math.max(0, budget.capUsd - spentUsd),
+		isOverLimit: spentUsd >= budget.capUsd
+	};
+
+	return {
+		ok: true as const,
+		reservationId,
+		reservedCostUsd,
+		budget: updatedBudget
+	};
+}
 
 export const releaseAiBudgetReservation = mutation({
 	args: {
@@ -285,29 +306,47 @@ export const releaseAiBudgetReservation = mutation({
 	},
 	handler: async (ctx, args) => {
 		const ownerId = await requireAuthUserId(ctx);
-		const reservation = await ctx.db.get(args.reservationId);
-		if (!reservation || reservation.ownerId !== ownerId) {
-			throw new Error('Reservation not found');
-		}
-		if (reservation.status !== 'pending') {
-			return { ok: true as const, released: false };
-		}
-
-		const now = Date.now();
-		await addDailyUsageCost(ctx, {
-			ownerId,
-			dateKey: reservation.dateKey,
-			costUsdDelta: -reservation.reservedCostUsd,
-			now
-		});
-		await ctx.db.patch(reservation._id, {
-			status: 'released',
-			updatedAt: now
-		});
-
-		return { ok: true as const, released: true };
+		return await releaseAiBudgetReservationForOwnerImpl(ctx, ownerId, args.reservationId);
 	}
 });
+
+export const releaseAiBudgetReservationForOwner = internalMutation({
+	args: {
+		ownerId: v.id('users'),
+		reservationId: v.id('aiUsageReservations')
+	},
+	handler: async (ctx, args) => {
+		return await releaseAiBudgetReservationForOwnerImpl(ctx, args.ownerId, args.reservationId);
+	}
+});
+
+async function releaseAiBudgetReservationForOwnerImpl(
+	ctx: MutationCtx,
+	ownerId: Id<'users'>,
+	reservationId: Id<'aiUsageReservations'>
+) {
+	const reservation = await ctx.db.get(reservationId);
+	if (!reservation || reservation.ownerId !== ownerId) {
+		throw new Error('Reservation not found');
+	}
+	if (reservation.status !== 'pending') {
+		return { ok: true as const, released: false };
+	}
+
+	const now = Date.now();
+	await addDailyUsageCost(ctx, {
+		ownerId,
+		dateKey: reservation.dateKey,
+		costUsdDelta: -reservation.reservedCostUsd,
+		now
+	});
+	await ctx.db.patch(reservation._id, {
+		status: 'released',
+		updatedAt: now
+	});
+
+	return { ok: true as const, released: true };
+}
 
 async function getAiBudgetStatusForOwnerImpl(ctx: QueryCtx, ownerId: Id<'users'>, now: number) {
 	const timeZone = await getUserTimeZone(ctx, ownerId);
@@ -439,7 +478,7 @@ async function recordAiRunForOwnerImpl(
 ) {
 	const timeZone = await getUserTimeZone(ctx, params.ownerId);
 	const dateKey = dateKeyForMs(params.occurredAt, timeZone);
-	const costUsd = estimateCostUsd({
+	const costUsd = estimateAiUsageCostUsd({
 		modelId: params.modelId,
 		inputTokens: params.usage.inputTokens,
 		outputTokens: params.usage.outputTokens,

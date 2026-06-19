@@ -15,7 +15,8 @@ export function createWorkspaceChatStubTools(record: WorkspaceChatToolCallRecord
 			execute: log('listThreadArtifacts')
 		}),
 		readThreadArtifact: tool({
-			description: 'Read the full markdown for an artifact already linked to the active thread.',
+			description:
+				'Read the full source for a thread-linked artifact (markdown, HTML, or SVG). Returns contentFormat and content.',
 			inputSchema: z.object({
 				artifactId: z.string().describe('The artifact id.')
 			}),
@@ -23,22 +24,33 @@ export function createWorkspaceChatStubTools(record: WorkspaceChatToolCallRecord
 		}),
 		createIdeaArtifact: tool({
 			description:
-				'Create a loose idea artifact linked to the active thread. Use only after the user asks or confirms.',
+				'Create a markdown idea artifact linked to the active thread. Use only after the user asks or confirms.',
 			inputSchema: z.object({
 				title: z.string().min(1),
-				contentMarkdown: z.string().min(1)
+				content: z.string().min(1)
 			}),
 			execute: log('createIdeaArtifact')
 		}),
 		createPrdArtifact: tool({
 			description:
-				'Create a PRD artifact linked to the active thread. Use only after the user asks or confirms.',
+				'Create a markdown PRD artifact linked to the active thread. Use only after the user asks or confirms.',
 			inputSchema: z.object({
 				title: z.string().min(1),
 				problem: z.string().min(1),
 				targetUser: z.string().min(1)
 			}),
 			execute: log('createPrdArtifact')
+		}),
+		createVisualArtifact: tool({
+			description:
+				'Create an HTML or SVG visual artifact linked to the active thread. Use only after the user asks or confirms.',
+			inputSchema: z.object({
+				title: z.string().min(1),
+				type: z.string().min(1),
+				contentFormat: z.enum(['html', 'svg']),
+				content: z.string().min(1)
+			}),
+			execute: log('createVisualArtifact')
 		}),
 		prepareProjectPromotion: tool({
 			description:
@@ -48,23 +60,6 @@ export function createWorkspaceChatStubTools(record: WorkspaceChatToolCallRecord
 				summary: z.string().optional()
 			}),
 			execute: log('prepareProjectPromotion')
-		}),
-		requestUserChoice: tool({
-			description:
-				'Canonical UI tool for asking the user one compact decision. Use instead of prose multiple-choice questions.',
-			inputSchema: z.object({
-				question: z.string().min(1),
-				options: z
-					.array(
-						z.object({
-							label: z.string().min(1),
-							answer: z.string().min(1)
-						})
-					)
-					.min(2)
-					.max(3)
-			}),
-			execute: log('requestUserChoice')
 		}),
 		rememberUserPreference: tool({
 			description: 'Save a durable global user preference.',
@@ -90,7 +85,7 @@ export function createWorkspaceChatStubTools(record: WorkspaceChatToolCallRecord
 		}),
 		searchArtifacts: tool({
 			description:
-				'Search workspace artifacts by title, type, or markdown content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
+				'Search workspace artifacts by title, type, or content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
 			inputSchema: z.object({
 				query: z.string().optional(),
 				type: z.string().nullable().optional(),

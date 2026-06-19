@@ -22,9 +22,9 @@
 		listMessagesQuery,
 		saveMessagesMutation
 	} from '$lib/chat';
-	import IdeaChatChoiceCard from '$lib/components/idea-chat/IdeaChatChoiceCard.svelte';
 	import IdeaChatPromotionCard from '$lib/components/idea-chat/IdeaChatPromotionCard.svelte';
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
+	import OpenUIResponse from '$lib/openui/OpenUIResponse.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
 	import {
 		Context,
@@ -79,17 +79,16 @@
 		type IdeaAiModelId
 	} from '$lib/idea-ai-models';
 	import { ideaAiModelProviderGroups } from '$lib/idea-ai-model-selector';
-	import {
-		assistantSegmentsHaveContent,
-		buildAssistantSegments
-	} from '$lib/idea-chat-assistant-parts';
+	import { buildAssistantSegments } from '$lib/idea-chat-assistant-parts';
 	import WorkspaceMessageActions from '$lib/components/workspaces/WorkspaceMessageActions.svelte';
 	import {
+		assistantMessageHasVisibleContent,
 		buildAssistantMessageCopyText,
 		buildUserMessageCopyText,
 		truncateMessagesAfterUserMessage,
 		uiMessageText
 	} from '$lib/workspace-chat-message-actions';
+	import { logOpenUIFallbackIfNeeded } from '$lib/openui/response';
 	import { consumeThreadAutoStart } from '$lib/workspace-thread-start';
 	import { workspaceThreadHref, workspaceThreadViewHref } from '$lib/workspace-route-contract';
 	import {
@@ -746,8 +745,13 @@
 			}),
 			onFinish: ({ messages, isError }) => {
 				if (isError) return;
-				void persistMessages(threadId, messages);
-				void requestThreadTitleGeneration(threadId);
+				const last = messages.at(-1);
+				if (last?.role === 'assistant') {
+					logOpenUIFallbackIfNeeded(uiMessageText(last, ''), threadId);
+				}
+				void persistMessages(threadId, messages).then((saved) => {
+					if (saved) void requestThreadTitleGeneration(threadId);
+				});
 			}
 		});
 	}
@@ -880,9 +884,11 @@
 				},
 				body: JSON.stringify({ threadId })
 			});
-			if (response.ok) {
-				void invalidateAll();
+			if (!response.ok) {
+				console.error('Could not generate thread title', response.status, await response.text());
+				return;
 			}
+			void invalidateAll();
 		} catch {
 			// Non-blocking; sidebar keeps placeholder until next visit or retry.
 		}
@@ -896,7 +902,7 @@
 		if (message.role !== 'assistant') return false;
 		if (messageIndex !== messages.length - 1) return false;
 		if (chat?.status !== 'submitted' && chat?.status !== 'streaming') return false;
-		return !assistantSegmentsHaveContent(buildAssistantSegments(message));
+		return !assistantMessageHasVisibleContent(message);
 	}
 
 	const threadStateFade = $derived({
@@ -987,31 +993,32 @@
 										<MessageContent>
 											{#if message.role === 'assistant'}
 												{@const segments = buildAssistantSegments(message)}
-												{#if assistantSegmentsHaveContent(segments)}
-													<!-- gap-2: prose vs tools within one assistant turn; message gap-5 separates turns -->
+												{@const assistantText = uiMessageText(message, '')}
+												{#if assistantMessageHasVisibleContent(message)}
+													<!-- Tool state stays explicit; final assistant text is one progressively rendered OpenUI document. -->
 													<div class="flex w-full min-w-0 flex-col gap-2">
 														{#each segments as segment, segmentIndex (segmentIndex)}
-															{#if segment.kind === 'text'}
-																<MessageResponse
-																	content={segment.text}
-																	class="text-xs leading-relaxed"
-																/>
-															{:else}
-																<div class="border-l border-border/40 pl-4 sm:pl-5">
-																	{#if segment.kind === 'tools'}
-																		<IdeaChatToolSteps tools={segment.tools} />
-																	{:else if segment.kind === 'choice'}
-																		<IdeaChatChoiceCard
-																			choice={segment.choice}
-																			disabled={isChatBusy}
-																			onAnswer={submitChoiceAnswer}
-																		/>
-																	{:else}
-																		<IdeaChatPromotionCard proposal={segment.proposal} />
-																	{/if}
-																</div>
-															{/if}
+															<div class="border-l border-border/40 pl-4 sm:pl-5">
+																{#if segment.kind === 'tools'}
+																	<IdeaChatToolSteps
+																		tools={segment.tools}
+																		deemphasized={Boolean(assistantText)}
+																	/>
+																{:else}
+																	<IdeaChatPromotionCard proposal={segment.proposal} />
+																{/if}
+															</div>
 														{/each}
+														{#if assistantText}
+															<OpenUIResponse
+																response={assistantText}
+																isStreaming={messageIndex === chat.messages.length - 1 &&
+																	(chat.status === 'submitted' || chat.status === 'streaming')}
+																onSend={submitChoiceAnswer}
+																onRetry={() => void retryAssistantRequest()}
+																reducedMotion={prefersReducedMotion.current}
+															/>
+														{/if}
 													</div>
 												{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages)}
 													<MessageResponse

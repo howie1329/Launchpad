@@ -1,4 +1,4 @@
-import { buildWorkspaceChatInstructions } from '../../src/lib/server/workspace-chat-instructions.ts';
+import { buildFullWorkspaceChatInstructions } from '../../src/lib/server/workspace-chat-instructions.ts';
 import { wrapAISDK } from 'braintrust';
 import * as ai from 'ai';
 import { stepCountIs } from 'ai';
@@ -29,7 +29,7 @@ export async function runWorkspaceChatEvalTask(
 	input: WorkspaceChatEvalInput
 ): Promise<WorkspaceChatEvalOutput> {
 	const toolCallLog: WorkspaceChatToolCallRecord[] = [];
-	const instructions = buildWorkspaceChatInstructions({
+	const instructions = buildFullWorkspaceChatInstructions({
 		project: fixtureContext(input.fixture),
 		referencedBlock: input.referencedBlock ?? '',
 		profileBlock: input.profileBlock ?? '',

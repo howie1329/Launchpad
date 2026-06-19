@@ -469,13 +469,13 @@
 				<Command.Item
 					class={paletteItemClass}
 					value="artifact {artifact._id} {artifact.title} {artifact.type} {artifactPreview(
-						artifact.contentMarkdown
+						artifact.content
 					)}"
 					keywords={[
 						artifact.title,
 						artifactTypeLabel(artifact.type),
 						artifact.type,
-						artifactPreview(artifact.contentMarkdown),
+						artifactPreview(artifact.content),
 						projectLabel(artifact.projectId),
 						'document',
 						'doc'
@@ -486,7 +486,7 @@
 					<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span class="truncate">{artifact.title}</span>
 						<span class="truncate text-[11px] font-normal text-muted-foreground">
-							{artifactPreview(artifact.contentMarkdown)}
+							{artifactPreview(artifact.content)}
 						</span>
 					</span>
 					<span

@@ -47,6 +47,15 @@ Ownership is consistently represented with `ownerId`. Server-side Convex functio
 
 Workspace chat streams through `src/routes/api/workspace/chat/+server.ts` with the Vercel AI SDK. Model selection is catalog-driven in `src/lib/idea-ai-models.ts` and resolved in `src/lib/server/resolve-workspace-language-model.ts`.
 
+Assistant final responses use OpenUI Lang. A Launchpad-owned Svelte component library in
+`src/lib/openui` defines the allowed generated interface, while the OpenUI CLI produces a
+deterministic system prompt under `src/lib/openui/generated` before development and builds. AI SDK
+tool parts remain explicit execution status; final text parts are joined and progressively rendered
+as one OpenUI document by `src/lib/openui/OpenUIResponse.svelte`. Existing markdown messages and
+invalid OpenUI output fall back to the existing markdown renderer. Generated UI may only manage local
+form state and send a follow-up chat message. It has no direct tool, URL, Convex, or external-app
+access.
+
 Supported provider paths:
 
 - Vercel AI Gateway via `AI_GATEWAY_API_KEY`
@@ -71,6 +80,8 @@ Optional Braintrust tracing for workspace chat (engineering only, not product us
 
 Artifacts are markdown-first documents with flexible string `type` values. User saves and explicit AI writes create immutable `artifactVersions`. Artifact history and restore behavior should preserve the latest version as the source of truth while keeping old versions inspectable.
 
+HTML artifacts can be previewed through the sandbox path in `src/lib/artifact-sandbox.ts` and `src/lib/components/workspaces/ArtifactSandboxPreview.svelte`. The sandbox should keep generated artifact previews isolated from workspace chrome and should not be treated as a trusted execution context.
+
 Thread-artifact links record why an artifact is present in a thread: `created`, `referenced`, or `imported`.
 
 ## Workspace Settings And Account Controls
@@ -83,18 +94,25 @@ Launchpad Actions are project-scoped external activity listeners backed by Compo
 
 ## Environment
 
-| Variable                  | Purpose                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------- |
-| `PUBLIC_CONVEX_URL`       | Convex deployment URL for browser and server HTTP clients                                |
-| `AI_GATEWAY_API_KEY`      | Vercel AI Gateway key for default AI workflows                                           |
-| `OPENROUTER_API_KEY`      | Optional OpenRouter provider key                                                         |
-| `TAVILY_API_KEY`          | Optional web search/page extraction key                                                  |
-| `SUPERMEMORY_API_KEY`     | Optional Supermemory key                                                                 |
-| `COMPOSIO_API_KEY`        | Optional Composio key for selected external app tools and Launchpad Actions              |
-| `COMPOSIO_WEBHOOK_SECRET` | Optional Composio webhook secret for Launchpad Actions; set in SvelteKit and Convex envs |
-| `CONVEX_SITE_URL`         | Convex Auth deployment site URL                                                          |
-| `PUBLIC_CONVEX_SITE_URL`  | Public Convex site URL when client-facing site routes need it                            |
-| `CONVEX_DEPLOYMENT`       | Local Convex deployment identifier managed by `convex dev`                               |
+| Variable                          | Purpose                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `PUBLIC_CONVEX_URL`               | Convex deployment URL for browser and server HTTP clients                                |
+| `AI_GATEWAY_API_KEY`              | Vercel AI Gateway key for default AI workflows                                           |
+| `OPENROUTER_API_KEY`              | Optional OpenRouter provider key                                                         |
+| `TAVILY_API_KEY`                  | Optional web search/page extraction key                                                  |
+| `SUPERMEMORY_API_KEY`             | Optional Supermemory key                                                                 |
+| `COMPOSIO_API_KEY`                | Optional Composio key for selected external app tools and Launchpad Actions              |
+| `COMPOSIO_WEBHOOK_SECRET`         | Optional Composio webhook secret for Launchpad Actions; set in SvelteKit and Convex envs |
+| `BRAINTRUST_API_KEY`              | Optional Braintrust key for workspace chat tracing and evals                             |
+| `BRAINTRUST_TRACING_ENABLED`      | Optional flag to enable workspace chat tracing                                           |
+| `BRAINTRUST_PROJECT_NAME`         | Optional Braintrust tracing project name                                                 |
+| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional eval provider, `gateway` or `openrouter`                                        |
+| `WORKSPACE_CHAT_EVAL_MODEL_ID`    | Optional catalog model id for workspace chat evals                                       |
+| `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional flag to enable selected LLM judge scorers                                       |
+| `WORKSPACE_CHAT_EVAL_JUDGE_MODEL` | Optional catalog model id for eval judge scoring                                         |
+| `CONVEX_SITE_URL`                 | Convex Auth deployment site URL                                                          |
+| `PUBLIC_CONVEX_SITE_URL`          | Public Convex site URL when client-facing site routes need it                            |
+| `CONVEX_DEPLOYMENT`               | Local Convex deployment identifier managed by `convex dev`                               |
 
 ## Maintainer Checks
 
@@ -103,7 +121,9 @@ Use the narrowest useful check for the change:
 ```sh
 npm run check
 npm run lint
+npm run test
 npm run build
+npm run eval:chat
 ```
 
 Docs-only changes should at minimum pass a local Markdown link check and placeholder search.

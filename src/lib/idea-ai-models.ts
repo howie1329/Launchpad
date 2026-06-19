@@ -148,6 +148,7 @@ export const ideaAiModels: readonly IdeaAiModel[] = [
 export type IdeaAiModelId = (typeof ideaAiModels)[number]['id'];
 
 export const defaultIdeaAiModelId: IdeaAiModelId = ideaAiModels[0].id;
+export const utilityAiModelId: IdeaAiModelId = 'openai/gpt-5.4-nano';
 
 export function isIdeaAiModelId(value: unknown): value is IdeaAiModelId {
 	return typeof value === 'string' && ideaAiModels.some((model) => model.id === value);

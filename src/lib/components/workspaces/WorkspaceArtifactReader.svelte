@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import {
+		isCodeArtifactFormat,
 		listArtifactVersionsQuery,
 		restoreArtifactVersionMutation,
 		updateArtifactMutation,
@@ -73,7 +74,7 @@
 			surfaceMode === 'read' &&
 			readMode === 'editor' &&
 			editorValue.trim().length > 0 &&
-			editorValue !== (artifact?.contentMarkdown ?? '') &&
+			editorValue !== (artifact?.content ?? '') &&
 			!isSaving
 	);
 	const newerSavedVersionAvailable = $derived(
@@ -105,11 +106,14 @@
 
 		if (hydratedArtifactId !== artifact._id) {
 			hydratedArtifactId = artifact._id;
-			editorValue = artifact.contentMarkdown;
+			editorValue = artifact.content;
 			contentDirty = false;
 			saveError = '';
 			surfaceMode = initialSelectedVersionNumber ? 'history' : 'read';
-			readMode = fullWidthContent ? 'preview' : 'editor';
+			readMode =
+				fullWidthContent || (artifact && isCodeArtifactFormat(artifact.contentFormat))
+					? 'preview'
+					: 'editor';
 			selectedVersionId = null;
 			compareBaseVersionId = null;
 			editorBaseRevision = artifact.revision;
@@ -118,7 +122,7 @@
 		}
 
 		if (!contentDirty) {
-			editorValue = artifact.contentMarkdown;
+			editorValue = artifact.content;
 			saveError = '';
 			editorBaseRevision = artifact.revision;
 		}
@@ -209,7 +213,7 @@
 		try {
 			const result = await getConvexClient().mutation(updateArtifactMutation, {
 				artifactId: artifact._id,
-				contentMarkdown: editorValue
+				content: editorValue
 			});
 			contentDirty = false;
 			editorBaseRevision = result.versionNumber;
@@ -278,7 +282,7 @@
 
 	const reloadEditorToLatest = () => {
 		if (!artifact) return;
-		editorValue = artifact.contentMarkdown;
+		editorValue = artifact.content;
 		contentDirty = false;
 		editorBaseRevision = artifact.revision;
 		saveError = '';
@@ -501,12 +505,13 @@
 							<ArtifactReadSurface
 								artifactId={artifact._id}
 								value={editorValue}
+								contentFormat={artifact.contentFormat}
 								{compact}
 								{readMode}
 								{saveError}
 								onChange={(nextValue) => {
 									editorValue = nextValue;
-									contentDirty = nextValue !== (artifact?.contentMarkdown ?? '');
+									contentDirty = nextValue !== (artifact?.content ?? '');
 								}}
 							/>
 						{/if}

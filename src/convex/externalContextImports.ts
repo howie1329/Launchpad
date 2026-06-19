@@ -160,7 +160,7 @@ export const createProjectFromDraft = mutation({
 			projectId,
 			title: 'Imported external context',
 			type: 'source',
-			contentMarkdown: draft.sourceMarkdown,
+			content: draft.sourceMarkdown,
 			metadata: {
 				source: 'external-ai-context-import',
 				draftId: draft._id,
@@ -175,7 +175,7 @@ export const createProjectFromDraft = mutation({
 			projectId,
 			title: 'Project Brief',
 			type: 'brief',
-			contentMarkdown: projectBriefMarkdown,
+			content: projectBriefMarkdown,
 			metadata: {
 				source: 'external-ai-context-import',
 				draftId: draft._id,
@@ -546,7 +546,7 @@ async function insertImportedArtifact(
 		projectId: Id<'projects'>;
 		title: string;
 		type: string;
-		contentMarkdown: string;
+		content: string;
 		metadata: Record<string, unknown>;
 		actor: 'user' | 'ai';
 		summary: string;
@@ -557,7 +557,7 @@ async function insertImportedArtifact(
 		ownerId: args.ownerId,
 		type: args.type,
 		title: args.title,
-		contentMarkdown: args.contentMarkdown,
+		content: args.content,
 		contentFormat: 'markdown',
 		revision: 1,
 		metadata: args.metadata,
@@ -571,7 +571,7 @@ async function insertImportedArtifact(
 		artifactId,
 		versionNumber: 1,
 		title: args.title,
-		contentMarkdown: args.contentMarkdown,
+		content: args.content,
 		actor: args.actor,
 		source: 'editor',
 		summary: args.summary,
