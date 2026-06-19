@@ -15,20 +15,6 @@ export type ToolStepView = {
 	actionVersionNumber?: number;
 };
 
-export type ChoiceCardOption = {
-	label: string;
-	answer: string;
-	description?: string;
-};
-
-export type ChoiceCardView = {
-	id: string;
-	question: string;
-	context?: string;
-	options: ChoiceCardOption[];
-	customPlaceholder: string;
-};
-
 export type PromotionProposalView = {
 	id: string;
 	name: string;
@@ -39,9 +25,7 @@ export type PromotionProposalView = {
 };
 
 export type AssistantSegment =
-	| { kind: 'text'; text: string }
 	| { kind: 'tools'; tools: ToolStepView[] }
-	| { kind: 'choice'; choice: ChoiceCardView }
 	| { kind: 'promotionProposal'; proposal: PromotionProposalView };
 
 const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = {
@@ -55,12 +39,13 @@ const WORKSPACE_TOOL_META: Record<string, { title: string; running: string }> = 
 	},
 	createIdeaArtifact: { title: 'Save idea artifact', running: 'Saving idea artifact…' },
 	createPrdArtifact: { title: 'Save PRD artifact', running: 'Saving PRD artifact…' },
+	createVisualArtifact: { title: 'Save visual artifact', running: 'Saving visual artifact…' },
 	prepareProjectPromotion: {
 		title: 'Prepare project promotion',
 		running: 'Reviewing project readiness…'
 	},
 	updateThreadArtifact: { title: 'Update artifact', running: 'Updating artifact…' },
-	requestUserChoice: { title: 'Choose next step', running: 'Preparing choices…' },
+	requestUserChoice: { title: 'Past choice', running: 'Past choice card…' },
 	tavilySearch: { title: 'Search web', running: 'Searching the web…' },
 	tavilyExtract: { title: 'Read web pages', running: 'Reading source pages…' }
 };
@@ -228,10 +213,11 @@ function summarizeWorkspaceTool(
 						}
 					: {})
 			};
-		case 'requestUserChoice': {
-			const question = typeof out.question === 'string' ? out.question : '';
-			return { summary: question || 'Asked for a choice.', detailJson };
-		}
+		case 'requestUserChoice':
+			return {
+				summary: 'Past choice card (no longer interactive).',
+				detailJson
+			};
 		default:
 			return { summary: 'Finished.', detailJson };
 	}
@@ -261,53 +247,6 @@ export function toolPartToView(part: unknown): ToolStepView | null {
 		...(actionLabel ? { actionLabel } : {}),
 		...(actionArtifactId ? { actionArtifactId } : {}),
 		...(actionVersionNumber !== undefined ? { actionVersionNumber } : {})
-	};
-}
-
-export function toolPartToChoiceCard(part: unknown): ChoiceCardView | null {
-	if (!part || typeof part !== 'object') return null;
-	const p = part as Record<string, unknown>;
-	const toolName = parseToolName(p);
-	if (toolName !== 'requestUserChoice') return null;
-	if (p.state !== 'output-available') return null;
-
-	const output =
-		p.output && typeof p.output === 'object' ? (p.output as Record<string, unknown>) : {};
-	const question = typeof output.question === 'string' ? output.question.trim() : '';
-	const options = Array.isArray(output.options)
-		? output.options
-				.map((raw): ChoiceCardOption | null => {
-					if (!raw || typeof raw !== 'object') return null;
-					const option = raw as Record<string, unknown>;
-					const label = typeof option.label === 'string' ? option.label.trim() : '';
-					const answer = typeof option.answer === 'string' ? option.answer.trim() : '';
-					const description =
-						typeof option.description === 'string' ? option.description.trim() : '';
-					if (!label || !answer) return null;
-					return {
-						label,
-						answer,
-						...(description ? { description } : {})
-					};
-				})
-				.filter((option): option is ChoiceCardOption => option !== null)
-		: [];
-
-	if (!question || options.length < 2) return null;
-
-	const toolCallId = typeof p.toolCallId === 'string' ? p.toolCallId : `choice-${question}`;
-	const context = typeof output.context === 'string' ? output.context.trim() : '';
-	const customPlaceholder =
-		typeof output.customPlaceholder === 'string' && output.customPlaceholder.trim()
-			? output.customPlaceholder.trim()
-			: 'Write a custom answer...';
-
-	return {
-		id: toolCallId,
-		question,
-		...(context ? { context } : {}),
-		options,
-		customPlaceholder
 	};
 }
 
@@ -354,22 +293,11 @@ function isToolLikePart(part: { type?: unknown }): boolean {
 	return t.startsWith('tool-') || t === 'dynamic-tool';
 }
 
-function flushTextBuffer(buf: string[]): string | null {
-	const text = buf.join('').trim();
-	buf.length = 0;
-	return text.length ? text : null;
-}
-
-/** Ordered segments: merged text runs, grouped consecutive tool invocations. */
+/** Tool and promotion segments from assistant message parts (OpenUI text is handled separately). */
 export function buildAssistantSegments(message: UIMessage): AssistantSegment[] {
 	if (message.role !== 'assistant') return [];
 
 	const out: AssistantSegment[] = [];
-	const textBuf: string[] = [];
-
-	const pushText = (text: string) => {
-		out.push({ kind: 'text', text });
-	};
 
 	const appendTool = (step: ToolStepView) => {
 		const last = out[out.length - 1];
@@ -382,44 +310,24 @@ export function buildAssistantSegments(message: UIMessage): AssistantSegment[] {
 
 	for (const part of message.parts) {
 		if (!part || typeof part !== 'object') continue;
-		const typed = part as { type?: string; text?: string };
-
-		if (typed.type === 'text' && typeof typed.text === 'string') {
-			textBuf.push(typed.text);
-			continue;
-		}
+		const typed = part as { type?: string };
 
 		if (isToolLikePart(typed)) {
-			const flushed = flushTextBuffer(textBuf);
-			if (flushed) pushText(flushed);
-			const choice = toolPartToChoiceCard(part);
-			if (choice) {
-				out.push({ kind: 'choice', choice });
-				continue;
-			}
 			const promotionProposal = toolPartToPromotionProposal(part);
 			if (promotionProposal) {
 				out.push({ kind: 'promotionProposal', proposal: promotionProposal });
 			}
-			// Promotion proposals intentionally render both a prominent card and the
-			// collapsed technical tool row, so keep falling through to toolPartToView.
 			const view = toolPartToView(part);
 			if (view) appendTool(view);
-			continue;
 		}
 	}
-
-	const tail = flushTextBuffer(textBuf);
-	if (tail) pushText(tail);
 
 	return out;
 }
 
 export function assistantSegmentsHaveContent(segments: AssistantSegment[]): boolean {
 	for (const seg of segments) {
-		if (seg.kind === 'text' && seg.text.trim()) return true;
 		if (seg.kind === 'tools' && seg.tools.length > 0) return true;
-		if (seg.kind === 'choice') return true;
 		if (seg.kind === 'promotionProposal') return true;
 	}
 	return false;

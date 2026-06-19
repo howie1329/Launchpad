@@ -28,14 +28,14 @@ The product is designed for builders who want more structure than a blank chat w
 | Feature                     | Status                                                                                                                               |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Signed-in workspace         | Main app surface at `/workspace`                                                                                                     |
-| General and project threads | Persisted chats with model selection                                                                                                 |
+| General and project threads | Persisted chats with model selection and OpenUI-rendered assistant responses with markdown fallback                                  |
 | Projects                    | Containers for related chats, artifacts, Launchpad Actions, and project activity                                                     |
-| Artifacts                   | Markdown documents with editing, preview, versions, diffs, and restore                                                               |
+| Artifacts                   | Markdown documents and sandboxed HTML previews with editing, preview, versions, diffs, and restore                                   |
 | External context imports    | Review flow for converting pasted AI context into project material                                                                   |
 | External app tools          | Connected app tools for selected chat runs through Composio                                                                          |
 | Launchpad Actions           | Project-scoped GitHub and Linear triggers that record external activity into Launchpad                                               |
 | AI tools                    | Artifact/project operations, promotion support, optional Tavily search, optional Supermemory recall, and selected external app tools |
-| Multi-provider AI           | Gateway, OpenRouter, Groq, and NVIDIA NIM catalog entries                                                                            |
+| Multi-provider AI           | Vercel AI Gateway and OpenRouter catalog entries                                                                                     |
 | Usage controls              | Daily AI cap, usage ledger, AI preferences, external app connections, account controls, and activity history                         |
 | Notifications and tabs      | Workspace navigation and progress feedback                                                                                           |
 

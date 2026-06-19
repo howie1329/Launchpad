@@ -25,6 +25,7 @@ export type RecordAiRunArgs = {
 		reasoningTokens?: number;
 		cachedInputTokens?: number;
 	};
+	reservationId?: Id<'aiUsageReservations'>;
 };
 
 export const recordAiRunMutation = makeFunctionReference<
@@ -32,3 +33,32 @@ export const recordAiRunMutation = makeFunctionReference<
 	RecordAiRunArgs,
 	{ ok: true; costUsd: number }
 >('usage:recordAiRun');
+
+export type ReserveAiBudgetResult =
+	| {
+			ok: true;
+			reservationId: Id<'aiUsageReservations'>;
+			reservedCostUsd: number;
+			budget: AiBudgetStatus;
+	  }
+	| {
+			ok: false;
+			budget: AiBudgetStatus;
+	  };
+
+export const reserveAiBudgetMutation = makeFunctionReference<
+	'mutation',
+	{
+		sourceKind: 'chatThread' | 'externalContextImportDraft';
+		sourceId: string;
+		modelId: string;
+		atMs?: number;
+	},
+	ReserveAiBudgetResult
+>('usage:reserveAiBudget');
+
+export const releaseAiBudgetReservationMutation = makeFunctionReference<
+	'mutation',
+	{ reservationId: Id<'aiUsageReservations'> },
+	{ ok: true; released: boolean }
+>('usage:releaseAiBudgetReservation');

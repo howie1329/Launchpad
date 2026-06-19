@@ -8,6 +8,7 @@
 		modified,
 		oldFileName = 'artifact.md',
 		newFileName = 'artifact.md',
+		lang = 'markdown',
 		compact = false,
 		diffStyle = 'unified'
 	}: {
@@ -15,6 +16,7 @@
 		modified: string;
 		oldFileName?: string;
 		newFileName?: string;
+		lang?: 'markdown' | 'html';
 		compact?: boolean;
 		diffStyle?: 'unified' | 'split';
 	} = $props();
@@ -45,12 +47,12 @@
 	const oldFile = $derived<FileContents>({
 		name: oldFileName,
 		contents: original,
-		lang: 'markdown'
+		lang
 	});
 	const newFile = $derived<FileContents>({
 		name: newFileName,
 		contents: modified,
-		lang: 'markdown'
+		lang
 	});
 	const parsedDiff = $derived(
 		parseDiffFromFile(
@@ -79,6 +81,7 @@
 		void modified;
 		void oldFileName;
 		void newFileName;
+		void lang;
 		void compact;
 		void diffStyle;
 		void themeType;
@@ -93,9 +96,7 @@
 	});
 </script>
 
-<div
-	class="artifact-diff-renderer flex min-h-0 flex-1 flex-col overflow-hidden"
->
+<div class="artifact-diff-renderer flex min-h-0 flex-1 flex-col overflow-hidden">
 	<div class="min-h-0 flex-1 overflow-auto" bind:this={containerEl}></div>
 </div>
 

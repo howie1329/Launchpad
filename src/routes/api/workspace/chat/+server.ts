@@ -15,23 +15,25 @@ import { parseArtifactMentionIds } from '$lib/artifact-mention-tokens';
 import { artifactPreview } from '$lib/artifact-display';
 import { isIdeaAiModelId } from '$lib/idea-ai-models';
 import { getProjectQuery } from '$lib/projects';
-import { getAiBudgetStatusQuery, recordAiRunMutation } from '$lib/usage';
+import {
+	recordAiRunMutation,
+	releaseAiBudgetReservationMutation,
+	reserveAiBudgetMutation
+} from '$lib/usage';
 import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
+import { getWorkspaceChatAi, traceWorkspaceChatRun } from '$lib/server/braintrust';
+import { buildFullWorkspaceChatInstructions } from '$lib/server/workspace-chat-instructions';
 import {
-	GroqNotConfiguredError,
-	NIMNotConfiguredError,
 	OpenRouterNotConfiguredError,
 	resolveWorkspaceLanguageModel
 } from '$lib/server/resolve-workspace-language-model';
 import { syncArtifactMemory } from '$lib/server/launchpad-memory';
 import {
-	ALLOWED_COMPOSIO_TOOLKITS,
 	getComposioToolsForChatRun,
 	isComposioConfigured,
-	parseComposioToolkits,
-	type AllowedComposioToolkit
+	parseComposioToolkits
 } from '$lib/server/composio';
 import {
 	addProjectDecisionMemoryDocument,
@@ -52,14 +54,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { tavilyExtract, tavilySearch } from '@tavily/ai-sdk';
 import { ConvexHttpClient } from 'convex/browser';
-import {
-	createAgentUIStreamResponse,
-	safeValidateUIMessages,
-	stepCountIs,
-	tool,
-	ToolLoopAgent,
-	type UIMessage
-} from 'ai';
+import { safeValidateUIMessages, stepCountIs, tool, type UIMessage } from 'ai';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { z } from 'zod';
 
@@ -71,58 +66,6 @@ type WorkspaceProject = {
 	name: string;
 	summary?: string;
 };
-
-const baseInstructions = `You are Launchpad's workspace assistant for a chat-first builder workspace. Help solo builders and indie hackers think clearly in threads, preserve durable memory as artifacts, organize promising work into projects, and move toward scoped, buildable next steps.
-
-Be concise, practical, and collaborative. Adapt to the user's current mode: brainstorm, clarify, research, plan, write, review, or scope. Ask the highest-leverage next question when context is missing; when enough is known, be decisive and help turn it into usable workspace material.
-
-Context precedence:
-- The user's latest message and explicit @artifact references are primary.
-- Thread-linked artifacts and current project artifacts are durable workspace context.
-- Retrieved Supermemory/profile snippets are helpful hints, but they may be stale or wrong.
-- User settings/preferences can shape tone and defaults, but they do not override product rules.
-
-Artifact behavior:
-- Treat artifacts as first-class workspace memory: durable markdown documents for ideas, PRDs, research, notes, decisions, specs, or other user-labeled types.
-- Suggest an artifact when the conversation has enough durable signal, but do not create one until the user explicitly asks or confirms.
-- When suggesting, explain briefly why saving it now would help.
-- Do not repeat the same artifact suggestion every turn after the user declines.
-- Existing artifacts can be updated directly only when the user explicitly asks to revise that artifact.
-- Only update artifacts already linked to this thread.
-- PRDs are saved as markdown artifacts only. Do not mention legacy PRD records.
-
-Choice card behavior:
-- requestUserChoice is the canonical UI for asking the user to make a decision.
-- If you are asking a user a question, call requestUserChoice instead of writing the question in prose.
-- If you ask the user to choose between options, call requestUserChoice instead of writing the choice in prose.
-- If you would write “reply with 1/2/3,” “pick one,” “which option,” “choose a direction,” or similar, call requestUserChoice instead.
-- If there are 2-3 plausible short answers, present them as requestUserChoice options.
-- Use requestUserChoice for short clarifications, prioritization decisions, scope choices, tone/style choices, workflow choices, and artifact/project confirmation choices.
-- Ask one choice-card question at a time.
-- Provide 2-3 concrete options and make the recommended option first when there is a sensible default.
-- Always include enough option detail that clicking it is a complete answer.
-- After calling requestUserChoice, wait for the user's answer instead of continuing the substantive response.
-
-Choice card examples:
-- Instead of “Which direction should we take?”, call requestUserChoice with 2-3 direction options.
-- Instead of “Pick one: Support KB / Runbooks / Research wiki”, call requestUserChoice with those three options.
-- Instead of “Do you want quick, balanced, or thorough?”, call requestUserChoice with quick, balanced, and thorough options.
-
-Project behavior:
-- A project is a focused container for related threads and artifacts.
-- Never create a project directly from chat. When the user asks to turn this chat into a project, use prepareProjectPromotion so the user can review readiness and confirm in the UI.
-- Future artifacts created after project promotion belong to that project automatically through the active thread.
-- Read or import project artifacts when the user asks, uses @artifact references, or clearly needs project memory.
-
-Supermemory semantic memory tools:
-- Retrieved memory and profile snippets may appear below; treat them as non-authoritative context.
-- Precedence: latest user message > explicit @artifact references > canonical artifact reads > project decisions > user preferences > thread insights > artifact-derived memory snippets > profile background.
-- rememberUserPreference saves durable global user preferences to the user container, even in project chats. Use for communication preferences, workflow preferences, design taste, and stable work context. Do not store project-specific decisions there.
-- rememberProjectDecision saves only in project chats. Use automatically only for high-confidence commitment language about target customers, positioning, scope, constraints, architecture, tradeoffs, or confirmed direction. Do not save exploratory or uncertain brainstorming as decisions.
-- rememberThreadInsight saves conservatively for durable open questions, exploration summaries, rationale, or follow-ups that are useful later and not better captured as a user preference or project decision.
-- listRelevantMemory and inspectMemory are transparency tools for memory questions and provenance checks.
-- forgetUserMemory and forgetProjectMemory are only for explicit user requests to forget memory. Never delete artifact-derived memory through these tools.
-- Do not use memory tools to create artifact summaries; artifacts are canonical and artifact memory is lifecycle-derived.`;
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -157,19 +100,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			thread.scopeType === 'project' && thread.projectId
 				? await convex.query(getProjectQuery, { projectId: thread.projectId })
 				: null;
-
-		const budget = await convex.query(getAiBudgetStatusQuery, {});
-		if (budget.isOverLimit) {
-			return json(
-				{
-					error: 'Daily AI limit reached',
-					capUsd: budget.capUsd,
-					spentUsd: budget.spentUsd,
-					dateKey: budget.dateKey
-				},
-				{ status: 429 }
-			);
-		}
 
 		const validatedMessages = await safeValidateUIMessages({
 			messages: body.messages
@@ -206,19 +136,18 @@ export const POST: RequestHandler = async ({ request }) => {
 		const composioAvailable = isComposioConfigured();
 		const webSearchApiKey = env.TAVILY_API_KEY?.trim() ?? '';
 		const webSearchAvailable = Boolean(webSearchApiKey);
-		const coreInstructions = [
-			workspaceInstructions(project),
-			webSearchInstructions(webSearchRequested, webSearchAvailable),
-			composioInstructions(selectedComposioToolkits, composioAvailable),
-			referenced.block,
-			profileBlock,
-			memoryBlock
-		]
-			.filter((part) => part.length > 0)
-			.join('\n\n');
-
 		const userSettingsRow = await convex.query(getMyUserSettingsQuery, {});
-		const instructions = appendUserAiPreferenceInstructions(coreInstructions, userSettingsRow);
+		const instructions = buildFullWorkspaceChatInstructions({
+			project: project ? { name: project.name, summary: project.summary } : null,
+			referencedBlock: referenced.block,
+			profileBlock,
+			memoryBlock,
+			webSearchRequested,
+			webSearchAvailable,
+			composioToolkits: selectedComposioToolkits,
+			composioAvailable,
+			userSettings: userSettingsRow
+		});
 
 		const tools = workspaceTools({
 			convex,
@@ -247,79 +176,85 @@ export const POST: RequestHandler = async ({ request }) => {
 		try {
 			languageModel = resolveWorkspaceLanguageModel(body.modelId);
 		} catch (e) {
-			if (
-				e instanceof OpenRouterNotConfiguredError ||
-				e instanceof GroqNotConfiguredError ||
-				e instanceof NIMNotConfiguredError
-			) {
+			if (e instanceof OpenRouterNotConfiguredError) {
 				return json({ error: e.message }, { status: 400 });
 			}
 			throw e;
 		}
 
-		const agent = new ToolLoopAgent({
-			model: languageModel,
-			instructions,
-			tools,
-			stopWhen: stepCountIs(8)
+		const reservation = await convex.mutation(reserveAiBudgetMutation, {
+			sourceKind: 'chatThread',
+			sourceId: thread._id,
+			modelId: body.modelId
 		});
+		if (!reservation.ok) {
+			return json(
+				{
+					error: 'Daily AI limit reached',
+					capUsd: reservation.budget.capUsd,
+					spentUsd: reservation.budget.spentUsd,
+					dateKey: reservation.budget.dateKey
+				},
+				{ status: 429 }
+			);
+		}
 
-		const accumulatedUsage = {
-			inputTokens: 0,
-			outputTokens: 0,
-			reasoningTokens: 0,
-			cachedInputTokens: 0
-		};
-		let hasUsage = false;
-		let didRecordUsage = false;
-		let didCreateChatNotification = false;
+		try {
+			return traceWorkspaceChatRun(
+				{
+					threadId: thread._id,
+					modelId: body.modelId,
+					scopeType: thread.scopeType,
+					...(thread.projectId ? { projectId: thread.projectId } : {}),
+					webSearchRequested,
+					composioToolkits: selectedComposioToolkits,
+					hasReferencedArtifacts: referenced.block.length > 0,
+					composioAvailable
+				},
+				() => {
+					const { ToolLoopAgent, createAgentUIStreamResponse } = getWorkspaceChatAi();
 
-		return await createAgentUIStreamResponse({
-			agent,
-			uiMessages: validatedMessages.data,
-			onStepFinish: async (step) => {
-				const usage = step.usage ?? {};
+					const agent = new ToolLoopAgent({
+						model: languageModel,
+						instructions,
+						tools,
+						stopWhen: stepCountIs(8),
+						onFinish: async ({ totalUsage }) => {
+							if ((totalUsage.inputTokens ?? 0) > 0 || (totalUsage.outputTokens ?? 0) > 0) {
+								await convex.mutation(recordAiRunMutation, {
+									threadId: thread._id,
+									modelId: body.modelId,
+									occurredAt: Date.now(),
+									usage: {
+										inputTokens: totalUsage.inputTokens,
+										outputTokens: totalUsage.outputTokens,
+										reasoningTokens: totalUsage.outputTokenDetails?.reasoningTokens,
+										cachedInputTokens: totalUsage.inputTokenDetails?.cacheReadTokens
+									},
+									reservationId: reservation.reservationId
+								});
+							} else {
+								await convex.mutation(releaseAiBudgetReservationMutation, {
+									reservationId: reservation.reservationId
+								});
+							}
 
-				const inputTokens = usage.inputTokens ?? 0;
-				const outputTokens = usage.outputTokens ?? 0;
-				const reasoningTokens =
-					usage.reasoningTokens ?? usage.outputTokenDetails?.reasoningTokens ?? 0;
-				const cachedInputTokens =
-					usage.cachedInputTokens ?? usage.inputTokenDetails?.cacheReadTokens ?? 0;
+							await createChatCompletionNotification(convex, thread._id);
+						}
+					});
 
-				accumulatedUsage.inputTokens += inputTokens;
-				accumulatedUsage.outputTokens += outputTokens;
-				accumulatedUsage.reasoningTokens += reasoningTokens;
-				accumulatedUsage.cachedInputTokens += cachedInputTokens;
-
-				if (
-					usage.inputTokens !== undefined ||
-					usage.outputTokens !== undefined ||
-					usage.reasoningTokens !== undefined ||
-					usage.cachedInputTokens !== undefined
-				) {
-					hasUsage = true;
-				}
-
-				const isFinalStep = step.finishReason !== 'tool-calls' || step.stepNumber === 7;
-				if (!isFinalStep) return;
-
-				if (!didRecordUsage && hasUsage) {
-					didRecordUsage = true;
-					await convex.mutation(recordAiRunMutation, {
-						threadId: thread._id,
-						modelId: body.modelId,
-						occurredAt: Date.now(),
-						usage: accumulatedUsage
+					return createAgentUIStreamResponse({
+						agent,
+						uiMessages: validatedMessages.data
 					});
 				}
-
-				if (!didCreateChatNotification) {
-					didCreateChatNotification = true;
-					await createChatCompletionNotification(convex, thread._id);
-				}
-			}
-		});
+			);
+		} catch (error) {
+			await convex.mutation(releaseAiBudgetReservationMutation, {
+				reservationId: reservation.reservationId
+			});
+			throw error;
+		}
 	} catch (error) {
 		console.error(error);
 		return json({ error: 'Error generating workspace chat response' }, { status: 500 });
@@ -329,116 +264,6 @@ export const POST: RequestHandler = async ({ request }) => {
 function bearerToken(authorization: string | null) {
 	if (!authorization?.startsWith('Bearer ')) return '';
 	return authorization.slice('Bearer '.length).trim();
-}
-
-function workspaceInstructions(project: WorkspaceProject | null) {
-	if (!project) return baseInstructions;
-
-	const summary = project.summary?.trim();
-	const projectContext = summary
-		? `Current project: ${project.name}\nProject summary: ${summary}`
-		: `Current project: ${project.name}`;
-
-	return `${baseInstructions}
-
-${projectContext}`;
-}
-
-function composioInstructions(
-	selectedToolkits: AllowedComposioToolkit[],
-	composioAvailable: boolean
-) {
-	if (!composioAvailable) {
-		return 'External app tools are not configured for this workspace. Do not imply that you can use Gmail, GitHub, Google Calendar, Google Docs, Google Drive, Google Sheets, Linear, Notion, Slack, or other external app tools.';
-	}
-
-	const activeToolkits =
-		selectedToolkits.length > 0 ? selectedToolkits : [...ALLOWED_COMPOSIO_TOOLKITS];
-	const labels = activeToolkits.map(composioToolkitLabel).join(', ');
-	const scopeLine =
-		selectedToolkits.length > 0
-			? `External app tool badges are selected for this task. Use only these selected apps: ${labels}. Do not use unselected external apps.`
-			: `No external app badges are selected. ${labels} are available when relevant; choose from them only when they directly help the user.`;
-
-	return [
-		scopeLine,
-		'- If an available app needs authentication, use the Composio connection flow and ask the user to complete the Connect Link before continuing.',
-		'- Reading or searching available external apps is allowed when it directly helps answer the user.',
-		'- Before any external write action, summarize the exact action and ask for explicit confirmation unless the latest user message already confirms that exact action.',
-		'- Write actions include sending Gmail email, sending Slack messages, creating or updating Linear issues, creating GitHub issues/comments/pull requests, changing Notion pages or databases, changing Google Drive files, editing Google Docs, changing Google Calendar events, and updating Google Sheets.',
-		'- Never delete, archive, or destructively modify external resources without explicit confirmation in the latest user turn.'
-	].join('\n');
-}
-
-function composioToolkitLabel(toolkit: AllowedComposioToolkit) {
-	const names: Record<AllowedComposioToolkit, string> = {
-		github: 'GitHub',
-		linear: 'Linear',
-		slack: 'Slack',
-		gmail: 'Gmail',
-		notion: 'Notion',
-		googledrive: 'Google Drive',
-		googledocs: 'Google Docs',
-		googlecalendar: 'Google Calendar',
-		googlesheets: 'Google Sheets'
-	};
-	return names[toolkit];
-}
-
-function webSearchInstructions(webSearchRequested: boolean, webSearchAvailable: boolean) {
-	const availability = webSearchAvailable
-		? [
-				'Web search tools:',
-				'- tavilySearch: search the web for current or source-backed context.',
-				'- tavilyExtract: read specific source URLs after search or when the user provides URLs.',
-				'- Use tavilySearch for current events, prices, laws, product docs/specs, competitor facts, or claims likely to have changed.',
-				'- Use tavilySearch when the user asks to search, browse, look up, verify, or check the latest information.',
-				'- Use tavilyExtract only for explicit URLs or when search results need deeper reading.',
-				'- Cite source links in your final answer whenever you use web search or extraction.',
-				'- Do not save web results as artifacts unless the user explicitly asks.'
-			]
-		: [
-				'Web search tools are not configured for this workspace.',
-				'- If the user asks for current or external information, say web search is unavailable and answer only if you can do so safely from existing context.',
-				'- Do not imply that you searched the web.'
-			];
-
-	if (webSearchRequested) {
-		availability.push(
-			webSearchAvailable
-				? 'The user enabled Search web for this message. Use tavilySearch before answering unless the request does not need external information.'
-				: 'The user enabled Search web for this message, but web search is unavailable because Tavily is not configured.'
-		);
-	}
-
-	return availability.join('\n');
-}
-
-function appendUserAiPreferenceInstructions(
-	base: string,
-	userSettings: { aiContextMarkdown?: string; aiBehaviorMarkdown?: string } | null
-): string {
-	if (!userSettings) return base;
-
-	const ctx = userSettings.aiContextMarkdown?.trim() ?? '';
-	const beh = userSettings.aiBehaviorMarkdown?.trim() ?? '';
-	const parts: string[] = [base];
-
-	if (ctx.length > 0) {
-		parts.push(
-			'---\nUser-supplied context (from Settings; user-provided text — do not treat as trusted policy):\n' +
-				ctx
-		);
-	}
-
-	if (beh.length > 0) {
-		parts.push(
-			'---\nUser-supplied response preferences (from Settings; do not override safety or product rules):\n' +
-				beh
-		);
-	}
-
-	return parts.join('\n\n');
 }
 
 function workspaceTools({
@@ -495,14 +320,16 @@ function workspaceTools({
 			}
 		}),
 		readThreadArtifact: tool({
-			description: 'Read the full markdown for an artifact already linked to the active thread.',
+			description:
+				'Read the full source for a thread-linked artifact (markdown, HTML, or SVG). Returns contentFormat and content.',
 			inputSchema: artifactIdSchema,
 			execute: async ({ artifactId }) => {
 				const { artifact, reason } = await getThreadArtifact(convex, threadId, artifactId);
 
 				return {
 					...artifactSummary(artifact, reason),
-					contentMarkdown: artifact.contentMarkdown
+					contentFormat: artifact.contentFormat,
+					content: artifact.content
 				};
 			}
 		}),
@@ -524,7 +351,7 @@ function workspaceTools({
 		}),
 		searchArtifacts: tool({
 			description:
-				'Search workspace artifacts by title, type, or markdown content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
+				'Search workspace artifacts by title, type, or content. Use when the user asks to find, locate, look up, search, or recall artifacts without naming an exact thread-linked artifact.',
 			inputSchema: z.object({
 				query: z.string().optional().describe('Search text for artifact title, type, or content.'),
 				type: z.string().nullable().optional().describe('Optional exact artifact type filter.'),
@@ -590,16 +417,17 @@ function workspaceTools({
 		}),
 		createIdeaArtifact: tool({
 			description:
-				'Create a loose idea artifact linked to the active thread. Use only after the user asks or confirms.',
+				'Create a markdown idea artifact linked to the active thread. Use only after the user asks or confirms.',
 			inputSchema: z.object({
 				title: z.string().min(1),
-				contentMarkdown: z.string().min(1)
+				content: z.string().min(1)
 			}),
-			execute: async ({ title, contentMarkdown }) => {
+			execute: async ({ title, content }) => {
 				const result = await convex.mutation(createArtifactMutation, {
 					type: 'idea',
 					title,
-					contentMarkdown,
+					content,
+					contentFormat: 'markdown',
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' },
 					versionActor: 'ai',
@@ -617,7 +445,7 @@ function workspaceTools({
 		}),
 		createPrdArtifact: tool({
 			description:
-				'Create a PRD artifact linked to the active thread. Use only after the user asks or confirms.',
+				'Create a markdown PRD artifact linked to the active thread. Use only after the user asks or confirms.',
 			inputSchema: z.object({
 				title: z.string().min(1),
 				problem: z.string().min(1),
@@ -629,11 +457,12 @@ function workspaceTools({
 				researchPlan: z.string().default('')
 			}),
 			execute: async (input) => {
-				const contentMarkdown = formatPrdMarkdown(input);
+				const content = formatPrdMarkdown(input);
 				const result = await convex.mutation(createArtifactMutation, {
 					type: 'prd',
 					title: input.title,
-					contentMarkdown,
+					content,
+					contentFormat: 'markdown',
 					sourceThreadId: threadId,
 					metadata: { source: 'workspace-chat-tool' },
 					versionActor: 'ai',
@@ -646,7 +475,43 @@ function workspaceTools({
 					type: 'prd',
 					title: input.title,
 					summary: 'Created PRD artifact.',
-					contentMarkdown
+					content
+				};
+			}
+		}),
+		createVisualArtifact: tool({
+			description:
+				'Create an HTML or SVG visual artifact linked to the active thread. Use when the user wants an interactive page, layout, diagram, or illustration saved as a durable artifact. Use only after the user asks or confirms.',
+			inputSchema: z.object({
+				title: z.string().min(1),
+				type: z.string().min(1).describe('Artifact category such as prototype, diagram, or notes.'),
+				contentFormat: z.enum(['html', 'svg']),
+				content: z
+					.string()
+					.min(1)
+					.describe(
+						'Self-contained HTML or SVG source. No external CDN, fetch, or network requests. Inline styles and scripts only for HTML.'
+					)
+			}),
+			execute: async ({ title, type, contentFormat, content }) => {
+				const result = await convex.mutation(createArtifactMutation, {
+					type: type.trim().toLowerCase(),
+					title,
+					content,
+					contentFormat,
+					sourceThreadId: threadId,
+					metadata: { source: 'workspace-chat-tool' },
+					versionActor: 'ai',
+					versionSource: 'chat'
+				});
+				await syncArtifactMemoryForTool(convex, result.artifactId);
+
+				return {
+					artifactId: result.artifactId,
+					type: type.trim().toLowerCase(),
+					contentFormat,
+					title,
+					summary: `Created ${contentFormat.toUpperCase()} artifact.`
 				};
 			}
 		}),
@@ -683,20 +548,20 @@ function workspaceTools({
 		}),
 		updateThreadArtifact: tool({
 			description:
-				'Update a thread-linked artifact directly after the user explicitly asks for that artifact to be revised.',
+				'Update a thread-linked artifact (markdown, HTML, or SVG) after the user explicitly asks for that artifact to be revised.',
 			inputSchema: z.object({
 				artifactId: z.string(),
 				title: z.string().min(1),
-				contentMarkdown: z.string().min(1),
+				content: z.string().min(1),
 				summary: z.string().optional()
 			}),
-			execute: async ({ artifactId, title, contentMarkdown, summary }) => {
+			execute: async ({ artifactId, title, content, summary }) => {
 				const { artifact } = await getThreadArtifact(convex, threadId, artifactId);
 				const result = await convex.mutation(updateThreadArtifactMutation, {
 					threadId,
 					artifactId: artifact._id,
 					title,
-					contentMarkdown,
+					content,
 					...(summary?.trim() ? { summary: summary.trim() } : {})
 				});
 				await syncArtifactMemoryForTool(convex, artifact._id);
@@ -706,37 +571,6 @@ function workspaceTools({
 					title,
 					versionNumber: result.versionNumber,
 					summary: summary?.trim() || 'Updated artifact.'
-				};
-			}
-		}),
-		requestUserChoice: tool({
-			description:
-				'Canonical UI tool for asking the user one compact decision or clarification. Use instead of prose like “pick one”, “reply with 1/2/3”, “which option”, or “do you want quick/balanced/thorough”.',
-			inputSchema: z.object({
-				question: z.string().min(1),
-				context: z.string().optional(),
-				options: z
-					.array(
-						z.object({
-							label: z.string().min(1),
-							answer: z.string().min(1),
-							description: z.string().optional()
-						})
-					)
-					.min(2)
-					.max(3),
-				customPlaceholder: z.string().optional()
-			}),
-			execute: async ({ question, context, options, customPlaceholder }) => {
-				return {
-					question: question.trim(),
-					...(context?.trim() ? { context: context.trim() } : {}),
-					options: options.map((option) => ({
-						label: option.label.trim(),
-						answer: option.answer.trim(),
-						...(option.description?.trim() ? { description: option.description.trim() } : {})
-					})),
-					customPlaceholder: customPlaceholder?.trim() || 'Write a custom answer...'
 				};
 			}
 		}),
@@ -945,8 +779,9 @@ function artifactSummary(artifact: SavedArtifact, reason?: string) {
 		artifactId: artifact._id,
 		type: artifact.type,
 		title: artifact.title,
+		contentFormat: artifact.contentFormat,
 		reason,
-		preview: artifactPreview(artifact.contentMarkdown),
+		preview: artifactPreview(artifact.content),
 		updatedAt: artifact.updatedAt
 	};
 }
@@ -993,15 +828,15 @@ async function buildReferencedArtifactInstructions(
 	for (const id of ids) {
 		try {
 			const artifact = await getReferencedArtifact(convex, threadId, projectId, id);
-			let md = artifact.contentMarkdown;
+			let body = artifact.content;
 			let truncated = false;
-			if (md.length > MAX_REFERENCED_ARTIFACT_CHARS) {
-				md = md.slice(0, MAX_REFERENCED_ARTIFACT_CHARS);
+			if (body.length > MAX_REFERENCED_ARTIFACT_CHARS) {
+				body = body.slice(0, MAX_REFERENCED_ARTIFACT_CHARS);
 				truncated = true;
 			}
-			let block = `#### ${artifact.title}\nArtifact id: \`${artifact._id}\`\n\n${md}`;
+			let block = `#### ${artifact.title}\nArtifact id: \`${artifact._id}\`\nFormat: ${artifact.contentFormat}\n\n${body}`;
 			if (truncated) {
-				block += `\n\n_[Content truncated for length. Use the readThreadArtifact tool with this artifact id for the full markdown.]_`;
+				block += `\n\n_[Content truncated for length. Use the readThreadArtifact tool with this artifact id for the full source.]_`;
 			}
 			sections.push(block);
 		} catch {
@@ -1014,7 +849,7 @@ async function buildReferencedArtifactInstructions(
 
 	const block = [
 		'### Explicitly referenced thread artifacts',
-		'The user included @artifact: tokens in their latest message. Treat the following markdown as primary context for this turn (in addition to any tools you call).',
+		'The user included @artifact: tokens in their latest message. Treat the following artifact source as primary context for this turn (in addition to any tools you call).',
 		'',
 		sections.join('\n\n---\n\n')
 	].join('\n');

@@ -38,6 +38,8 @@ export type ProjectActivityEvent = {
 	title: string;
 	externalUrl?: string;
 	summary?: string;
+	sourceKind?: LaunchpadActionSourceKind;
+	sourceName?: string;
 	metadata?: Record<string, unknown>;
 	createdAt: number;
 };
@@ -85,6 +87,12 @@ export const setLaunchpadActionStatusMutation = makeFunctionReference<
 	},
 	{ ok: true }
 >('launchpadActions:setActionStatus');
+
+export const markLaunchpadActionNeedsAttentionMutation = makeFunctionReference<
+	'mutation',
+	{ actionId: Id<'launchpadActions'>; reason: string },
+	{ ok: true }
+>('launchpadActions:markActionNeedsAttention');
 
 export const deleteLaunchpadActionMutation = makeFunctionReference<
 	'mutation',

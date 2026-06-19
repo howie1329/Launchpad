@@ -3,7 +3,7 @@
 import { v } from 'convex/values';
 import { createGateway, generateText, Output } from 'ai';
 import { z } from 'zod';
-import { defaultIdeaAiModelId } from '../lib/idea-ai-models';
+import { utilityAiModelId } from '../lib/idea-ai-models';
 import { internal } from './_generated/api';
 import { internalAction } from './_generated/server';
 import type { Id } from './_generated/dataModel';
@@ -25,16 +25,24 @@ export const synthesizeDraft = internalAction({
 		});
 		if (!draft || draft.status !== 'processing') return { ok: true, skipped: true };
 
-		const budget = await ctx.runQuery(internal.usage.getAiBudgetStatusForOwner, {
-			ownerId: draft.ownerId as Id<'users'>
+		const ownerId = draft.ownerId as Id<'users'>;
+		const reservation = await ctx.runMutation(internal.usage.reserveAiBudgetForOwner, {
+			ownerId,
+			sourceKind: 'externalContextImportDraft',
+			sourceId: draft._id,
+			modelId: utilityAiModelId
 		});
-		if (budget.isOverLimit) {
-			await markFailed(ctx, draft.ownerId as Id<'users'>, draft._id, 'Daily AI limit reached.');
+		if (!reservation.ok) {
+			await markFailed(ctx, ownerId, draft._id, 'Daily AI limit reached.');
 			return { ok: false, error: 'Daily AI limit reached' };
 		}
 
 		const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
 		if (!apiKey) {
+			await ctx.runMutation(internal.usage.releaseAiBudgetReservationForOwner, {
+				ownerId,
+				reservationId: reservation.reservationId
+			});
 			await markFailed(
 				ctx,
 				draft.ownerId as Id<'users'>,
@@ -47,7 +55,7 @@ export const synthesizeDraft = internalAction({
 		try {
 			const gateway = createGateway({ apiKey });
 			const result = await generateText({
-				model: gateway(defaultIdeaAiModelId),
+				model: gateway(utilityAiModelId),
 				output: Output.object({ schema: synthesisSchema }),
 				temperature: 0.2,
 				maxOutputTokens: 3000,
@@ -65,8 +73,8 @@ export const synthesizeDraft = internalAction({
 					(usage.cachedInputTokens ?? 0) > 0)
 			) {
 				await ctx.runMutation(internal.usage.recordAiRunForOwner, {
-					ownerId: draft.ownerId as Id<'users'>,
-					modelId: defaultIdeaAiModelId,
+					ownerId,
+					modelId: utilityAiModelId,
 					occurredAt,
 					sourceKind: 'externalContextImportDraft',
 					sourceId: draft._id,
@@ -75,7 +83,13 @@ export const synthesizeDraft = internalAction({
 						outputTokens: usage.outputTokens,
 						reasoningTokens: usage.reasoningTokens,
 						cachedInputTokens: usage.cachedInputTokens
-					}
+					},
+					reservationId: reservation.reservationId
+				});
+			} else {
+				await ctx.runMutation(internal.usage.releaseAiBudgetReservationForOwner, {
+					ownerId,
+					reservationId: reservation.reservationId
 				});
 			}
 
@@ -85,12 +99,16 @@ export const synthesizeDraft = internalAction({
 				generatedProjectName: output.projectName,
 				generatedProjectSummary: output.projectSummary,
 				generatedProjectBriefMarkdown: output.projectBriefMarkdown,
-				modelUsed: defaultIdeaAiModelId
+				modelUsed: utilityAiModelId
 			});
 
 			return { ok: true, skipped: false };
 		} catch (error) {
 			console.error(error);
+			await ctx.runMutation(internal.usage.releaseAiBudgetReservationForOwner, {
+				ownerId,
+				reservationId: reservation.reservationId
+			});
 			await markFailed(
 				ctx,
 				draft.ownerId as Id<'users'>,

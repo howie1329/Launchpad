@@ -71,17 +71,41 @@ export type ArtifactSyncResult =
 			error: string;
 	  };
 
+function stripHtmlTags(value: string) {
+	return value
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+function summarizeCodeArtifactContent(content: string, maxChars = 500) {
+	const stripped = stripHtmlTags(content);
+	if (!stripped) return 'Visual artifact with no extractable text.';
+	if (stripped.length <= maxChars) return stripped;
+	return `${stripped.slice(0, Math.max(0, maxChars - 16)).trimEnd()}…`;
+}
+
 function formatArtifactMemoryContent(artifact: SavedArtifact) {
-	return [
+	const header = [
 		`# ${artifact.title}`,
 		'',
 		`Artifact type: ${artifact.type}`,
+		`Artifact format: ${artifact.contentFormat}`,
 		artifact.projectId ? `Project id: ${artifact.projectId}` : 'Project id: none',
 		artifact.sourceThreadId
 			? `Source thread id: ${artifact.sourceThreadId}`
 			: 'Source thread id: none',
-		'',
-		artifact.contentMarkdown
+		''
+	];
+
+	if (artifact.contentFormat === 'markdown') {
+		return [...header, artifact.content].join('\n');
+	}
+
+	return [
+		...header,
+		'This artifact is stored as visual source code (HTML or SVG).',
+		`Summary: ${summarizeCodeArtifactContent(artifact.content)}`
 	].join('\n');
 }
 

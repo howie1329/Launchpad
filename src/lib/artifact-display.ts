@@ -52,8 +52,8 @@ export function groupArtifacts<T>(
 	}));
 }
 
-export function artifactPreview(contentMarkdown: string) {
-	const firstLine = contentMarkdown
+export function artifactPreview(content: string) {
+	const firstLine = content
 		.split('\n')
 		.map((line) => line.trim())
 		.find(Boolean);
@@ -62,8 +62,8 @@ export function artifactPreview(contentMarkdown: string) {
 	return firstLine.length > 140 ? `${firstLine.slice(0, 137)}...` : firstLine;
 }
 
-export function draftPreview(contentMarkdown: string) {
-	const preview = artifactPreview(contentMarkdown);
+export function draftPreview(content: string) {
+	const preview = artifactPreview(content);
 	return preview.length > 120 ? `${preview.slice(0, 117)}...` : preview;
 }
 

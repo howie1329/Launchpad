@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ArtifactVersion, SavedArtifact } from '$lib/artifacts';
+	import { artifactDiffFileName, artifactDiffLang } from '$lib/artifacts';
 	import {
 		artifactVersionActorLabel,
 		artifactVersionSourceLabel,
@@ -48,14 +49,10 @@
 		Boolean(
 			selectedVersion &&
 			compareBaseVersion &&
-			compareBaseVersion.contentMarkdown !== selectedVersion.contentMarkdown
+			compareBaseVersion.content !== selectedVersion.content
 		)
 	);
-	function asMarkdownFileName(title: string) {
-		const trimmed = title.trim();
-		if (!trimmed) return 'artifact.md';
-		return trimmed.toLowerCase().endsWith('.md') ? trimmed : `${trimmed}.md`;
-	}
+	const diffFileName = $derived(artifactDiffFileName(artifact.contentFormat));
 </script>
 
 <div class={compact ? 'space-y-4' : 'min-h-[calc(100vh-13rem)]'}>
@@ -234,10 +231,11 @@
 							<div class={cn(compact ? 'min-h-[14rem]' : 'min-h-[28rem]', 'pt-4')}>
 								{#key `${selectedVersion._id}-${compareBaseVersion._id}`}
 									<ArtifactDiffRendererDiffs
-										original={compareBaseVersion.contentMarkdown}
-										modified={selectedVersion.contentMarkdown}
-										oldFileName={asMarkdownFileName(compareBaseVersion.title)}
-										newFileName={asMarkdownFileName(selectedVersion.title)}
+										original={compareBaseVersion.content}
+										modified={selectedVersion.content}
+										oldFileName={diffFileName}
+										newFileName={diffFileName}
+										lang={artifactDiffLang(artifact.contentFormat)}
 										{diffStyle}
 										{compact}
 									/>

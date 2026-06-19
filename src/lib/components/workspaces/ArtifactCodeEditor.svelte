@@ -13,6 +13,7 @@
 		indentMore
 	} from '@codemirror/commands';
 	import { markdown } from '@codemirror/lang-markdown';
+	import { html } from '@codemirror/lang-html';
 	import {
 		bracketMatching,
 		foldKeymap,
@@ -36,6 +37,7 @@
 	} from '@codemirror/view';
 	import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 	import { onDestroy, onMount } from 'svelte';
+	import type { ArtifactContentFormat } from '$lib/artifacts';
 
 	type MarkdownHeading = {
 		line: number;
@@ -215,7 +217,7 @@
 		{ key: 'Shift-Tab', run: indentLess }
 	];
 
-	const artifactEditorSetup = /* @__PURE__ */ (() => [
+	const artifactEditorBaseSetup = /* @__PURE__ */ (() => [
 		highlightSpecialChars(),
 		history(),
 		drawSelection(),
@@ -229,11 +231,7 @@
 		rectangularSelection(),
 		crosshairCursor(),
 		highlightSelectionMatches(),
-		EditorView.domEventHandlers({
-			paste: pasteMarkdownLink
-		}),
 		keymap.of([
-			...markdownKeymap,
 			...closeBracketsKeymap,
 			...defaultKeymap,
 			...searchKeymap,
@@ -244,8 +242,16 @@
 		])
 	])();
 
+	const markdownExtras = /* @__PURE__ */ (() => [
+		EditorView.domEventHandlers({
+			paste: pasteMarkdownLink
+		}),
+		keymap.of(markdownKeymap)
+	])();
+
 	let {
 		value,
+		contentFormat = 'markdown',
 		readOnly = true,
 		compact = false,
 		scrollToLine = null,
@@ -253,6 +259,7 @@
 		onChange
 	}: {
 		value: string;
+		contentFormat?: ArtifactContentFormat;
 		readOnly?: boolean;
 		compact?: boolean;
 		scrollToLine?: number | null;
@@ -266,6 +273,11 @@
 	const editableCompartment = new Compartment();
 	const readOnlyCompartment = new Compartment();
 	const sizeCompartment = new Compartment();
+	const languageCompartment = new Compartment();
+	const markdownExtrasCompartment = new Compartment();
+
+	const languageExtension = (format: ArtifactContentFormat) =>
+		format === 'markdown' ? markdown() : html();
 
 	const editorTheme = EditorView.theme({
 		'&': {
@@ -328,6 +340,7 @@
 	}
 
 	function emitHeadings(doc: string) {
+		if (contentFormat !== 'markdown') return;
 		onHeadingsChange?.(markdownHeadings(doc));
 	}
 
@@ -339,8 +352,9 @@
 			state: EditorState.create({
 				doc: value,
 				extensions: [
-					artifactEditorSetup,
-					markdown(),
+					artifactEditorBaseSetup,
+					languageCompartment.of(languageExtension(contentFormat)),
+					markdownExtrasCompartment.of(contentFormat === 'markdown' ? markdownExtras : []),
 					EditorView.lineWrapping,
 					editorTheme,
 					sizeCompartment.of(createSizeTheme(compact)),
@@ -401,7 +415,9 @@
 			effects: [
 				editableCompartment.reconfigure(EditorView.editable.of(!readOnly)),
 				readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)),
-				sizeCompartment.reconfigure(createSizeTheme(compact))
+				sizeCompartment.reconfigure(createSizeTheme(compact)),
+				languageCompartment.reconfigure(languageExtension(contentFormat)),
+				markdownExtrasCompartment.reconfigure(contentFormat === 'markdown' ? markdownExtras : [])
 			]
 		});
 	});

@@ -113,6 +113,7 @@
 	let artifactTitle = $state('');
 	let artifactTypePreset = $state('notes');
 	let artifactCustomType = $state('');
+	let artifactFormatPreset = $state<import('$lib/artifacts').ArtifactContentFormat>('markdown');
 	let artifactBody = $state('');
 	let artifactCreateError = $state('');
 	let isCreatingArtifact = $state(false);
@@ -315,6 +316,12 @@
 		linkedArtifactCount?: number;
 	};
 
+	const artifactFormatPresets = [
+		{ value: 'markdown', label: 'Markdown' },
+		{ value: 'html', label: 'HTML' },
+		{ value: 'svg', label: 'SVG' }
+	] as const;
+
 	const artifactTypePresets = [
 		{ value: 'idea', label: 'Idea' },
 		{ value: 'prd', label: 'PRD' },
@@ -420,7 +427,7 @@
 					title: artifact.title,
 					type: artifact.type,
 					reason: link.reason,
-					preview: artifact.contentMarkdown.slice(0, 140)
+					preview: artifact.content.slice(0, 140)
 				})) ?? [];
 		} finally {
 			isLoadingReadiness = false;
@@ -444,7 +451,8 @@
 	const selectedArtifactTypeLabel = $derived(
 		artifactTypePreset === 'custom'
 			? artifactCustomType.trim() || 'Custom type'
-			: (artifactTypePresets.find((preset) => preset.value === artifactTypePreset)?.label ?? 'Artifact')
+			: (artifactTypePresets.find((preset) => preset.value === artifactTypePreset)?.label ??
+					'Artifact')
 	);
 	const createArtifactDestination = $derived(
 		activeThreadId
@@ -456,16 +464,16 @@
 	const isCreateArtifactDirty = $derived(
 		Boolean(
 			artifactTitle.trim() ||
-				artifactBody.trim() ||
-				artifactCustomType.trim() ||
-				artifactTypePreset !== 'notes'
+			artifactBody.trim() ||
+			artifactCustomType.trim() ||
+			artifactTypePreset !== 'notes'
 		)
 	);
 	const canCreateArtifact = $derived(
 		Boolean(
 			artifactTitle.trim() &&
-				artifactBody.trim() &&
-				(artifactTypePreset !== 'custom' || artifactCustomType.trim())
+			artifactBody.trim() &&
+			(artifactTypePreset !== 'custom' || artifactCustomType.trim())
 		)
 	);
 
@@ -473,6 +481,7 @@
 		artifactTitle = '';
 		artifactTypePreset = 'notes';
 		artifactCustomType = '';
+		artifactFormatPreset = 'markdown';
 		artifactBody = '';
 		artifactCreateError = '';
 		createArtifactDialogOpen = true;
@@ -630,7 +639,7 @@ Important rules:
 			artifactTypePreset === 'custom'
 				? artifactCustomType.trim().toLowerCase()
 				: artifactTypePreset;
-		const contentMarkdown = artifactBody.trim();
+		const content = artifactBody.trim();
 
 		if (!title) {
 			artifactCreateError = 'Artifact title is required.';
@@ -640,7 +649,7 @@ Important rules:
 			artifactCreateError = 'Artifact type is required.';
 			return;
 		}
-		if (!contentMarkdown) {
+		if (!content) {
 			artifactCreateError = 'Artifact body is required.';
 			return;
 		}
@@ -652,7 +661,8 @@ Important rules:
 			const result = await getConvexClient().mutation(createArtifactMutation, {
 				type,
 				title,
-				contentMarkdown,
+				content,
+				contentFormat: artifactFormatPreset,
 				metadata: { source: 'manual-workspace-create' },
 				...(activeThreadId ? { sourceThreadId: activeThreadId as Id<'chatThreads'> } : {}),
 				...(!activeThreadId && activeProjectId
@@ -2477,7 +2487,7 @@ Important rules:
 							<div class="min-w-0 space-y-1">
 								<Dialog.Title>Create artifact</Dialog.Title>
 								<Dialog.Description class="max-w-prose text-pretty">
-									Save a Markdown document to this workspace. {createArtifactDestination}
+									Save a durable document to this workspace. {createArtifactDestination}
 								</Dialog.Description>
 							</div>
 							<div
@@ -2489,7 +2499,7 @@ Important rules:
 					</Dialog.Header>
 
 					<div class="min-h-0 overflow-y-auto px-5 py-4">
-						<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem]">
+						<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_9rem]">
 							<div class="space-y-1.5">
 								<Label for="create-artifact-title">Title</Label>
 								<Input
@@ -2517,6 +2527,19 @@ Important rules:
 									{/each}
 								</NativeSelect>
 							</div>
+							<div class="space-y-1.5">
+								<Label for="create-artifact-format">Format</Label>
+								<NativeSelect
+									id="create-artifact-format"
+									bind:value={artifactFormatPreset}
+									class="w-full"
+									disabled={isCreatingArtifact}
+								>
+									{#each artifactFormatPresets as preset (preset.value)}
+										<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
+									{/each}
+								</NativeSelect>
+							</div>
 						</div>
 
 						{#if artifactTypePreset === 'custom'}
@@ -2526,7 +2549,9 @@ Important rules:
 									id="create-artifact-custom-type"
 									bind:value={artifactCustomType}
 									placeholder="decision, spec, notes"
-									aria-invalid={artifactCreateError && !artifactCustomType.trim() ? 'true' : undefined}
+									aria-invalid={artifactCreateError && !artifactCustomType.trim()
+										? 'true'
+										: undefined}
 									disabled={isCreatingArtifact}
 								/>
 								<p class="text-[11px] leading-4 text-muted-foreground">
@@ -2538,7 +2563,13 @@ Important rules:
 						<div class="mt-4 space-y-1.5">
 							<div class="flex items-end justify-between gap-3">
 								<div class="space-y-1.5">
-									<Label for="create-artifact-body">Markdown</Label>
+									<Label for="create-artifact-body">
+										{artifactFormatPreset === 'markdown'
+											? 'Markdown'
+											: artifactFormatPreset === 'html'
+												? 'HTML'
+												: 'SVG'}
+									</Label>
 									<p class="max-w-prose text-xs leading-5 text-muted-foreground">
 										Write the durable version here. You can edit it after creation.
 									</p>
@@ -2550,7 +2581,11 @@ Important rules:
 							<Textarea
 								id="create-artifact-body"
 								bind:value={artifactBody}
-								placeholder="# Decision&#10;&#10;Capture the useful details, constraints, and next step."
+								placeholder={artifactFormatPreset === 'markdown'
+									? '# Decision\n\nCapture the useful details, constraints, and next step.'
+									: artifactFormatPreset === 'html'
+										? '<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Title</h1>\n  </body>\n</html>'
+										: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">\n  <!-- diagram -->\n</svg>'}
 								class="min-h-72 resize-y bg-background font-mono text-xs leading-5 sm:min-h-80"
 								onkeydown={handleCreateArtifactKeydown}
 								aria-invalid={artifactCreateError && !artifactBody.trim() ? 'true' : undefined}
@@ -2565,7 +2600,7 @@ Important rules:
 								</p>
 							{:else}
 								<p class="text-xs leading-5 text-muted-foreground">
-									Artifacts are saved as Markdown and remain editable from the artifact page.
+									Artifacts stay editable from the artifact page after creation.
 								</p>
 							{/if}
 						</div>

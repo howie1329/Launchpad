@@ -1,10 +1,11 @@
 import type { UIMessage } from 'ai';
 import { buildAssistantSegments } from '$lib/idea-chat-assistant-parts';
+import { openUIVisibleText } from '$lib/openui/response';
 
 /**
  * Workspace chat UX — product defaults for PRD “open confirmations” (v1):
  * - Retry from any user message (truncate everything after that user turn, then new assistant reply).
- * - Assistant clipboard: human-readable text parts only; tool steps and choice cards are omitted.
+ * - Assistant clipboard: human-readable OpenUI text; tool steps are omitted.
  * - Forked threads use the normal new-thread title placeholder until title generation runs.
  * - Tail user-only + in-flight assistant: rely on existing “Thinking…” / spinner; errors use chatError + Retry send.
  */
@@ -34,16 +35,17 @@ export function buildUserMessageCopyText(message: UIMessage): string {
 	return uiMessageText(message);
 }
 
-/** Plain text for assistant copy: text segments only (no tool dumps / choice JSON). */
+export function assistantMessageHasVisibleContent(message: UIMessage): boolean {
+	if (message.role !== 'assistant') return false;
+	if (uiMessageText(message).trim()) return true;
+	return buildAssistantSegments(message).length > 0;
+}
+
+/** Plain text for assistant copy: OpenUI visible text or legacy markdown source. */
 export function buildAssistantMessageCopyText(message: UIMessage): string {
 	if (message.role !== 'assistant') return '';
-	const segments = buildAssistantSegments(message);
-	const chunks: string[] = [];
-	for (const seg of segments) {
-		if (seg.kind === 'text') {
-			const t = seg.text.trim();
-			if (t) chunks.push(t);
-		}
-	}
-	return chunks.join('\n\n').trim();
+	const source = uiMessageText(message, '');
+	const openUIText = openUIVisibleText(source);
+	if (openUIText) return openUIText;
+	return source;
 }
