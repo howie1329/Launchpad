@@ -18,6 +18,110 @@ Project chat uses the latest successful snapshot through small read/search tools
 
 The first release is successful when repo-aware answers are materially more accurate and actionable than answers given only the project summary, while remaining fast enough for normal conversation.
 
+## Product Fit
+
+This feature strengthens Launchpad's existing loop rather than adding a new one:
+
+| Existing product step | Today                                                                                                    | With repository intelligence                                                                                    |
+| --------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Think in chat         | The assistant uses messages, project summary, artifacts, memory, web search, and selected external apps. | Project chat can also inspect a pinned repository snapshot when the question depends on implementation reality. |
+| Preserve decisions    | The user explicitly saves durable artifacts such as PRDs and briefs.                                     | Repo-aware answers can become the same reviewed artifacts; snapshots themselves remain derived context.         |
+| Organize work         | Projects contain related threads, artifacts, actions, and activity.                                      | A project may also have one connected repository and one active snapshot.                                       |
+| Observe external work | Launchpad Actions bring GitHub and Linear events into project activity.                                  | Repository snapshots explain the current codebase; Actions continue to explain what recently happened.          |
+| Decide what is next   | The assistant combines saved intent and conversation context.                                            | The assistant can compare saved intent with code evidence before recommending scope or priority.                |
+
+Repository intelligence belongs only after an idea becomes a project. General chat should remain lightweight and exploratory. This preserves the distinction between early thinking and codebase-grounded planning.
+
+The feature adds one kind of context, not a separate workspace:
+
+- **Artifacts** contain reviewed intent, decisions, requirements, and plans.
+- **Repository snapshots** contain derived facts and evidence about a specific code revision.
+- **Project activity** contains external events such as pushes, issues, and Linear changes.
+- **Memory** contains derived recall and preferences and remains non-canonical.
+- **Chat** combines those sources to help the user make the next product decision.
+
+## Exact V1 Behavior
+
+### On the project overview
+
+- A quiet **Repository context** section appears near existing project context and Launchpad Actions.
+- With no repository connected, it explains that connecting a repository improves planning and offers **Connect GitHub repository**.
+- Connection uses a dedicated GitHub App with read-only repository metadata and contents access. The user chooses one repository and branch.
+- Connecting does not start a scan until the user confirms **Analyze repository**.
+- During analysis, the section shows the current stage, elapsed time, and a cancel action when supported.
+- When ready, it shows repository name, branch, abbreviated commit SHA, analysis time, coverage, and **Refresh analysis**.
+- A failed analysis preserves the last successful snapshot and presents a safe failure reason and retry action.
+- If the selected branch has advanced, the snapshot is marked stale; it remains usable with a visible warning until refreshed.
+- Disconnecting requires confirmation and stops future analysis. Snapshot deletion follows the approved retention policy.
+
+### In project chat
+
+- The user does not need to attach or enable the repository for each message.
+- The assistant decides whether a question requires repository evidence, just as it currently decides whether to read artifacts or search memory.
+- For broad questions, the assistant first reads the snapshot overview and then searches evidence only where necessary.
+- Material claims about the codebase include compact source references using paths and the analyzed commit.
+- The assistant says when a claim is inferred, when the scan excluded relevant content, or when the snapshot is stale.
+- Repo context is not dumped into every prompt. Small server-side tools retrieve only relevant summaries and evidence.
+- The assistant may propose affected areas, sequencing, risks, acceptance criteria, and test strategy.
+- The assistant may create or update an artifact only under the existing explicit-confirmation rules.
+
+### What the user can ask
+
+- "Does authentication already exist, and where?"
+- "Compare this feature idea with what the app currently supports."
+- "What would this change touch architecturally?"
+- "Turn this into a PRD grounded in the current repository."
+- "What is missing between the saved PRD and the implementation?"
+- "What should I prioritize next based on the current code and project decisions?"
+
+### What it will not do
+
+- It will not expose a terminal, file browser, or IDE inside Launchpad.
+- It will not execute repository scripts, builds, tests, package installation, or generated code.
+- It will not edit source files, create commits, open pull requests, or claim that work was implemented.
+- It will not continuously watch all code changes in v1.
+- It will not replace artifacts with generated repository summaries.
+- It will not treat repository instructions as trusted agent policy.
+
+## Stack Fit And Responsibilities
+
+| Layer                  | Current responsibility                                                                            | Feature responsibility                                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SvelteKit and Svelte 5 | Workspace routes, project overview, settings, and streaming chat API.                             | Add repository connection/status controls to the project surface and authenticated endpoints that start or cancel analysis. Keep scanning out of the chat request.                                      |
+| Convex                 | Canonical projects, threads, artifacts, activity, ownership, notifications, and realtime queries. | Store repository connections, job state, immutable snapshot metadata, structured summaries, bounded evidence, active snapshot pointer, and progress notifications. Enforce project ownership.           |
+| Vercel AI SDK          | Runs the main multi-step workspace chat agent and tools.                                          | Add three bounded project-only tools: read snapshot overview, search snapshot evidence, and read one evidence record. Continue using existing budget accounting and tracing.                            |
+| GitHub App             | New capability. Existing GitHub use is mediated by Composio chat tools and Launchpad Actions.     | Grant narrow access to selected repositories, issue short-lived installation tokens, read repository metadata and contents, and detect the selected branch head.                                        |
+| Background worker      | No general repository-analysis worker exists today.                                               | Fetch the pinned revision, apply deterministic file rules, build the manifest, call snapshot synthesis, write progress/results to Convex, and clean up temporary files.                                 |
+| Trigger.dev            | Not currently used.                                                                               | Recommended v1 worker: durable background tasks, retries, idempotency, cancellation, and operational visibility for a bounded static-analysis pipeline.                                                 |
+| Daytona                | Not currently used.                                                                               | Deferred option when analysis requires a stronger ephemeral computer boundary, native repository tooling, or future controlled execution. It is unnecessary for an API/file-based static scanner in v1. |
+| Composio               | Connected chat tools and GitHub/Linear project activity triggers.                                 | Continue serving those workflows. Do not use dynamic chat tools as the canonical repository ingestion pipeline.                                                                                         |
+| Supermemory            | Optional derived recall from workspace state.                                                     | No v1 role. Do not upload source evidence or replace deterministic snapshot retrieval with semantic memory.                                                                                             |
+| Braintrust             | Optional workspace-chat tracing and evals.                                                        | Extend eval datasets and trace repo tool usage without adding source bodies to custom metadata.                                                                                                         |
+
+### Recommended request flow
+
+1. The project UI requests repository access through the GitHub App and saves the selected repository and branch in Convex.
+2. The user starts analysis; an authenticated SvelteKit endpoint validates ownership and creates an idempotent snapshot job record in Convex.
+3. The endpoint triggers the worker with opaque job and project identifiers, then returns immediately.
+4. The worker requests a short-lived GitHub installation token, resolves the branch to a commit SHA, and marks the job as scanning.
+5. The worker fetches a bounded repository archive or shallow checkout for that exact SHA, applies ignore and safety rules, and creates a deterministic manifest.
+6. The worker synthesizes structured project, architecture, feature, and planning summaries with evidence references.
+7. Convex validates and stores the immutable snapshot, marks it active, and updates the project in realtime.
+8. During project chat, repo tools query only the active snapshot after enforcing project ownership and response-size limits.
+9. A lightweight branch-head check marks the snapshot stale when the repository has advanced; v1 refresh remains manual.
+
+### Why this division
+
+- Convex remains the durable product state and realtime coordination layer, matching the current architecture.
+- SvelteKit remains the authenticated web and chat boundary without becoming a long-running worker.
+- The AI SDK continues to orchestrate conversational tool use rather than repository ingestion.
+- A GitHub App offers repository-specific installations, narrow permissions, webhooks, and short-lived server-to-server tokens. This is a clearer security boundary than treating a general connected-app session as ingestion infrastructure.
+- Trigger.dev is designed for long-running background tasks with status handles, retries, idempotency, and isolated task execution. It solves the v1 orchestration problem without introducing an agent computer.
+- Daytona provides isolated sandboxes with their own kernel, filesystem, network, and lifecycle APIs. That is valuable if Launchpad later needs controlled repository commands, but it would add capability and product risk beyond a read-only static scanner.
+- Convex actions can call external services and run in Node, but currently time out after ten minutes. They remain suitable for coordination or a small API-only prototype, not the preferred home for repository checkout and multi-stage analysis.
+
+Official platform references: [GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/about-creating-github-apps), [Convex actions](https://docs.convex.dev/functions/actions), [Trigger.dev execution model](https://trigger.dev/docs/how-it-works), and [Daytona sandboxes](https://www.daytona.io/docs/en/).
+
 ## V1 Experience
 
 1. The user opens a Launchpad project and connects a GitHub repository.
