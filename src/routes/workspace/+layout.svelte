@@ -5,6 +5,9 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import WorkspaceCommandPalette from '$lib/components/workspaces/WorkspaceCommandPalette.svelte';
+	import WorkspaceCreateArtifactDialog from '$lib/components/workspaces/WorkspaceCreateArtifactDialog.svelte';
+	import WorkspaceDeleteConfirmDialog from '$lib/components/workspaces/WorkspaceDeleteConfirmDialog.svelte';
+	import WorkspaceExternalContextImportDialog from '$lib/components/workspaces/WorkspaceExternalContextImportDialog.svelte';
 	import WorkspaceTabPicker from '$lib/components/workspaces/WorkspaceTabPicker.svelte';
 	import WorkspaceTabStrip from '$lib/components/workspaces/WorkspaceTabStrip.svelte';
 	import { hrefForWorkspaceTarget, urlToWorkspaceTarget } from '$lib/workspace-route-contract';
@@ -28,12 +31,21 @@
 		linkArtifactToThreadMutation,
 		listArtifactsQuery,
 		listThreadArtifactsQuery,
+		type ArtifactContentFormat,
 		type ArtifactLinkReason
 	} from '$lib/artifacts';
 	import { artifactTypeLabel, groupArtifacts } from '$lib/artifact-display';
 	import { listThreadsQuery } from '$lib/chat';
 	import { formatThreadTitleForDisplay, PLACEHOLDER_THREAD_TITLE } from '$lib/thread-title';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
+	import {
+		formatNotificationTime,
+		missingNotificationTargetMessage,
+		notificationHref,
+		notificationStateClasses,
+		notificationStateLabel,
+		primaryNotificationActionLabel
+	} from '$lib/workspace-notifications';
 	import {
 		countUnreadNotificationsQuery,
 		deleteNotificationMutation,
@@ -44,10 +56,6 @@
 		type NotificationState,
 		type SavedNotification
 	} from '$lib/notifications';
-	import {
-		startExternalContextImportDraftReviewMutation,
-		type ExternalContextImportSourceToolHint
-	} from '$lib/external-context-imports';
 	import { LaunchpadMarkOutline } from '$lib/components/brand';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
@@ -55,7 +63,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { cn } from '$lib/utils';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -110,19 +117,7 @@
 	let readinessKeyArtifacts = $state<string[]>([]);
 	let readinessIncludedArtifacts = $state<PromotionReadinessArtifact[]>([]);
 	let createArtifactDialogOpen = $state(false);
-	let artifactTitle = $state('');
-	let artifactTypePreset = $state('notes');
-	let artifactCustomType = $state('');
-	let artifactFormatPreset = $state<import('$lib/artifacts').ArtifactContentFormat>('markdown');
-	let artifactBody = $state('');
-	let artifactCreateError = $state('');
-	let isCreatingArtifact = $state(false);
 	let importDialogOpen = $state(false);
-	let importSourceMarkdown = $state('');
-	let importSourceToolHint = $state<ExternalContextImportSourceToolHint>('unknown');
-	let importError = $state('');
-	let importNotice = $state('');
-	let isStartingImportReview = $state(false);
 	let importingArtifactId = $state('');
 	let artifactActionError = $state('');
 	let workspaceNotice = $state('');
@@ -316,20 +311,6 @@
 		linkedArtifactCount?: number;
 	};
 
-	const artifactFormatPresets = [
-		{ value: 'markdown', label: 'Markdown' },
-		{ value: 'html', label: 'HTML' },
-		{ value: 'svg', label: 'SVG' }
-	] as const;
-
-	const artifactTypePresets = [
-		{ value: 'idea', label: 'Idea' },
-		{ value: 'prd', label: 'PRD' },
-		{ value: 'research', label: 'Research' },
-		{ value: 'notes', label: 'Notes' },
-		{ value: 'custom', label: 'Custom' }
-	] as const;
-
 	/** Sidebar row vocabulary: compact, distinct roles, no new tokens. */
 	const navPill =
 		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/72 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70';
@@ -448,12 +429,6 @@
 		readinessIncludedArtifacts = [];
 	};
 
-	const selectedArtifactTypeLabel = $derived(
-		artifactTypePreset === 'custom'
-			? artifactCustomType.trim() || 'Custom type'
-			: (artifactTypePresets.find((preset) => preset.value === artifactTypePreset)?.label ??
-					'Artifact')
-	);
 	const createArtifactDestination = $derived(
 		activeThreadId
 			? 'This will save to the workspace and link to the active chat.'
@@ -461,227 +436,40 @@
 				? 'This will save to the current project.'
 				: 'This will save to the workspace artifacts library.'
 	);
-	const isCreateArtifactDirty = $derived(
-		Boolean(
-			artifactTitle.trim() ||
-			artifactBody.trim() ||
-			artifactCustomType.trim() ||
-			artifactTypePreset !== 'notes'
-		)
-	);
-	const canCreateArtifact = $derived(
-		Boolean(
-			artifactTitle.trim() &&
-			artifactBody.trim() &&
-			(artifactTypePreset !== 'custom' || artifactCustomType.trim())
-		)
-	);
 
 	const openCreateArtifactDialog = () => {
-		artifactTitle = '';
-		artifactTypePreset = 'notes';
-		artifactCustomType = '';
-		artifactFormatPreset = 'markdown';
-		artifactBody = '';
-		artifactCreateError = '';
 		createArtifactDialogOpen = true;
 	};
 
-	const closeCreateArtifactDialog = () => {
-		if (isCreatingArtifact) return;
-		if (isCreateArtifactDirty && !window.confirm('Discard this artifact draft?')) return;
-		createArtifactDialogOpen = false;
-		artifactCreateError = '';
-	};
-
-	const handleCreateArtifactKeydown = (event: KeyboardEvent) => {
-		if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && canCreateArtifact) {
-			event.preventDefault();
-			void createArtifact();
-		}
-	};
-
-	const handleCreateArtifactDismiss = (event: Event) => {
-		event.preventDefault();
-		closeCreateArtifactDialog();
-	};
-
-	const externalContextPrompt = `I want to import this project context into LaunchPad, a project-focused AI workspace.
-
-Please summarize the current conversation/project using the exact Markdown structure below.
-
-Important rules:
-- Do not invent details.
-- If something is unclear or missing, write it under "Things Not Known" or "Open Questions".
-- Prefer concise, practical bullets.
-- Preserve important decisions, goals, constraints, and next steps.
-- Write this so another AI assistant can help me continue the project later.
-
-# Project Name
-
-[Suggest a clear project name.]
-
-## One-Sentence Summary
-
-[Summarize the project in one sentence.]
-
-## Background
-
-[Explain the relevant context, history, problem, audience, and why this project matters.]
-
-## Goals
-
-- [Goal 1]
-- [Goal 2]
-- [Goal 3]
-
-## Key Decisions
-
-- [Decision 1 and why it was made]
-- [Decision 2 and why it was made]
-
-## Constraints and Requirements
-
-- [Important constraint, requirement, platform, stack, timeline, style, or business rule]
-
-## Open Questions
-
-- [Question 1]
-- [Question 2]
-
-## Next Steps
-
-- [Concrete next step 1]
-- [Concrete next step 2]
-- [Concrete next step 3]
-
-## Useful Files, Artifacts, or References
-
-- [Mention any documents, files, links, designs, notes, or artifacts that matter]
-
-## Durable Project Context
-
-[Write facts, preferences, definitions, or project-specific context that would help an AI assistant continue the work accurately.]
-
-## Things Not Known
-
-- [Anything important that is missing, uncertain, or should not be assumed]`;
-
 	const openImportDialog = () => {
 		importDialogOpen = true;
-		importError = '';
-		importNotice = '';
 	};
 
-	const closeImportDialog = () => {
-		if (isStartingImportReview) return;
-		importDialogOpen = false;
-		importError = '';
-		importNotice = '';
+	const openImportReview = async (draftId: Id<'externalContextImportDrafts'>) => {
+		workspaceNotice = 'Import review started. You can leave this page.';
+		await goto(resolve(`/workspace/imports/external-context/${draftId}`));
 	};
 
-	const copyExternalContextPrompt = async () => {
-		importNotice = '';
-		importError = '';
-		try {
-			await navigator.clipboard.writeText(externalContextPrompt);
-			importNotice = 'Prompt copied.';
-		} catch (error) {
-			console.error(error);
-			importError = 'Could not copy the prompt. Select and copy it manually.';
-		}
-	};
-
-	const startExternalContextImportReview = async () => {
-		if (isStartingImportReview) return;
-		const sourceMarkdown = importSourceMarkdown.trim();
-		if (!sourceMarkdown) {
-			importError = 'Paste the external AI summary before reviewing.';
-			return;
-		}
-
-		isStartingImportReview = true;
-		importError = '';
-		importNotice = '';
-		try {
-			const result = await getConvexClient().mutation(
-				startExternalContextImportDraftReviewMutation,
-				{
-					sourceMarkdown,
-					sourceToolHint: importSourceToolHint
-				}
-			);
-			importDialogOpen = false;
-			importSourceMarkdown = '';
-			importSourceToolHint = 'unknown';
-			workspaceNotice = 'Import review started. You can leave this page.';
-			await goto(
-				resolve(
-					`/workspace/imports/external-context/${result.draftId}` as `/workspace/imports/external-context/${string}`
-				)
-			);
-		} catch (error) {
-			console.error(error);
-			importError =
-				error instanceof Error && error.message
-					? error.message
-					: 'Could not start import review. Please try again.';
-		} finally {
-			isStartingImportReview = false;
-		}
-	};
-
-	const createArtifact = async () => {
-		if (isCreatingArtifact) return;
-
-		const title = artifactTitle.trim();
-		const type =
-			artifactTypePreset === 'custom'
-				? artifactCustomType.trim().toLowerCase()
-				: artifactTypePreset;
-		const content = artifactBody.trim();
-
-		if (!title) {
-			artifactCreateError = 'Artifact title is required.';
-			return;
-		}
-		if (!type) {
-			artifactCreateError = 'Artifact type is required.';
-			return;
-		}
-		if (!content) {
-			artifactCreateError = 'Artifact body is required.';
-			return;
-		}
-
-		isCreatingArtifact = true;
-		artifactCreateError = '';
-
-		try {
-			const result = await getConvexClient().mutation(createArtifactMutation, {
-				type,
-				title,
-				content,
-				contentFormat: artifactFormatPreset,
-				metadata: { source: 'manual-workspace-create' },
-				...(activeThreadId ? { sourceThreadId: activeThreadId as Id<'chatThreads'> } : {}),
-				...(!activeThreadId && activeProjectId
-					? { projectId: activeProjectId as Id<'projects'> }
-					: {})
-			});
-			queueArtifactMemorySync(result.artifactId);
-			createArtifactDialogOpen = false;
-			workspaceNotice = 'Artifact created.';
-			await goto(resolve(workspaceArtifactHref(result.artifactId) as '/workspace'));
-		} catch (error) {
-			console.error(error);
-			artifactCreateError =
-				error instanceof Error && error.message
-					? error.message
-					: 'Could not create this artifact. Please try again.';
-		} finally {
-			isCreatingArtifact = false;
-		}
+	const createArtifact = async (draft: {
+		title: string;
+		type: string;
+		content: string;
+		contentFormat: ArtifactContentFormat;
+	}) => {
+		const result = await getConvexClient().mutation(createArtifactMutation, {
+			type: draft.type,
+			title: draft.title,
+			content: draft.content,
+			contentFormat: draft.contentFormat,
+			metadata: { source: 'manual-workspace-create' },
+			...(activeThreadId ? { sourceThreadId: activeThreadId as Id<'chatThreads'> } : {}),
+			...(!activeThreadId && activeProjectId
+				? { projectId: activeProjectId as Id<'projects'> }
+				: {})
+		});
+		queueArtifactMemorySync(result.artifactId);
+		workspaceNotice = 'Artifact created.';
+		await goto(resolve(workspaceArtifactHref(result.artifactId) as '/workspace'));
 	};
 
 	const promoteThreadToProject = async () => {
@@ -833,7 +621,15 @@ Important rules:
 		notificationActionId = `open:${notification._id}`;
 		try {
 			await markNotificationRead(notification);
-			const href = notificationHref(notification);
+			const href = notificationHref(notification, {
+				threadIds: threads.data ? new Set(threads.data.map((thread) => thread._id)) : undefined,
+				projectIds: projects.data
+					? new Set(projects.data.map((project) => project._id))
+					: undefined,
+				artifactIds: artifacts.data
+					? new Set(artifacts.data.map((artifact) => artifact._id))
+					: undefined
+			});
 			if (!href) {
 				workspaceNotice = missingNotificationTargetMessage(notification);
 				return;
@@ -847,93 +643,6 @@ Important rules:
 		}
 	};
 
-	function notificationHref(notification: SavedNotification) {
-		switch (notification.targetKind) {
-			case 'chatThread':
-				if (threads.data && !threads.data.some((thread) => thread._id === notification.targetId)) {
-					return null;
-				}
-				return workspaceThreadHref(notification.targetId);
-			case 'project':
-				if (
-					projects.data &&
-					!projects.data.some((project) => project._id === notification.targetId)
-				) {
-					return null;
-				}
-				return workspaceProjectHref(notification.targetId);
-			case 'artifact':
-				if (
-					artifacts.data &&
-					!artifacts.data.some((artifact) => artifact._id === notification.targetId)
-				) {
-					return null;
-				}
-				return workspaceArtifactHref(notification.targetId);
-			case 'externalContextImportDraft':
-				return `/workspace/imports/external-context/${notification.targetId}`;
-		}
-	}
-
-	function primaryNotificationActionLabel(notification: SavedNotification) {
-		if (notification.type === 'external_context_import') {
-			switch (notification.state) {
-				case 'success':
-					return 'Review';
-				case 'failed':
-					return 'Retry';
-				case 'in_progress':
-					return 'View progress';
-				case 'activity':
-					return 'Open';
-			}
-		}
-
-		switch (notification.targetKind) {
-			case 'artifact':
-				return 'Open artifact';
-			case 'project':
-				return 'Open project';
-			case 'chatThread':
-				return 'Open chat';
-			case 'externalContextImportDraft':
-				return 'Open';
-		}
-	}
-
-	function missingNotificationTargetMessage(notification: SavedNotification) {
-		if (notification.targetKind === 'externalContextImportDraft') {
-			return 'That import draft is no longer available.';
-		}
-		return 'That notification target is no longer available.';
-	}
-
-	function notificationStateClasses(state: NotificationState) {
-		switch (state) {
-			case 'success':
-				return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
-			case 'failed':
-				return 'border-destructive/30 bg-destructive/10 text-destructive';
-			case 'in_progress':
-				return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300';
-			case 'activity':
-				return 'border-border bg-muted/40 text-muted-foreground';
-		}
-	}
-
-	function notificationStateLabel(state: NotificationState) {
-		switch (state) {
-			case 'success':
-				return 'Ready';
-			case 'failed':
-				return 'Failed';
-			case 'in_progress':
-				return 'Working';
-			case 'activity':
-				return 'Update';
-		}
-	}
-
 	function notificationStateIcon(state: NotificationState) {
 		switch (state) {
 			case 'success':
@@ -945,15 +654,6 @@ Important rules:
 			case 'activity':
 				return InboxIcon;
 		}
-	}
-
-	function formatNotificationTime(createdAt: number) {
-		return new Intl.DateTimeFormat(undefined, {
-			month: 'short',
-			day: 'numeric',
-			hour: 'numeric',
-			minute: '2-digit'
-		}).format(new Date(createdAt));
 	}
 
 	function isWorkspaceTypableTarget(target: EventTarget | null) {
@@ -1040,6 +740,11 @@ Important rules:
 		projectDeleteDialogOpen = true;
 	};
 
+	const closeDeleteProjectDialog = () => {
+		projectDeleteDialogOpen = false;
+		projectToDelete = null;
+	};
+
 	const confirmDeleteProject = async () => {
 		if (isDeletingProject || !projectToDelete) return;
 		isDeletingProject = true;
@@ -1073,6 +778,11 @@ Important rules:
 		deleteNavError = '';
 		threadToDelete = { id, title, projectId };
 		threadDeleteDialogOpen = true;
+	};
+
+	const closeDeleteThreadDialog = () => {
+		threadDeleteDialogOpen = false;
+		threadToDelete = null;
 	};
 
 	const confirmDeleteThread = async () => {
@@ -2082,225 +1792,40 @@ Important rules:
 			onToggleThreadContext={toggleThreadContext}
 		/>
 
-		<Dialog.Root bind:open={importDialogOpen}>
-			<Dialog.Content
-				class="flex h-[min(44rem,calc(100vh-2rem))] flex-col p-0 sm:max-w-4xl"
-				showCloseButton={!isStartingImportReview}
-			>
-				<form
-					class="flex min-h-0 flex-1 flex-col"
-					onsubmit={(event) => {
-						event.preventDefault();
-						void startExternalContextImportReview();
-					}}
-				>
-					<Dialog.Header class="border-b border-border/70 px-5 py-4 text-left">
-						<Dialog.Title>Import external AI context</Dialog.Title>
-						<Dialog.Description>
-							Bring project context from another AI chat into a Launchpad review draft.
-						</Dialog.Description>
-					</Dialog.Header>
+		<WorkspaceExternalContextImportDialog
+			bind:open={importDialogOpen}
+			onReviewStarted={openImportReview}
+		/>
 
-					<div
-						class="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(17rem,0.78fr)_minmax(0,1.22fr)]"
-					>
-						<section
-							class="flex min-h-0 flex-col border-b border-border/70 bg-muted/30 lg:border-r lg:border-b-0"
-						>
-							<div class="space-y-3 p-5">
-								<div class="flex gap-3">
-									<div
-										class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground"
-									>
-										1
-									</div>
-									<div class="min-w-0 space-y-1">
-										<h2 class="text-sm font-semibold tracking-tight">Copy the prompt</h2>
-										<p class="text-xs leading-5 text-pretty text-muted-foreground">
-											Run this in ChatGPT, Claude, or another AI tool that already has the context
-											you want to bring over.
-										</p>
-									</div>
-								</div>
-								<div class="flex items-center gap-2 pl-9">
-									<Button
-										type="button"
-										variant="secondary"
-										size="sm"
-										disabled={isStartingImportReview}
-										onclick={copyExternalContextPrompt}
-									>
-										Copy prompt
-									</Button>
-									{#if importNotice && !importError}
-										<p class="text-xs text-muted-foreground" role="status">{importNotice}</p>
-									{/if}
-								</div>
-							</div>
+		<WorkspaceDeleteConfirmDialog
+			bind:open={projectDeleteDialogOpen}
+			title="Delete project"
+			description={projectToDelete
+				? `This removes “${projectToDelete.name}” and all of its chats and saved artifacts. This cannot be undone.`
+				: ''}
+			confirmLabel="Delete project"
+			pendingLabel="Deleting…"
+			isDeleting={isDeletingProject}
+			confirmDisabled={!projectToDelete}
+			error={deleteNavError}
+			onCancel={closeDeleteProjectDialog}
+			onConfirm={confirmDeleteProject}
+		/>
 
-							<div class="flex min-h-0 flex-1 flex-col border-t border-border/70 p-5 pt-4">
-								<div class="mb-2 flex items-center justify-between gap-3">
-									<Label for="external-context-prompt">Prompt to run externally</Label>
-									<span class="text-[11px] text-muted-foreground">Read only</span>
-								</div>
-								<Textarea
-									id="external-context-prompt"
-									value={externalContextPrompt}
-									readonly
-									class="min-h-40 flex-1 resize-none bg-background font-mono text-[11px] leading-5 lg:min-h-0"
-								/>
-							</div>
-						</section>
-
-						<section class="flex min-h-0 flex-col p-5">
-							<div class="flex gap-3">
-								<div
-									class="flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-background text-[11px] font-medium text-foreground"
-								>
-									2
-								</div>
-								<div class="min-w-0 flex-1 space-y-1">
-									<h2 class="text-sm font-semibold tracking-tight">Paste the summary</h2>
-									<p class="max-w-prose text-xs leading-5 text-pretty text-muted-foreground">
-										Paste the Markdown response. You will review it before creating or changing any
-										project.
-									</p>
-								</div>
-							</div>
-
-							<div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
-								<div class="space-y-1.5">
-									<Label for="external-context-source">External summary</Label>
-									<p class="text-xs leading-5 text-muted-foreground">
-										Do not paste passwords, API keys, private keys, or sensitive personal data.
-									</p>
-								</div>
-								<div class="space-y-1.5">
-									<Label for="external-context-source-tool">Source</Label>
-									<NativeSelect
-										id="external-context-source-tool"
-										bind:value={importSourceToolHint}
-										disabled={isStartingImportReview}
-									>
-										<NativeSelectOption value="unknown">Unknown</NativeSelectOption>
-										<NativeSelectOption value="chatgpt">ChatGPT</NativeSelectOption>
-										<NativeSelectOption value="claude">Claude</NativeSelectOption>
-										<NativeSelectOption value="other">Other</NativeSelectOption>
-									</NativeSelect>
-								</div>
-							</div>
-
-							<Textarea
-								id="external-context-source"
-								bind:value={importSourceMarkdown}
-								placeholder="# Project Name&#10;&#10;Paste the structured Markdown summary here..."
-								class="mt-3 min-h-56 flex-1 resize-none font-mono text-xs leading-5"
-								disabled={isStartingImportReview}
-							/>
-
-							{#if importError}
-								<p class="mt-3 text-xs text-destructive" role="status">{importError}</p>
-							{:else}
-								<p class="mt-3 text-xs leading-5 text-muted-foreground">
-									Launchpad starts a review draft first. Nothing is added to a project until you
-									approve it.
-								</p>
-							{/if}
-						</section>
-					</div>
-
-					<Dialog.Footer class="border-t border-border/70 px-5 py-4">
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={isStartingImportReview}
-							onclick={closeImportDialog}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isStartingImportReview || !importSourceMarkdown.trim()}>
-							{isStartingImportReview ? 'Starting review...' : 'Start review'}
-						</Button>
-					</Dialog.Footer>
-				</form>
-			</Dialog.Content>
-		</Dialog.Root>
-
-		<Dialog.Root bind:open={projectDeleteDialogOpen}>
-			<Dialog.Content class="sm:max-w-md" showCloseButton={!isDeletingProject}>
-				<Dialog.Header>
-					<Dialog.Title>Delete project</Dialog.Title>
-					<Dialog.Description>
-						{#if projectToDelete}
-							This removes “{projectToDelete.name}” and all of its chats and saved artifacts. This
-							cannot be undone.
-						{/if}
-					</Dialog.Description>
-				</Dialog.Header>
-				{#if deleteNavError}
-					<p class="text-xs text-destructive">{deleteNavError}</p>
-				{/if}
-				<Dialog.Footer>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={isDeletingProject}
-						onclick={() => {
-							projectDeleteDialogOpen = false;
-							projectToDelete = null;
-						}}
-					>
-						Cancel
-					</Button>
-					<Button
-						type="button"
-						variant="destructive"
-						disabled={isDeletingProject || !projectToDelete}
-						onclick={confirmDeleteProject}
-					>
-						{isDeletingProject ? 'Deleting…' : 'Delete project'}
-					</Button>
-				</Dialog.Footer>
-			</Dialog.Content>
-		</Dialog.Root>
-
-		<Dialog.Root bind:open={threadDeleteDialogOpen}>
-			<Dialog.Content class="sm:max-w-md" showCloseButton={!isDeletingThread}>
-				<Dialog.Header>
-					<Dialog.Title>Delete thread</Dialog.Title>
-					<Dialog.Description>
-						{#if threadToDelete}
-							This removes “{formatThreadTitleForDisplay(threadToDelete.title)}” and its messages
-							and saved artifacts. This cannot be undone.
-						{/if}
-					</Dialog.Description>
-				</Dialog.Header>
-				{#if deleteNavError}
-					<p class="text-xs text-destructive">{deleteNavError}</p>
-				{/if}
-				<Dialog.Footer>
-					<Button
-						type="button"
-						variant="secondary"
-						disabled={isDeletingThread}
-						onclick={() => {
-							threadDeleteDialogOpen = false;
-							threadToDelete = null;
-						}}
-					>
-						Cancel
-					</Button>
-					<Button
-						type="button"
-						variant="destructive"
-						disabled={isDeletingThread || !threadToDelete}
-						onclick={confirmDeleteThread}
-					>
-						{isDeletingThread ? 'Deleting…' : 'Delete thread'}
-					</Button>
-				</Dialog.Footer>
-			</Dialog.Content>
-		</Dialog.Root>
+		<WorkspaceDeleteConfirmDialog
+			bind:open={threadDeleteDialogOpen}
+			title="Delete thread"
+			description={threadToDelete
+				? `This removes “${formatThreadTitleForDisplay(threadToDelete.title)}” and its messages and saved artifacts. This cannot be undone.`
+				: ''}
+			confirmLabel="Delete thread"
+			pendingLabel="Deleting…"
+			isDeleting={isDeletingThread}
+			confirmDisabled={!threadToDelete}
+			error={deleteNavError}
+			onCancel={closeDeleteThreadDialog}
+			onConfirm={confirmDeleteThread}
+		/>
 
 		<Dialog.Root bind:open={promoteDialogOpen}>
 			<Dialog.Content class="sm:max-w-2xl" showCloseButton={!isPromoting && !isLoadingReadiness}>
@@ -2468,159 +1993,10 @@ Important rules:
 			</Dialog.Content>
 		</Dialog.Root>
 
-		<Dialog.Root bind:open={createArtifactDialogOpen}>
-			<Dialog.Content
-				class="overflow-hidden p-0 sm:max-w-2xl"
-				showCloseButton={false}
-				onEscapeKeydown={handleCreateArtifactDismiss}
-				onInteractOutside={handleCreateArtifactDismiss}
-			>
-				<form
-					class="grid max-h-[min(44rem,calc(100vh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto]"
-					onsubmit={(event) => {
-						event.preventDefault();
-						void createArtifact();
-					}}
-				>
-					<Dialog.Header class="border-b border-border/70 px-5 py-4 text-left">
-						<div class="flex items-start justify-between gap-4">
-							<div class="min-w-0 space-y-1">
-								<Dialog.Title>Create artifact</Dialog.Title>
-								<Dialog.Description class="max-w-prose text-pretty">
-									Save a durable document to this workspace. {createArtifactDestination}
-								</Dialog.Description>
-							</div>
-							<div
-								class="hidden shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground sm:block"
-							>
-								{selectedArtifactTypeLabel}
-							</div>
-						</div>
-					</Dialog.Header>
-
-					<div class="min-h-0 overflow-y-auto px-5 py-4">
-						<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_9rem]">
-							<div class="space-y-1.5">
-								<Label for="create-artifact-title">Title</Label>
-								<Input
-									id="create-artifact-title"
-									bind:value={artifactTitle}
-									placeholder="Artifact title"
-									autofocus
-									aria-invalid={artifactCreateError && !artifactTitle.trim() ? 'true' : undefined}
-									disabled={isCreatingArtifact}
-								/>
-								<p class="text-[11px] leading-4 text-muted-foreground">
-									Use the name you will scan for later in the artifacts list.
-								</p>
-							</div>
-							<div class="space-y-1.5">
-								<Label for="create-artifact-type">Type</Label>
-								<NativeSelect
-									id="create-artifact-type"
-									bind:value={artifactTypePreset}
-									class="w-full"
-									disabled={isCreatingArtifact}
-								>
-									{#each artifactTypePresets as preset (preset.value)}
-										<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
-									{/each}
-								</NativeSelect>
-							</div>
-							<div class="space-y-1.5">
-								<Label for="create-artifact-format">Format</Label>
-								<NativeSelect
-									id="create-artifact-format"
-									bind:value={artifactFormatPreset}
-									class="w-full"
-									disabled={isCreatingArtifact}
-								>
-									{#each artifactFormatPresets as preset (preset.value)}
-										<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
-									{/each}
-								</NativeSelect>
-							</div>
-						</div>
-
-						{#if artifactTypePreset === 'custom'}
-							<div class="mt-3 space-y-1.5">
-								<Label for="create-artifact-custom-type">Custom type</Label>
-								<Input
-									id="create-artifact-custom-type"
-									bind:value={artifactCustomType}
-									placeholder="decision, spec, notes"
-									aria-invalid={artifactCreateError && !artifactCustomType.trim()
-										? 'true'
-										: undefined}
-									disabled={isCreatingArtifact}
-								/>
-								<p class="text-[11px] leading-4 text-muted-foreground">
-									Keep it short. This becomes the artifact category.
-								</p>
-							</div>
-						{/if}
-
-						<div class="mt-4 space-y-1.5">
-							<div class="flex items-end justify-between gap-3">
-								<div class="space-y-1.5">
-									<Label for="create-artifact-body">
-										{artifactFormatPreset === 'markdown'
-											? 'Markdown'
-											: artifactFormatPreset === 'html'
-												? 'HTML'
-												: 'SVG'}
-									</Label>
-									<p class="max-w-prose text-xs leading-5 text-muted-foreground">
-										Write the durable version here. You can edit it after creation.
-									</p>
-								</div>
-								<span class="hidden text-[11px] text-muted-foreground sm:inline">
-									⌘/Ctrl Enter creates
-								</span>
-							</div>
-							<Textarea
-								id="create-artifact-body"
-								bind:value={artifactBody}
-								placeholder={artifactFormatPreset === 'markdown'
-									? '# Decision\n\nCapture the useful details, constraints, and next step.'
-									: artifactFormatPreset === 'html'
-										? '<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Title</h1>\n  </body>\n</html>'
-										: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">\n  <!-- diagram -->\n</svg>'}
-								class="min-h-72 resize-y bg-background font-mono text-xs leading-5 sm:min-h-80"
-								onkeydown={handleCreateArtifactKeydown}
-								aria-invalid={artifactCreateError && !artifactBody.trim() ? 'true' : undefined}
-								disabled={isCreatingArtifact}
-							/>
-						</div>
-
-						<div class="mt-3 min-h-5">
-							{#if artifactCreateError}
-								<p class="text-xs leading-5 text-destructive" role="status">
-									{artifactCreateError}
-								</p>
-							{:else}
-								<p class="text-xs leading-5 text-muted-foreground">
-									Artifacts stay editable from the artifact page after creation.
-								</p>
-							{/if}
-						</div>
-					</div>
-
-					<Dialog.Footer class="border-t border-border/70 bg-muted/35 px-5 py-4">
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={isCreatingArtifact}
-							onclick={closeCreateArtifactDialog}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isCreatingArtifact || !canCreateArtifact}>
-							{isCreatingArtifact ? 'Creating…' : 'Create artifact'}
-						</Button>
-					</Dialog.Footer>
-				</form>
-			</Dialog.Content>
-		</Dialog.Root>
+		<WorkspaceCreateArtifactDialog
+			bind:open={createArtifactDialogOpen}
+			destination={createArtifactDestination}
+			onCreate={createArtifact}
+		/>
 	</Sidebar.Provider>
 {/if}
