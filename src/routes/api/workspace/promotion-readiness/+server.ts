@@ -108,7 +108,14 @@ export const POST: RequestHandler = async ({ request }) => {
 			const parsed = parseAiReadiness(result.text);
 			const occurredAt = Date.now();
 			const usage = result.usage;
-			if ((usage.inputTokens ?? 0) > 0 || (usage.outputTokens ?? 0) > 0) {
+			const reasoningTokens = usage.outputTokenDetails?.reasoningTokens;
+			const cachedInputTokens = usage.inputTokenDetails?.cacheReadTokens;
+			if (
+				(usage.inputTokens ?? 0) > 0 ||
+				(usage.outputTokens ?? 0) > 0 ||
+				(reasoningTokens ?? 0) > 0 ||
+				(cachedInputTokens ?? 0) > 0
+			) {
 				await convex.mutation(recordAiRunMutation, {
 					threadId: thread._id,
 					modelId: READINESS_MODEL_ID,
@@ -116,8 +123,8 @@ export const POST: RequestHandler = async ({ request }) => {
 					usage: {
 						inputTokens: usage.inputTokens,
 						outputTokens: usage.outputTokens,
-						reasoningTokens: usage.reasoningTokens,
-						cachedInputTokens: usage.cachedInputTokens
+						reasoningTokens,
+						cachedInputTokens
 					},
 					reservationId: reservation.reservationId
 				});

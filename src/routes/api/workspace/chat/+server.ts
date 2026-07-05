@@ -25,10 +25,7 @@ import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
 import { getWorkspaceChatAi, traceWorkspaceChatRun } from '$lib/server/braintrust';
 import { buildFullWorkspaceChatInstructions } from '$lib/server/workspace-chat-instructions';
-import {
-	OpenRouterNotConfiguredError,
-	resolveWorkspaceLanguageModel
-} from '$lib/server/resolve-workspace-language-model';
+import { resolveWorkspaceLanguageModel } from '$lib/server/resolve-workspace-language-model';
 import { syncArtifactMemory } from '$lib/server/launchpad-memory';
 import {
 	getComposioToolsForChatRun,
@@ -52,9 +49,8 @@ import {
 } from '$lib/server/memory';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
-import { tavilyExtract, tavilySearch } from '@tavily/ai-sdk';
 import { ConvexHttpClient } from 'convex/browser';
-import { safeValidateUIMessages, stepCountIs, tool, type UIMessage } from 'ai';
+import { isStepCount, safeValidateUIMessages, tool, type UIMessage } from 'ai';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { z } from 'zod';
 
@@ -172,15 +168,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			console.error('Could not load Composio tools', error);
 		}
 
-		let languageModel;
-		try {
-			languageModel = resolveWorkspaceLanguageModel(body.modelId);
-		} catch (e) {
-			if (e instanceof OpenRouterNotConfiguredError) {
-				return json({ error: e.message }, { status: 400 });
-			}
-			throw e;
-		}
+		const languageModel = resolveWorkspaceLanguageModel(body.modelId);
 
 		const reservation = await convex.mutation(reserveAiBudgetMutation, {
 			sourceKind: 'chatThread',
@@ -218,18 +206,18 @@ export const POST: RequestHandler = async ({ request }) => {
 						model: languageModel,
 						instructions,
 						tools,
-						stopWhen: stepCountIs(8),
-						onFinish: async ({ totalUsage }) => {
-							if ((totalUsage.inputTokens ?? 0) > 0 || (totalUsage.outputTokens ?? 0) > 0) {
+						stopWhen: isStepCount(8),
+						onEnd: async ({ usage }) => {
+							if ((usage.inputTokens ?? 0) > 0 || (usage.outputTokens ?? 0) > 0) {
 								await convex.mutation(recordAiRunMutation, {
 									threadId: thread._id,
 									modelId: body.modelId,
 									occurredAt: Date.now(),
 									usage: {
-										inputTokens: totalUsage.inputTokens,
-										outputTokens: totalUsage.outputTokens,
-										reasoningTokens: totalUsage.outputTokenDetails?.reasoningTokens,
-										cachedInputTokens: totalUsage.inputTokenDetails?.cacheReadTokens
+										inputTokens: usage.inputTokens,
+										outputTokens: usage.outputTokens,
+										reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
+										cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens
 									},
 									reservationId: reservation.reservationId
 								});
@@ -286,25 +274,51 @@ function workspaceTools({
 	const artifactIdSchema = z.object({
 		artifactId: z.string().describe('The artifact id.')
 	});
+	const tavilySearchInputSchema = z.object({
+		query: z.string().min(1).describe('The search query.'),
+		topic: z.enum(['general', 'news', 'finance']).optional(),
+		timeRange: z.enum(['day', 'week', 'month', 'year', 'd', 'w', 'm', 'y']).optional(),
+		includeDomains: z.array(z.string()).max(20).optional(),
+		excludeDomains: z.array(z.string()).max(20).optional()
+	});
+	const tavilyExtractInputSchema = z.object({
+		urls: z.union([z.string().url(), z.array(z.string().url()).min(1).max(5)]),
+		query: z.string().min(1).optional()
+	});
 
 	return {
 		...(webSearchAvailable
 			? {
-					tavilySearch: tavilySearch({
-						apiKey: webSearchApiKey,
-						searchDepth: 'basic',
-						maxResults: 5,
-						includeAnswer: false,
-						includeImages: false,
-						includeFavicon: true
+					tavilySearch: tool({
+						description: 'Search the web for current or source-backed context.',
+						inputSchema: tavilySearchInputSchema,
+						execute: async (input) =>
+							callTavily(webSearchApiKey, 'search', {
+								query: input.query,
+								search_depth: 'basic',
+								max_results: 5,
+								topic: input.topic ?? 'general',
+								...(input.timeRange ? { time_range: input.timeRange } : {}),
+								include_answer: false,
+								include_images: false,
+								include_favicon: true,
+								...(input.includeDomains ? { include_domains: input.includeDomains } : {}),
+								...(input.excludeDomains ? { exclude_domains: input.excludeDomains } : {})
+							})
 					}),
-					tavilyExtract: tavilyExtract({
-						apiKey: webSearchApiKey,
-						extractDepth: 'basic',
-						format: 'markdown',
-						includeImages: false,
-						chunksPerSource: 3,
-						timeout: 10
+					tavilyExtract: tool({
+						description: 'Extract readable markdown from specific source URLs.',
+						inputSchema: tavilyExtractInputSchema,
+						execute: async (input) =>
+							callTavily(webSearchApiKey, 'extract', {
+								urls: input.urls,
+								...(input.query ? { query: input.query, chunks_per_source: 3 } : {}),
+								extract_depth: 'basic',
+								format: 'markdown',
+								include_images: false,
+								include_favicon: true,
+								timeout: 10
+							})
 					})
 				}
 			: {}),
@@ -732,6 +746,24 @@ function workspaceTools({
 			}
 		})
 	};
+}
+
+async function callTavily(apiKey: string, endpoint: 'search' | 'extract', body: unknown) {
+	const response = await fetch(`https://api.tavily.com/${endpoint}`, {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${apiKey}`,
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify(body)
+	});
+
+	if (!response.ok) {
+		const detail = await response.text();
+		throw new Error(`Tavily ${endpoint} failed (${response.status}): ${detail}`);
+	}
+
+	return response.json();
 }
 
 function semanticMemoryToolResult(

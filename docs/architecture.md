@@ -59,7 +59,6 @@ access.
 Supported provider paths:
 
 - Vercel AI Gateway via `AI_GATEWAY_API_KEY`
-- OpenRouter via `OPENROUTER_API_KEY`
 
 Optional AI context and integrations:
 
@@ -72,7 +71,7 @@ External app connections are managed from workspace settings. Chat-time app tool
 
 Convex artifacts remain canonical workspace memory. Supermemory is derived recall infrastructure and must not replace Convex state. Composio may act on external services, but Launchpad workspace state should still be saved through Convex artifacts and thread tools.
 
-Workspace chat system instructions are assembled in `src/lib/server/workspace-chat-instructions.ts`. Policy evals live under `evals/workspace-chat/` (`npm run eval:chat`; requires `BRAINTRUST_API_KEY` and either `AI_GATEWAY_API_KEY` with `WORKSPACE_CHAT_EVAL_PROVIDER=gateway` or `OPENROUTER_API_KEY` with `WORKSPACE_CHAT_EVAL_PROVIDER=openrouter`). Provider wiring is in `evals/workspace-chat/eval-provider.ts`.
+Workspace chat system instructions are assembled in `src/lib/server/workspace-chat-instructions.ts`. Policy evals live under `evals/workspace-chat/` (`npm run eval:chat`; requires `BRAINTRUST_API_KEY` and `AI_GATEWAY_API_KEY`). Provider wiring is in `evals/workspace-chat/eval-provider.ts`.
 
 Optional Braintrust tracing for workspace chat (engineering only, not product usage metrics): set `BRAINTRUST_API_KEY` and `BRAINTRUST_TRACING_ENABLED=true` in the SvelteKit server environment. Wiring lives in `src/lib/server/braintrust.ts` and applies only to `src/routes/api/workspace/chat/+server.ts`. Each traced request gets a parent `workspace-chat` span with filterable metadata (`threadId`, `modelId`, `scopeType`, optional `projectId`, web search and Composio flags) and child spans from the AI SDK wrapper. Leave tracing disabled in production unless you have a data-handling policy; traces may include user messages, artifacts, and tool I/O.
 
@@ -98,7 +97,6 @@ Launchpad Actions are project-scoped external activity listeners backed by Compo
 | --------------------------------- | ---------------------------------------------------------------------------------------- |
 | `PUBLIC_CONVEX_URL`               | Convex deployment URL for browser and server HTTP clients                                |
 | `AI_GATEWAY_API_KEY`              | Vercel AI Gateway key for default AI workflows                                           |
-| `OPENROUTER_API_KEY`              | Optional OpenRouter provider key                                                         |
 | `TAVILY_API_KEY`                  | Optional web search/page extraction key                                                  |
 | `SUPERMEMORY_API_KEY`             | Optional Supermemory key                                                                 |
 | `COMPOSIO_API_KEY`                | Optional Composio key for selected external app tools and Launchpad Actions              |
@@ -106,7 +104,7 @@ Launchpad Actions are project-scoped external activity listeners backed by Compo
 | `BRAINTRUST_API_KEY`              | Optional Braintrust key for workspace chat tracing and evals                             |
 | `BRAINTRUST_TRACING_ENABLED`      | Optional flag to enable workspace chat tracing                                           |
 | `BRAINTRUST_PROJECT_NAME`         | Optional Braintrust tracing project name                                                 |
-| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional eval provider, `gateway` or `openrouter`                                        |
+| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional eval catalog group, `gateway` or `openrouter`                                   |
 | `WORKSPACE_CHAT_EVAL_MODEL_ID`    | Optional catalog model id for workspace chat evals                                       |
 | `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional flag to enable selected LLM judge scorers                                       |
 | `WORKSPACE_CHAT_EVAL_JUDGE_MODEL` | Optional catalog model id for eval judge scoring                                         |

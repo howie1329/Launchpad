@@ -174,7 +174,7 @@ export function getModelSelectorLogoProvider(model: IdeaAiModel): 'vercel' | 'op
 /** For UI: section lists and labels. */
 export const ideaAiModelProviderCopy: Record<IdeaAiModelProvider, string> = {
 	gateway: 'Vercel AI Gateway',
-	openrouter: 'OpenRouter'
+	openrouter: 'Additional Gateway Models'
 };
 
 export function listIdeaModelsByProvider(provider: IdeaAiModelProvider): readonly IdeaAiModel[] {

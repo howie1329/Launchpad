@@ -1,4 +1,3 @@
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { createGateway } from 'ai';
 import {
 	getIdeaAiModelById,
@@ -54,33 +53,15 @@ export function resolveEvalLanguageModel(modelId?: IdeaAiModelId) {
 		);
 	}
 
-	if (provider === 'gateway') {
-		const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
-		if (!apiKey) {
-			throw new Error(
-				'AI_GATEWAY_API_KEY is required for workspace chat evals when WORKSPACE_CHAT_EVAL_PROVIDER=gateway.'
-			);
-		}
-		const gateway = createGateway({ apiKey });
-		return gateway(entry.id);
-	}
-
-	const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+	const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
 	if (!apiKey) {
 		throw new Error(
-			'OPENROUTER_API_KEY is required for workspace chat evals when WORKSPACE_CHAT_EVAL_PROVIDER=openrouter.'
+			'AI_GATEWAY_API_KEY is required for workspace chat evals when WORKSPACE_CHAT_EVAL_PROVIDER=gateway or openrouter.'
 		);
 	}
+	const gateway = createGateway({ apiKey });
 
-	if (!isOpenRouterIdeaModel(entry)) {
-		throw new Error(`Expected an OpenRouter catalog model for "${id}".`);
-	}
-
-	const openrouter = createOpenRouter({
-		apiKey,
-		appName: 'Launchpad'
-	});
-	return openrouter.chat(entry.openRouterModel);
+	return isOpenRouterIdeaModel(entry) ? gateway(entry.openRouterModel) : gateway(entry.id);
 }
 
 /** Catalog id for judge scorers; optional WORKSPACE_CHAT_EVAL_JUDGE_MODEL, else same as chat model. */

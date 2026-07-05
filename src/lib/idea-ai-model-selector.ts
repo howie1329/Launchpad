@@ -14,9 +14,8 @@ export type IdeaAiModelProviderGroup = {
 
 const ideaAiModelProviderOrder: readonly IdeaAiModelProvider[] = ['gateway', 'openrouter'];
 
-function logoProviderFor(provider: IdeaAiModelProvider): IdeaAiModelLogoProvider {
-	if (provider === 'gateway') return 'vercel';
-	return 'openrouter';
+function logoProviderFor(): IdeaAiModelLogoProvider {
+	return 'vercel';
 }
 
 export const ideaAiModelProviderGroups: readonly IdeaAiModelProviderGroup[] =
@@ -25,5 +24,5 @@ export const ideaAiModelProviderGroups: readonly IdeaAiModelProviderGroup[] =
 		.map((provider) => ({
 			provider,
 			heading: ideaAiModelProviderCopy[provider],
-			logoProvider: logoProviderFor(provider)
+			logoProvider: logoProviderFor()
 		}));

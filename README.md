@@ -61,17 +61,17 @@ Workspace APIs live under `/api/workspace/*`:
 
 ## Stack
 
-| Layer         | Technology                                                          |
-| ------------- | ------------------------------------------------------------------- |
-| App           | SvelteKit, Svelte 5, TypeScript                                     |
-| UI            | Tailwind CSS v4, shadcn-svelte/Bits UI primitives, Hugeicons        |
-| Backend       | Convex queries, mutations, realtime data, and Convex Auth           |
-| Client data   | `convex-svelte`                                                     |
-| AI            | Vercel AI SDK with Vercel AI Gateway and OpenRouter catalog entries |
-| Search        | Tavily for optional web search/page extraction                      |
-| External apps | Composio for selected chat app tools and Launchpad Actions          |
-| Memory        | Supermemory for optional derived recall                             |
-| Artifacts     | CodeMirror, Streamdown, `@pierre/diffs`, OpenUI Svelte runtime      |
+| Layer         | Technology                                                     |
+| ------------- | -------------------------------------------------------------- |
+| App           | SvelteKit, Svelte 5, TypeScript                                |
+| UI            | Tailwind CSS v4, shadcn-svelte/Bits UI primitives, Hugeicons   |
+| Backend       | Convex queries, mutations, realtime data, and Convex Auth      |
+| Client data   | `convex-svelte`                                                |
+| AI            | Vercel AI SDK with Vercel AI Gateway catalog entries           |
+| Search        | Tavily for optional web search/page extraction                 |
+| External apps | Composio for selected chat app tools and Launchpad Actions     |
+| Memory        | Supermemory for optional derived recall                        |
+| Artifacts     | CodeMirror, Streamdown, `@pierre/diffs`, OpenUI Svelte runtime |
 
 ## Documentation
 
@@ -131,7 +131,6 @@ Set local values in `.env.local` or the deployment environment.
 | --------------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
 | `PUBLIC_CONVEX_URL`               | Yes              | Convex deployment URL for browser and server HTTP clients                                    |
 | `AI_GATEWAY_API_KEY`              | Yes              | Vercel AI Gateway key for default workspace chat, title generation, and promotion readiness  |
-| `OPENROUTER_API_KEY`              | Optional         | Enables OpenRouter catalog models                                                            |
 | `TAVILY_API_KEY`                  | Optional         | Enables workspace chat web search and page extraction                                        |
 | `SUPERMEMORY_API_KEY`             | Optional         | Enables Supermemory retrieval, profile context, and artifact memory sync                     |
 | `COMPOSIO_API_KEY`                | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |
@@ -139,7 +138,7 @@ Set local values in `.env.local` or the deployment environment.
 | `BRAINTRUST_API_KEY`              | Optional         | Enables workspace chat tracing and `npm run eval:chat`                                       |
 | `BRAINTRUST_TRACING_ENABLED`      | Optional         | Set to `true` with `BRAINTRUST_API_KEY` to trace workspace chat requests                     |
 | `BRAINTRUST_PROJECT_NAME`         | Optional         | Braintrust project name for tracing; defaults to `Launchpad Workspace Chat`                  |
-| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` provider for `npm run eval:chat`                         |
+| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` catalog group for `npm run eval:chat`                    |
 | `WORKSPACE_CHAT_EVAL_MODEL_ID`    | Optional         | Catalog model id for workspace chat evals                                                    |
 | `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional         | Set to `true` to enable LLM judge scorers for selected eval cases                            |
 | `WORKSPACE_CHAT_EVAL_JUDGE_MODEL` | Optional         | Catalog model id for eval judge scoring                                                      |

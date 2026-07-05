@@ -80,7 +80,6 @@ Set values in `.env.local` for local development and in the deployment environme
 | --------------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
 | `PUBLIC_CONVEX_URL`               | Yes              | Convex deployment URL for browser clients and SvelteKit server routes                        |
 | `AI_GATEWAY_API_KEY`              | Yes              | Vercel AI Gateway key for default AI workflows                                               |
-| `OPENROUTER_API_KEY`              | Optional         | Enables OpenRouter models                                                                    |
 | `TAVILY_API_KEY`                  | Optional         | Enables web search and page extraction                                                       |
 | `SUPERMEMORY_API_KEY`             | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                        |
 | `COMPOSIO_API_KEY`                | Optional         | Enables selected external app tools and Launchpad Actions through Composio                   |
@@ -88,7 +87,7 @@ Set values in `.env.local` for local development and in the deployment environme
 | `BRAINTRUST_API_KEY`              | Optional         | Enables workspace chat tracing and Braintrust evals                                          |
 | `BRAINTRUST_TRACING_ENABLED`      | Optional         | Set to `true` with `BRAINTRUST_API_KEY` to trace workspace chat requests                     |
 | `BRAINTRUST_PROJECT_NAME`         | Optional         | Braintrust project name for tracing; defaults to `Launchpad Workspace Chat`                  |
-| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` provider for `npm run eval:chat`                         |
+| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` catalog group for `npm run eval:chat`                    |
 | `WORKSPACE_CHAT_EVAL_MODEL_ID`    | Optional         | Catalog model id for workspace chat evals                                                    |
 | `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional         | Set to `true` to enable LLM judge scorers for selected eval cases                            |
 | `WORKSPACE_CHAT_EVAL_JUDGE_MODEL` | Optional         | Catalog model id for eval judge scoring                                                      |

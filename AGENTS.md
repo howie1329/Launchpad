@@ -162,7 +162,6 @@ Set local values in `.env.local` or the deployment environment. Never document o
 | --------------------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
 | `PUBLIC_CONVEX_URL`               | Yes              | Convex deployment URL used by browser clients and SvelteKit server routes                  |
 | `AI_GATEWAY_API_KEY`              | Yes              | Vercel AI Gateway key for default workspace AI workflows                                   |
-| `OPENROUTER_API_KEY`              | Optional         | Enables OpenRouter model catalog entries                                                   |
 | `TAVILY_API_KEY`                  | Optional         | Enables workspace web search and page extraction                                           |
 | `SUPERMEMORY_API_KEY`             | Optional         | Enables Supermemory recall, profile context, and artifact memory sync                      |
 | `COMPOSIO_API_KEY`                | Optional         | Enables selected external app tools in workspace chat through Composio                     |
@@ -170,7 +169,7 @@ Set local values in `.env.local` or the deployment environment. Never document o
 | `BRAINTRUST_API_KEY`              | Optional         | Braintrust API key for workspace chat tracing (engineering observability)                  |
 | `BRAINTRUST_TRACING_ENABLED`      | Optional         | Set to `true` with `BRAINTRUST_API_KEY` to trace workspace chat in Braintrust              |
 | `BRAINTRUST_PROJECT_NAME`         | Optional         | Braintrust project name (defaults to `Launchpad Workspace Chat`)                           |
-| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` for `npm run eval:chat`                                |
+| `WORKSPACE_CHAT_EVAL_PROVIDER`    | Optional         | `gateway` (default) or `openrouter` catalog group for `npm run eval:chat`                  |
 | `WORKSPACE_CHAT_EVAL_MODEL_ID`    | Optional         | Catalog model id for evals; must match provider (defaults per provider)                    |
 | `WORKSPACE_CHAT_EVAL_LLM_JUDGE`   | Optional         | Set to `true` to run LLM judge scorers for proactivity and casual-conversation eval cases  |
 | `WORKSPACE_CHAT_EVAL_JUDGE_MODEL` | Optional         | Catalog model id for judge scorer (defaults to eval model for active provider)             |
@@ -187,7 +186,7 @@ Agents must read `docs/STACK.md` before changing stack-specific code.
 - Primary framework: SvelteKit with Svelte 5
 - Language/runtime: TypeScript on Node/Vite
 - Backend/data layer: Convex queries, mutations, realtime data, HTTP actions, and Convex Auth
-- AI: Vercel AI SDK with Vercel AI Gateway, OpenRouter, Tavily, and optional Supermemory
+- AI: Vercel AI SDK with Vercel AI Gateway, Tavily, and optional Supermemory
 - Styling system: Tailwind CSS v4 with shadcn-svelte/Bits UI primitives and project CSS in `src/routes/layout.css`
 - Test/check tools: `svelte-check`, SvelteKit sync, Vite build
 - Lint/format tools: ESLint, Prettier, `prettier-plugin-svelte`, `prettier-plugin-tailwindcss`

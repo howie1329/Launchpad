@@ -1,7 +1,7 @@
 import { buildFullWorkspaceChatInstructions } from '../../src/lib/server/workspace-chat-instructions.ts';
 import { wrapAISDK } from 'braintrust';
 import * as ai from 'ai';
-import { stepCountIs } from 'ai';
+import { isStepCount } from 'ai';
 import { fixtureContext } from './fixtures.ts';
 import { resolveEvalLanguageModel } from './eval-provider.ts';
 import { createWorkspaceChatStubTools } from './stub-tools.ts';
@@ -53,7 +53,7 @@ export async function runWorkspaceChatEvalTask(
 		model,
 		instructions,
 		tools,
-		stopWhen: stepCountIs(EVAL_MAX_STEPS)
+		stopWhen: isStepCount(EVAL_MAX_STEPS)
 	});
 
 	const messages = [

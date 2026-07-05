@@ -35,7 +35,7 @@ The product is designed for builders who want more structure than a blank chat w
 | External app tools          | Connected app tools for selected chat runs through Composio                                                                          |
 | Launchpad Actions           | Project-scoped GitHub and Linear triggers that record external activity into Launchpad                                               |
 | AI tools                    | Artifact/project operations, promotion support, optional Tavily search, optional Supermemory recall, and selected external app tools |
-| Multi-provider AI           | Vercel AI Gateway and OpenRouter catalog entries                                                                                     |
+| Gateway AI catalog          | Vercel AI Gateway catalog entries                                                                                                    |
 | Usage controls              | Daily AI cap, usage ledger, AI preferences, external app connections, account controls, and activity history                         |
 | Notifications and tabs      | Workspace navigation and progress feedback                                                                                           |
 
