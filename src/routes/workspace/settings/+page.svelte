@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { onMount } from 'svelte';
 	import { auth, getConvexClient, signOut } from '$lib/auth.svelte';
 	import { listMyActivityEventsQuery } from '$lib/activity';
 	import { Button } from '$lib/components/ui/button';
@@ -11,6 +12,13 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { getAiBudgetStatusQuery } from '$lib/usage';
 	import { getMyUserSettingsQuery, upsertMyUserSettingsMutation } from '$lib/user-settings';
+	import {
+		COLOR_THEMES,
+		getColorTheme,
+		isColorThemeId,
+		setColorTheme,
+		type ColorThemeId
+	} from '$lib/color-theme.svelte';
 	import { useQuery } from 'convex-svelte';
 
 	const detectedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -49,6 +57,23 @@
 	let resetError = $state('');
 	let deleteError = $state('');
 	let lastSavedAt = $state<number | null>(null);
+	let colorTheme = $state<ColorThemeId>('standard');
+
+	onMount(() => {
+		colorTheme = getColorTheme();
+		const handleColorThemeChange = (event: Event) => {
+			const next = (event as CustomEvent<unknown>).detail;
+			if (isColorThemeId(next)) colorTheme = next;
+		};
+
+		window.addEventListener('launchpad:color-theme-change', handleColorThemeChange);
+		return () => window.removeEventListener('launchpad:color-theme-change', handleColorThemeChange);
+	});
+
+	function selectColorTheme(next: ColorThemeId) {
+		colorTheme = next;
+		setColorTheme(next);
+	}
 
 	const savedTimeZone = $derived(settings.data?.timeZone || detectedTimeZone);
 	const savedDailyCapUsd = $derived(settings.data ? String(settings.data.dailyAiCapUsd) : '0.50');
@@ -488,6 +513,10 @@
 				<div class="space-y-1 text-xs">
 					<a
 						class="block rounded-md px-2 py-1.5 font-medium text-foreground hover:bg-muted"
+						href="#appearance">Appearance</a
+					>
+					<a
+						class="block rounded-md px-2 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
 						href="#usage">Usage</a
 					>
 					<a
@@ -510,6 +539,48 @@
 			</nav>
 
 			<div class="min-w-0 space-y-8">
+				<section id="appearance" class="scroll-mt-8 space-y-4">
+					<div class="space-y-1">
+						<h2 class="text-sm font-semibold tracking-tight">Appearance</h2>
+						<p class="max-w-prose text-xs leading-5 text-muted-foreground">
+							Choose the color language for Launchpad. This preference is stored in this browser
+							only.
+						</p>
+					</div>
+
+					<div class="grid gap-3 sm:grid-cols-2">
+						{#each COLOR_THEMES as theme (theme.id)}
+							<button
+								type="button"
+								class={`group rounded-lg border p-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 ${
+									colorTheme === theme.id
+										? 'border-primary bg-accent ring-1 ring-primary/40'
+										: 'border-border/70 hover:bg-muted/45'
+								}`}
+								aria-pressed={colorTheme === theme.id}
+								onclick={() => selectColorTheme(theme.id)}
+							>
+								<div class="flex items-center justify-between gap-3">
+									<span class="text-xs font-semibold">{theme.name}</span>
+									<span
+										class="flex size-6 shrink-0 overflow-hidden rounded-md border border-foreground/10"
+										aria-hidden="true"
+									>
+										{#each theme.swatches as swatch (swatch)}
+											<span class="min-w-0 flex-1" style={`background-color: ${swatch};`}></span>
+										{/each}
+									</span>
+								</div>
+								<p class="mt-1.5 text-[11px] leading-4 text-muted-foreground">
+									{theme.description}
+								</p>
+							</button>
+						{/each}
+					</div>
+				</section>
+
+				<Separator />
+
 				<section id="usage" class="scroll-mt-8 space-y-4">
 					<div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(15rem,0.8fr)] sm:items-start">
 						<div class="space-y-1">

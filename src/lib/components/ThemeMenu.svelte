@@ -1,7 +1,15 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import * as Sidebar from '$lib/components/ui/sidebar';
+	import {
+		COLOR_THEMES,
+		getColorTheme,
+		isColorThemeId,
+		setColorTheme,
+		type ColorThemeId
+	} from '$lib/color-theme.svelte';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { ComputerIcon, Moon01Icon, Sun01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
@@ -14,6 +22,7 @@
 	}: { variant?: Variant; align?: 'start' | 'end' | 'center' } = $props();
 
 	const preference = $derived(userPrefersMode.current);
+	let colorTheme = $state<ColorThemeId>('standard');
 
 	const triggerIcon = $derived<IconSvgElement>(
 		preference === 'system' ? ComputerIcon : preference === 'dark' ? Moon01Icon : Sun01Icon
@@ -22,6 +31,22 @@
 	function select(next: 'light' | 'dark' | 'system') {
 		setMode(next);
 	}
+
+	function selectColorTheme(next: ColorThemeId) {
+		colorTheme = next;
+		setColorTheme(next);
+	}
+
+	onMount(() => {
+		colorTheme = getColorTheme();
+		const handleColorThemeChange = (event: Event) => {
+			const next = (event as CustomEvent<unknown>).detail;
+			if (isColorThemeId(next)) colorTheme = next;
+		};
+
+		window.addEventListener('launchpad:color-theme-change', handleColorThemeChange);
+		return () => window.removeEventListener('launchpad:color-theme-change', handleColorThemeChange);
+	});
 </script>
 
 {#snippet appearanceItems()}
@@ -50,6 +75,23 @@
 			<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} class="size-3.5" />
 		{/if}
 	</DropdownMenu.Item>
+	<DropdownMenu.Separator />
+	<DropdownMenu.Label class="text-[11px] font-normal text-muted-foreground"
+		>Color theme</DropdownMenu.Label
+	>
+	{#each COLOR_THEMES as theme (theme.id)}
+		<DropdownMenu.Item class="gap-2" onclick={() => selectColorTheme(theme.id)}>
+			<span
+				class="size-3 shrink-0 rounded-full border border-foreground/15"
+				style={`background-color: ${theme.swatches[0]};`}
+				aria-hidden="true"
+			></span>
+			<span class="flex-1">{theme.name}</span>
+			{#if colorTheme === theme.id}
+				<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} class="size-3.5" />
+			{/if}
+		</DropdownMenu.Item>
+	{/each}
 {/snippet}
 
 {#if variant === 'sidebar' || variant === 'sidebar-label'}
@@ -80,7 +122,7 @@
 					</Sidebar.MenuButton>
 				{/snippet}
 			</DropdownMenu.Trigger>
-			<DropdownMenu.Content class="min-w-40" {align}>
+			<DropdownMenu.Content class="min-w-48" {align}>
 				{@render appearanceItems()}
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
@@ -113,7 +155,7 @@
 				{/if}
 			{/snippet}
 		</DropdownMenu.Trigger>
-		<DropdownMenu.Content class="min-w-40" {align}>
+		<DropdownMenu.Content class="min-w-48" {align}>
 			{@render appearanceItems()}
 		</DropdownMenu.Content>
 	</DropdownMenu.Root>
