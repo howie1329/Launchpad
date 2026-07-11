@@ -34,6 +34,7 @@ Launchpad is currently an active product build, not a static prototype. The main
 | AI assistant             | Streams through the Vercel AI SDK, renders final responses with OpenUI/markdown fallback, and can use workspace tools for artifacts, projects, memory, search, and connected apps |
 | Memory                   | Convex artifacts remain canonical; Supermemory can add derived recall when configured                                                                                             |
 | Usage controls           | Per-user daily AI cap, token/cost accounting, user AI preferences, external app connections, account controls, and activity history                                               |
+| Appearance               | Light, dark, or system mode plus Standard, Vercel, Codex, and Claude color themes stored locally in the browser                                                  |
 
 ## Routes
 
@@ -46,7 +47,7 @@ Launchpad is currently an active product build, not a static prototype. The main
 | `/workspace/project/[projectId]`                | Project overview                                              |
 | `/workspace/artifacts/[artifactId]`             | Full-page artifact reader/editor/history                      |
 | `/workspace/imports/external-context/[draftId]` | External context import review                                |
-| `/workspace/settings`                           | User settings, AI preferences, daily cap, usage, and activity |
+| `/workspace/settings`                           | User settings, appearance themes, AI preferences, daily cap, usage, and activity |
 | `/privacy`, `/terms`, `/support`                | Public support and policy pages                               |
 
 Workspace APIs live under `/api/workspace/*`:
