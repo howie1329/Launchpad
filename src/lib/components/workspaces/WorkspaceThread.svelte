@@ -68,7 +68,6 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Input } from '$lib/components/ui/input';
-	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select';
 	import { Handle, Pane, PaneGroup } from '$lib/components/ui/resizable';
 	import {
 		defaultIdeaAiModelId,
@@ -96,7 +95,6 @@
 		ArrowDown01Icon,
 		ArrowUp01Icon,
 		Cancel01Icon,
-		File01Icon,
 		GlobeIcon,
 		Loading03Icon,
 		Plug02Icon
@@ -133,8 +131,8 @@
 	let contextArtifactId = $state('');
 	let lastThreadIdForContext = $state('');
 	let contextSearch = $state('');
-	let contextTypeFilter = $state('all');
-	let contextDateSort = $state<'newest' | 'oldest'>('newest');
+	let contextListRef = $state<HTMLDivElement | null>(null);
+	let contextListScrollTop = $state(0);
 	/** Matches Tailwind `lg` — used so we only mount one chat + one context split (no duplicate Conversation). */
 	let mediaMinLg = $state(false);
 
@@ -202,36 +200,21 @@
 			? [...threadArtifacts.data].sort((a, b) => b.artifact.createdAt - a.artifact.createdAt)
 			: []
 	);
-	const contextArtifactTypes = $derived.by(() => {
-		const types: string[] = [];
-		for (const item of threadArtifacts.data ?? []) {
-			const type = item.artifact.type.trim();
-			if (type && !types.includes(type)) types.push(type);
-		}
-		return types.sort((a, b) => artifactTypeLabel(a).localeCompare(artifactTypeLabel(b)));
-	});
+	const linkedArtifactCount = $derived(threadArtifacts.data?.length ?? 0);
+	const showContextSearch = $derived(linkedArtifactCount >= 8);
 	const filteredContextArtifacts = $derived.by(() => {
-		const query = contextSearch.trim().toLowerCase();
-		const rows = sortedThreadArtifacts.filter((item) => {
+		const query = showContextSearch ? contextSearch.trim().toLowerCase() : '';
+		return sortedThreadArtifacts.filter((item) => {
 			const type = item.artifact.type.trim();
 			const typeLabel = artifactTypeLabel(type);
-			const matchesType = contextTypeFilter === 'all' || type === contextTypeFilter;
-			const matchesQuery =
+			return (
 				!query ||
 				item.artifact.title.toLowerCase().includes(query) ||
 				type.toLowerCase().includes(query) ||
-				typeLabel.toLowerCase().includes(query);
-
-			return matchesType && matchesQuery;
+				typeLabel.toLowerCase().includes(query)
+			);
 		});
-
-		if (contextDateSort === 'oldest') {
-			return [...rows].sort((a, b) => a.artifact.createdAt - b.artifact.createdAt);
-		}
-
-		return rows;
 	});
-	const linkedArtifactCount = $derived(threadArtifacts.data?.length ?? 0);
 	const visibleComposioToolkits = $derived(
 		composioToolkits.length > 0 ? composioToolkits : fallbackComposioToolkits
 	);
@@ -255,12 +238,6 @@
 		selectedComposioToolkits.length > 0
 			? `Only ${selectedComposioToolkits.length} selected ${selectedComposioToolkits.length === 1 ? 'app' : 'apps'}`
 			: 'All app tools'
-	);
-	const availableProjectArtifactCount = $derived(
-		(mentionableArtifacts.data ?? []).filter((item) => !item.linkedToThread).length
-	);
-	const contextHasFilters = $derived(
-		Boolean(contextSearch.trim()) || contextTypeFilter !== 'all' || contextDateSort !== 'newest'
 	);
 	const mentionListboxId = $derived(
 		activeThreadId
@@ -338,6 +315,8 @@
 		if (activeThreadId !== lastThreadIdForContext) {
 			lastThreadIdForContext = activeThreadId;
 			contextArtifactId = '';
+			contextSearch = '';
+			contextListScrollTop = 0;
 		}
 	});
 
@@ -467,10 +446,8 @@
 		mentionChips = mentionChips.filter((c) => c.id !== artifactId);
 	}
 
-	function clearContextFilters() {
+	function clearContextSearch() {
 		contextSearch = '';
-		contextTypeFilter = 'all';
-		contextDateSort = 'newest';
 	}
 
 	function requestCreateArtifact() {
@@ -702,6 +679,7 @@
 	}
 
 	const openThreadArtifact = async (artifactId: string) => {
+		contextListScrollTop = contextListRef?.scrollTop ?? 0;
 		if (contextPanelOpen) {
 			contextArtifactId = artifactId;
 			return;
@@ -722,8 +700,10 @@
 		contextArtifactId = artifactId;
 	};
 
-	const closeThreadArtifact = () => {
+	const closeThreadArtifact = async () => {
 		contextArtifactId = '';
+		await tick();
+		if (contextListRef) contextListRef.scrollTop = contextListScrollTop;
 	};
 
 	function createChat(threadId: string, messages: UIMessage[]) {
@@ -1101,95 +1081,47 @@
 						/>
 					{:else}
 						<div class="flex min-h-0 flex-1 flex-col">
-							<div class="shrink-0 border-b border-border/50">
-								<div class="space-y-3 px-3 py-3">
-									<div class="flex items-start justify-between gap-3">
-										<div class="min-w-0">
-											<p class="text-sm font-semibold tracking-tight">Thread context</p>
-											<p class="mt-0.5 text-[11px] leading-4 text-muted-foreground">
-												Durable artifacts and project context available to this chat.
-											</p>
-										</div>
-										<div
-											class="shrink-0 rounded-md border border-border/60 bg-muted/35 px-2 py-1 text-right"
-										>
-											<p class="text-[11px] leading-none font-semibold">{linkedArtifactCount}</p>
-											<p class="mt-0.5 text-[10px] leading-none text-muted-foreground">linked</p>
-										</div>
-									</div>
-
-									<div class="grid grid-cols-2 gap-2">
-										<div class="rounded-md border border-border/60 bg-muted/25 px-2 py-2">
-											<p class="text-[10px] leading-none font-medium text-muted-foreground">
-												Thread artifacts
-											</p>
-											<p class="mt-1 text-sm leading-none font-semibold">{linkedArtifactCount}</p>
-										</div>
-										<div class="rounded-md border border-border/60 bg-muted/25 px-2 py-2">
-											<p class="text-[10px] leading-none font-medium text-muted-foreground">
-												Project context
-											</p>
-											<p class="mt-1 text-sm leading-none font-semibold">
-												{availableProjectArtifactCount}
-											</p>
-										</div>
-									</div>
-
-									<div class="flex flex-wrap gap-2">
-										<Button
-											type="button"
-											variant="secondary"
-											size="sm"
-											class="h-7 gap-1.5 px-2 text-xs"
-											onclick={requestCreateArtifact}
-										>
-											<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
-											Create artifact
-										</Button>
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											class="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-											onclick={focusComposer}
-										>
-											<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3" />
-											Cite with @
-										</Button>
-									</div>
+							<div
+								class="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border/50 px-3 py-2.5"
+							>
+								<div class="flex min-w-0 items-center gap-2">
+									<h2 class="truncate text-sm font-semibold tracking-tight">Context</h2>
+									<span
+										class="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] leading-4 font-medium text-muted-foreground tabular-nums"
+										aria-label={`${linkedArtifactCount} linked artifact${linkedArtifactCount === 1 ? '' : 's'}`}
+									>
+										{linkedArtifactCount}
+									</span>
 								</div>
+								<Button
+									type="button"
+									variant="secondary"
+									size="sm"
+									class="h-7 shrink-0 gap-1.5 px-2 text-xs"
+									onclick={requestCreateArtifact}
+								>
+									<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
+									Create artifact
+								</Button>
+							</div>
 
-								<div class="space-y-2 border-t border-border/40 px-3 py-3">
+							{#if showContextSearch}
+								<div class="shrink-0 border-b border-border/40 px-3 py-2.5">
 									<Input
 										bind:value={contextSearch}
 										type="search"
-										placeholder="Search title or type"
-										class="h-7 text-xs"
+										aria-label="Search linked artifacts"
+										placeholder="Search linked artifacts"
+										class="h-8 text-xs"
 									/>
-									<div class="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
-										<NativeSelect bind:value={contextTypeFilter} size="sm" class="w-full">
-											<NativeSelectOption value="all">All types</NativeSelectOption>
-											{#each contextArtifactTypes as type (type)}
-												<NativeSelectOption value={type}
-													>{artifactTypeLabel(type)}</NativeSelectOption
-												>
-											{/each}
-										</NativeSelect>
-										<NativeSelect bind:value={contextDateSort} size="sm" class="w-full">
-											<NativeSelectOption value="newest">Newest first</NativeSelectOption>
-											<NativeSelectOption value="oldest">Oldest first</NativeSelectOption>
-										</NativeSelect>
-									</div>
 								</div>
-							</div>
+							{/if}
 
-							<div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+							<div bind:this={contextListRef} class="min-h-0 flex-1 overflow-y-auto">
 								{#if threadArtifacts.error}
-									<div
-										class="space-y-2 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-3"
-									>
-										<p class="text-xs font-medium text-destructive">Could not load context</p>
-										<p class="text-[11px] leading-4 text-muted-foreground">
+									<div class="space-y-2 px-4 py-5">
+										<p class="text-xs font-medium text-destructive">Couldn’t load context</p>
+										<p class="max-w-sm text-[11px] leading-4 text-muted-foreground">
 											The artifacts linked to this thread are unavailable right now.
 										</p>
 										<Button
@@ -1205,90 +1137,82 @@
 										</Button>
 									</div>
 								{:else if threadArtifacts.data === undefined}
-									<div class="space-y-1.5 px-1 py-1" aria-label="Loading thread context">
-										<div class="h-12 rounded-md bg-muted/60"></div>
-										<div class="h-12 rounded-md bg-muted/45"></div>
-										<div class="h-12 rounded-md bg-muted/35"></div>
+									<div class="divide-y divide-border/40" aria-label="Loading thread context">
+										{#each Array.from({ length: 4 }, (_, index) => index) as index (index)}
+											<div class="space-y-2 px-3 py-3.5">
+												<div class="h-3 w-2/3 rounded-sm bg-muted"></div>
+												<div class="h-2.5 w-1/2 rounded-sm bg-muted/70"></div>
+											</div>
+										{/each}
+									</div>
+								{:else if threadArtifacts.data.length === 0}
+									<div class="space-y-2 px-4 py-5">
+										<p class="text-xs font-medium">No artifacts linked</p>
+										<p class="max-w-sm text-[11px] leading-4 text-muted-foreground">
+											Artifacts linked to this chat will appear here.
+										</p>
+										<Button
+											type="button"
+											variant="secondary"
+											size="sm"
+											class="h-7 gap-1.5 px-2 text-xs"
+											onclick={requestCreateArtifact}
+										>
+											<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
+											Create artifact
+										</Button>
+									</div>
+								{:else if filteredContextArtifacts.length === 0}
+									<div class="space-y-2 px-4 py-5">
+										<p class="text-xs font-medium">No matching artifacts</p>
+										<p class="text-[11px] leading-4 text-muted-foreground">
+											Try another title or artifact type.
+										</p>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											class="h-7 px-2 text-xs"
+											onclick={clearContextSearch}
+										>
+											Clear search
+										</Button>
 									</div>
 								{:else}
-									<div class="space-y-3">
-										{#if threadArtifacts.data.length === 0}
-											<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
-												<p class="text-xs font-medium">No saved context yet</p>
-												<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
-													Saved ideas, PRDs, notes, and decisions from this chat will appear here.
-												</p>
+									<div class="divide-y divide-border/40">
+										{#each filteredContextArtifacts as item (item.link._id)}
+											<div
+												class="group/context-row relative min-w-0 transition-colors focus-within:bg-accent/45 hover:bg-accent/45"
+											>
+												<button
+													type="button"
+													class="block w-full min-w-0 px-3 py-3 pr-16 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+													onclick={() => openThreadArtifact(item.artifact._id)}
+												>
+													<span class="block truncate text-xs font-medium tracking-tight">
+														{item.artifact.title}
+													</span>
+													<span
+														class="mt-1 block truncate text-[10px] leading-4 text-muted-foreground"
+													>
+														{artifactTypeLabel(item.artifact.type)} · {linkReasonLabel(
+															item.link.reason
+														)} ·
+														{formatArtifactCreatedAt(item.artifact.createdAt)}
+													</span>
+												</button>
 												<Button
 													type="button"
-													variant="secondary"
+													variant="ghost"
 													size="sm"
-													class="mt-3 h-7 gap-1.5 px-2 text-xs"
-													onclick={requestCreateArtifact}
+													class="absolute top-1/2 right-2 h-7 -translate-y-1/2 px-2 text-[11px] text-muted-foreground opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within/context-row:opacity-100 sm:group-hover/context-row:opacity-100"
+													aria-label={`Cite ${item.artifact.title}`}
+													onclick={() => citeArtifact(item.artifact._id, item.artifact.title)}
 												>
-													<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
-													Create artifact
+													Cite
 												</Button>
 											</div>
-										{:else if filteredContextArtifacts.length === 0}
-											<div class="rounded-md border border-border/60 bg-muted/20 px-3 py-3">
-												<p class="text-xs font-medium">No matching artifacts</p>
-												<p class="mt-1 text-[11px] leading-4 text-muted-foreground">
-													Try another title, type, or sort order.
-												</p>
-												{#if contextHasFilters}
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														class="mt-3 h-7 px-2 text-xs"
-														onclick={clearContextFilters}
-													>
-														Clear filters
-													</Button>
-												{/if}
-											</div>
-										{:else}
-											<div class="space-y-1">
-												{#each filteredContextArtifacts as item (item.link._id)}
-													<div
-														class="group/context-row flex min-w-0 items-start gap-2 rounded-md px-2 py-2 transition-colors focus-within:bg-accent/45 hover:bg-accent/45"
-													>
-														<button
-															type="button"
-															class="flex min-w-0 flex-1 items-start gap-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-															onclick={() => openThreadArtifact(item.artifact._id)}
-														>
-															<span
-																class="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/70"
-																aria-hidden="true"
-															></span>
-															<span class="min-w-0 flex-1">
-																<span class="block truncate text-xs font-medium tracking-tight">
-																	{item.artifact.title}
-																</span>
-																<span
-																	class="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[10px] leading-3 text-muted-foreground"
-																>
-																	<span>{artifactTypeLabel(item.artifact.type)}</span>
-																	<span>{linkReasonLabel(item.link.reason)}</span>
-																	<span>{formatArtifactCreatedAt(item.artifact.createdAt)}</span>
-																</span>
-															</span>
-														</button>
-														<Button
-															type="button"
-															variant="ghost"
-															size="sm"
-															class="h-6 shrink-0 px-2 text-[11px] text-muted-foreground opacity-100 sm:opacity-0 sm:group-focus-within/context-row:opacity-100 sm:group-hover/context-row:opacity-100"
-															aria-label={`Cite ${item.artifact.title}`}
-															onclick={() => citeArtifact(item.artifact._id, item.artifact.title)}
-														>
-															Cite
-														</Button>
-													</div>
-												{/each}
-											</div>
-										{/if}
+										{/each}
 									</div>
 								{/if}
 							</div>
@@ -1558,11 +1482,15 @@
 															onclick={() => toggleComposioToolkit(toolkit.slug)}
 														>
 															<span class="flex min-w-0 flex-1 items-center gap-2">
-																<span class="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted ring-1 ring-border/70">
+																<span
+																	class="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted ring-1 ring-border/70"
+																>
 																	{#if toolkit.logo}
 																		<img src={toolkit.logo} alt="" class="size-3.5 rounded-[3px]" />
 																	{:else}
-																		<span class="size-1.5 rounded-full bg-muted-foreground/60" aria-hidden="true"
+																		<span
+																			class="size-1.5 rounded-full bg-muted-foreground/60"
+																			aria-hidden="true"
 																		></span>
 																	{/if}
 																</span>
@@ -1571,7 +1499,9 @@
 															<span
 																class={cn(
 																	'shrink-0 text-[10px]',
-																	toolkit.connected ? 'text-muted-foreground' : 'text-muted-foreground/80'
+																	toolkit.connected
+																		? 'text-muted-foreground'
+																		: 'text-muted-foreground/80'
 																)}
 															>
 																{toolkit.connected ? 'Connected' : 'Connect if needed'}
@@ -1698,12 +1628,7 @@
 					{#if !contextPanelOpen}
 						{@render chatColumn()}
 					{:else}
-						<div class="flex min-h-0 min-w-0 flex-1 flex-col">
-							{@render chatColumn()}
-							{@render threadContextAside(
-								'max-h-[min(44vh,25rem)] w-full shrink-0 border-t border-border/50'
-							)}
-						</div>
+						{@render threadContextAside('h-full min-h-0 w-full flex-1 overflow-hidden')}
 					{/if}
 				{:else}
 					<PaneGroup
@@ -1711,11 +1636,11 @@
 						autoSaveId="workspace-thread-context"
 						class="min-h-0 w-full flex-1 overflow-hidden"
 					>
-						<Pane defaultSize={60} minSize={15} class="flex min-h-0 min-w-0 flex-col">
+						<Pane defaultSize={70} minSize={50} class="flex min-h-0 min-w-0 flex-col">
 							{@render chatColumn()}
 						</Pane>
 						<Handle withHandle />
-						<Pane defaultSize={40} minSize={15} maxSize={90} class="flex min-h-0 min-w-0 flex-col">
+						<Pane defaultSize={30} minSize={20} maxSize={45} class="flex min-h-0 min-w-0 flex-col">
 							{@render threadContextAside(
 								'h-full min-h-0 min-w-0 overflow-hidden border-l border-border/50'
 							)}
