@@ -73,6 +73,7 @@
 		ArrowLeft01Icon,
 		ArrowRight01Icon,
 		BellDotIcon,
+		Cancel01Icon,
 		ChatAdd01Icon,
 		CheckmarkCircle01Icon,
 		Clock01Icon,
@@ -115,6 +116,7 @@
 	let artifactCustomType = $state('');
 	let artifactFormatPreset = $state<import('$lib/artifacts').ArtifactContentFormat>('markdown');
 	let artifactBody = $state('');
+	let artifactOptionsOpen = $state(false);
 	let artifactCreateError = $state('');
 	let isCreatingArtifact = $state(false);
 	let importDialogOpen = $state(false);
@@ -448,25 +450,39 @@
 		readinessIncludedArtifacts = [];
 	};
 
-	const selectedArtifactTypeLabel = $derived(
-		artifactTypePreset === 'custom'
-			? artifactCustomType.trim() || 'Custom type'
-			: (artifactTypePresets.find((preset) => preset.value === artifactTypePreset)?.label ??
-					'Artifact')
-	);
-	const createArtifactDestination = $derived(
+	const createArtifactDestinationLabel = $derived(
 		activeThreadId
-			? 'This will save to the workspace and link to the active chat.'
+			? 'Linked to this chat'
 			: activeProjectId
-				? 'This will save to the current project.'
-				: 'This will save to the workspace artifacts library.'
+				? 'Saved to this project'
+				: 'Saved to workspace'
 	);
+	const artifactBodyPlaceholder = $derived.by(() => {
+		if (artifactFormatPreset === 'html') {
+			return '<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Title</h1>\n  </body>\n</html>';
+		}
+		if (artifactFormatPreset === 'svg') {
+			return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">\n  <!-- diagram -->\n</svg>';
+		}
+
+		if (artifactTypePreset === 'idea') {
+			return 'Capture the idea, who it helps, and why it matters…';
+		}
+		if (artifactTypePreset === 'prd') {
+			return 'Summarize the problem, scope, and success criteria…';
+		}
+		if (artifactTypePreset === 'research') {
+			return 'Capture the findings, sources, and open questions…';
+		}
+		return 'Capture the useful details, decisions, and next steps…';
+	});
 	const isCreateArtifactDirty = $derived(
 		Boolean(
 			artifactTitle.trim() ||
 			artifactBody.trim() ||
 			artifactCustomType.trim() ||
-			artifactTypePreset !== 'notes'
+			artifactTypePreset !== 'notes' ||
+			artifactFormatPreset !== 'markdown'
 		)
 	);
 	const canCreateArtifact = $derived(
@@ -483,6 +499,7 @@
 		artifactCustomType = '';
 		artifactFormatPreset = 'markdown';
 		artifactBody = '';
+		artifactOptionsOpen = false;
 		artifactCreateError = '';
 		createArtifactDialogOpen = true;
 	};
@@ -2470,154 +2487,153 @@ Important rules:
 
 		<Dialog.Root bind:open={createArtifactDialogOpen}>
 			<Dialog.Content
-				class="overflow-hidden p-0 sm:max-w-2xl"
+				class="h-[calc(100dvh-1rem)] gap-0 overflow-hidden p-0 sm:h-auto sm:max-h-[min(38rem,calc(100vh-2rem))] sm:max-w-xl"
 				showCloseButton={false}
 				onEscapeKeydown={handleCreateArtifactDismiss}
 				onInteractOutside={handleCreateArtifactDismiss}
 			>
 				<form
-					class="grid max-h-[min(44rem,calc(100vh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto]"
+					class="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]"
 					onsubmit={(event) => {
 						event.preventDefault();
 						void createArtifact();
 					}}
 				>
-					<Dialog.Header class="border-b border-border/70 px-5 py-4 text-left">
-						<div class="flex items-start justify-between gap-4">
-							<div class="min-w-0 space-y-1">
-								<Dialog.Title>Create artifact</Dialog.Title>
-								<Dialog.Description class="max-w-prose text-pretty">
-									Save a durable document to this workspace. {createArtifactDestination}
-								</Dialog.Description>
-							</div>
-							<div
-								class="hidden shrink-0 rounded-full border border-border bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground sm:block"
-							>
-								{selectedArtifactTypeLabel}
-							</div>
-						</div>
+					<Dialog.Header
+						class="relative border-b border-border/70 px-4 py-3.5 pr-12 text-left sm:px-5 sm:pr-12"
+					>
+						<Dialog.Title>Create artifact</Dialog.Title>
+						<Dialog.Description>{createArtifactDestinationLabel}</Dialog.Description>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							class="absolute top-2.5 right-3"
+							aria-label="Close create artifact dialog"
+							disabled={isCreatingArtifact}
+							onclick={closeCreateArtifactDialog}
+						>
+							<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} class="size-3.5" />
+						</Button>
 					</Dialog.Header>
 
-					<div class="min-h-0 overflow-y-auto px-5 py-4">
-						<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_9rem]">
-							<div class="space-y-1.5">
-								<Label for="create-artifact-title">Title</Label>
-								<Input
-									id="create-artifact-title"
-									bind:value={artifactTitle}
-									placeholder="Artifact title"
-									autofocus
-									aria-invalid={artifactCreateError && !artifactTitle.trim() ? 'true' : undefined}
-									disabled={isCreatingArtifact}
-								/>
-								<p class="text-[11px] leading-4 text-muted-foreground">
-									Use the name you will scan for later in the artifacts list.
-								</p>
-							</div>
-							<div class="space-y-1.5">
-								<Label for="create-artifact-type">Type</Label>
-								<NativeSelect
-									id="create-artifact-type"
-									bind:value={artifactTypePreset}
-									class="w-full"
-									disabled={isCreatingArtifact}
-								>
-									{#each artifactTypePresets as preset (preset.value)}
-										<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
-									{/each}
-								</NativeSelect>
-							</div>
-							<div class="space-y-1.5">
-								<Label for="create-artifact-format">Format</Label>
-								<NativeSelect
-									id="create-artifact-format"
-									bind:value={artifactFormatPreset}
-									class="w-full"
-									disabled={isCreatingArtifact}
-								>
-									{#each artifactFormatPresets as preset (preset.value)}
-										<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
-									{/each}
-								</NativeSelect>
-							</div>
+					<div class="min-h-0 overflow-y-auto px-4 py-4 sm:px-5">
+						<div class="space-y-1.5">
+							<Label for="create-artifact-title">Title</Label>
+							<Input
+								id="create-artifact-title"
+								bind:value={artifactTitle}
+								placeholder="Artifact title"
+								autofocus
+								aria-invalid={artifactCreateError && !artifactTitle.trim() ? 'true' : undefined}
+								disabled={isCreatingArtifact}
+							/>
 						</div>
 
-						{#if artifactTypePreset === 'custom'}
-							<div class="mt-3 space-y-1.5">
-								<Label for="create-artifact-custom-type">Custom type</Label>
-								<Input
-									id="create-artifact-custom-type"
-									bind:value={artifactCustomType}
-									placeholder="decision, spec, notes"
-									aria-invalid={artifactCreateError && !artifactCustomType.trim()
-										? 'true'
-										: undefined}
-									disabled={isCreatingArtifact}
-								/>
-								<p class="text-[11px] leading-4 text-muted-foreground">
-									Keep it short. This becomes the artifact category.
-								</p>
-							</div>
-						{/if}
-
-						<div class="mt-4 space-y-1.5">
-							<div class="flex items-end justify-between gap-3">
-								<div class="space-y-1.5">
-									<Label for="create-artifact-body">
-										{artifactFormatPreset === 'markdown'
-											? 'Markdown'
-											: artifactFormatPreset === 'html'
-												? 'HTML'
-												: 'SVG'}
-									</Label>
-									<p class="max-w-prose text-xs leading-5 text-muted-foreground">
-										Write the durable version here. You can edit it after creation.
-									</p>
+						<Collapsible.Root bind:open={artifactOptionsOpen} class="mt-4">
+							<div class="flex items-end justify-between gap-4">
+								<div class="w-44 max-w-[60%] space-y-1.5">
+									<Label for="create-artifact-type">Type</Label>
+									<NativeSelect
+										id="create-artifact-type"
+										bind:value={artifactTypePreset}
+										class="w-full"
+										disabled={isCreatingArtifact}
+									>
+										{#each artifactTypePresets as preset (preset.value)}
+											<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
+										{/each}
+									</NativeSelect>
 								</div>
-								<span class="hidden text-[11px] text-muted-foreground sm:inline">
-									⌘/Ctrl Enter creates
-								</span>
+								<Collapsible.Trigger
+									type="button"
+									class="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+									disabled={isCreatingArtifact}
+								>
+									More options
+									<HugeiconsIcon
+										icon={ArrowRight01Icon}
+										strokeWidth={2}
+										class={cn('size-3 transition-transform', artifactOptionsOpen && 'rotate-90')}
+									/>
+								</Collapsible.Trigger>
 							</div>
+
+							{#if artifactTypePreset === 'custom'}
+								<div class="mt-3 w-full space-y-1.5 sm:w-64">
+									<Label for="create-artifact-custom-type">Custom type</Label>
+									<Input
+										id="create-artifact-custom-type"
+										bind:value={artifactCustomType}
+										placeholder="Decision, spec, notes"
+										aria-invalid={artifactCreateError && !artifactCustomType.trim()
+											? 'true'
+											: undefined}
+										disabled={isCreatingArtifact}
+									/>
+								</div>
+							{/if}
+
+							<Collapsible.Content class="pt-3">
+								<div class="w-full space-y-1.5 sm:w-44">
+									<Label for="create-artifact-format">Format</Label>
+									<NativeSelect
+										id="create-artifact-format"
+										bind:value={artifactFormatPreset}
+										class="w-full"
+										disabled={isCreatingArtifact}
+									>
+										{#each artifactFormatPresets as preset (preset.value)}
+											<NativeSelectOption value={preset.value}>{preset.label}</NativeSelectOption>
+										{/each}
+									</NativeSelect>
+								</div>
+							</Collapsible.Content>
+						</Collapsible.Root>
+
+						<div class="mt-5 space-y-1.5">
+							<Label for="create-artifact-body">Content</Label>
 							<Textarea
 								id="create-artifact-body"
 								bind:value={artifactBody}
-								placeholder={artifactFormatPreset === 'markdown'
-									? '# Decision\n\nCapture the useful details, constraints, and next step.'
-									: artifactFormatPreset === 'html'
-										? '<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Title</h1>\n  </body>\n</html>'
-										: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">\n  <!-- diagram -->\n</svg>'}
-								class="min-h-72 resize-y bg-background font-mono text-xs leading-5 sm:min-h-80"
+								placeholder={artifactBodyPlaceholder}
+								class={cn(
+									'min-h-52 resize-y border-0 bg-muted/35 px-3 py-3 text-sm leading-6 shadow-none ring-1 ring-border/50 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-ring/40 sm:min-h-56 md:!text-sm dark:bg-muted/25',
+									artifactFormatPreset !== 'markdown' && 'font-mono text-xs leading-5 md:!text-xs'
+								)}
 								onkeydown={handleCreateArtifactKeydown}
 								aria-invalid={artifactCreateError && !artifactBody.trim() ? 'true' : undefined}
 								disabled={isCreatingArtifact}
 							/>
 						</div>
 
-						<div class="mt-3 min-h-5">
-							{#if artifactCreateError}
-								<p class="text-xs leading-5 text-destructive" role="status">
-									{artifactCreateError}
-								</p>
-							{:else}
-								<p class="text-xs leading-5 text-muted-foreground">
-									Artifacts stay editable from the artifact page after creation.
-								</p>
-							{/if}
-						</div>
+						{#if artifactCreateError}
+							<p class="mt-3 text-xs leading-5 text-destructive" role="status">
+								{artifactCreateError}
+							</p>
+						{/if}
 					</div>
 
-					<Dialog.Footer class="border-t border-border/70 bg-muted/35 px-5 py-4">
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={isCreatingArtifact}
-							onclick={closeCreateArtifactDialog}
+					<Dialog.Footer
+						class="!flex-row items-center justify-between border-t border-border/70 bg-popover px-4 py-3 sm:px-5"
+					>
+						<span class="text-[10px] text-muted-foreground sm:text-[11px]"
+							>⌘/Ctrl Enter creates</span
 						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isCreatingArtifact || !canCreateArtifact}>
-							{isCreatingArtifact ? 'Creating…' : 'Create artifact'}
-						</Button>
+						<div class="flex items-center gap-2">
+							<Button
+								type="button"
+								variant="secondary"
+								size="sm"
+								disabled={isCreatingArtifact}
+								onclick={closeCreateArtifactDialog}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" size="sm" disabled={isCreatingArtifact || !canCreateArtifact}>
+								{isCreatingArtifact ? 'Creating…' : 'Create artifact'}
+							</Button>
+						</div>
 					</Dialog.Footer>
 				</form>
 			</Dialog.Content>
