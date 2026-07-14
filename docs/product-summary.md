@@ -38,6 +38,7 @@ The product is designed for builders who want more structure than a blank chat w
 | Multi-provider AI           | Vercel AI Gateway and OpenRouter catalog entries                                                                                     |
 | Usage controls              | Daily AI cap, usage ledger, AI preferences, external app connections, account controls, and activity history                         |
 | Notifications and tabs      | Workspace navigation and progress feedback                                                                                           |
+| Appearance                  | Light, dark, or system mode with locally stored Standard, Vercel, Codex, and Claude color themes                                    |
 
 ## Target Users
 

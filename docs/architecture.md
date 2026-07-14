@@ -18,7 +18,7 @@ Key routes:
 | `src/routes/workspace/project/[projectId]`                | Project overview, Launchpad Actions, and project activity                             |
 | `src/routes/workspace/artifacts/[artifactId]`             | Artifact reader/editor/history                                                        |
 | `src/routes/workspace/imports/external-context/[draftId]` | External context import review                                                        |
-| `src/routes/workspace/settings/+page.svelte`              | Settings, AI preferences, external app connections, usage, activity, account controls |
+| `src/routes/workspace/settings/+page.svelte`              | Settings, appearance themes, AI preferences, external app connections, usage, activity, account controls |
 | `src/routes/api/workspace/*`                              | Chat, artifacts, memory, external app tools, Launchpad Actions, and account APIs      |
 
 ## Data Model
@@ -86,7 +86,9 @@ Thread-artifact links record why an artifact is present in a thread: `created`, 
 
 ## Workspace Settings And Account Controls
 
-`/workspace/settings` is the owner-facing control surface for timezone, daily AI cap, user AI context and response preferences, external app connections, usage status, activity history, account reset, and account deletion. Account reset/delete flows should clean up local owner-scoped workspace data and remote Supermemory-derived data when configured.
+`/workspace/settings` is the owner-facing control surface for appearance themes, timezone, daily AI cap, user AI context and response preferences, external app connections, usage status, activity history, account reset, and account deletion. Account reset/delete flows should clean up local owner-scoped workspace data and remote Supermemory-derived data when configured.
+
+Appearance has two independent controls: Light/Dark/System mode through `mode-watcher`, and the Standard, Vercel, Codex, or Claude color theme through `src/lib/color-theme.svelte.ts`. Color themes override the shared CSS tokens in `src/routes/layout.css` using the `data-color-theme` attribute on `<html>`. The selected color theme is stored under the `launchpad-color-theme` browser `localStorage` key and is intentionally not part of the Convex `userSettings` record. `src/lib/components/ThemeMenu.svelte` provides quick access from the workspace chrome, while the settings page provides the descriptive selector.
 
 ## Launchpad Actions
 

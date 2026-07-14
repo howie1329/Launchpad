@@ -97,13 +97,13 @@ components:
 
 **Creative North Star: "The Builder's Workbench"**
 
-Launchpad is a product workspace, not a campaign surface. The interface should feel like a quiet workbench for turning messy thoughts into useful project material: neutral, compact, low-drama, and always oriented around the next decision. The current system uses a restrained monochrome palette, Geist Sans, compact controls, light borders, tonal panels, and simple rounded geometry.
+Launchpad is a product workspace, not a campaign surface. The interface should feel like a quiet workbench for turning messy thoughts into useful project material: neutral, compact, low-drama, and always oriented around the next decision. The default Standard theme uses a restrained monochrome palette, Geist Sans, compact controls, light borders, tonal panels, and simple rounded geometry. Alternate color themes may shift the action hue while preserving the same workbench vocabulary.
 
 The visual system should keep planning close to action. Chat, artifacts, projects, imports, settings, notifications, and usage controls all belong to the same workspace vocabulary. Avoid theatrical productivity language, decorative SaaS chrome, and anything that makes the product feel like a heavyweight PM suite.
 
 **Key Characteristics:**
 
-- Restrained neutral palette with black as the primary action color.
+- Restrained Standard palette with black as the primary action color, plus optional Vercel, Codex, and Claude color themes.
 - Geist Sans for app chrome, labels, marketing copy, and product surfaces.
 - Compact shadcn-svelte and Bits UI primitives with 7px base radius.
 - Tonal layering and 1px borders instead of decorative shadows.
@@ -112,7 +112,13 @@ The visual system should keep planning close to action. Chat, artifacts, project
 
 ## 2. Colors
 
-The palette is deliberately restrained: white and near-white surfaces, black primary actions, neutral gray supporting states, and semantic color only when the state demands it.
+The default Standard palette is deliberately restrained: white and near-white surfaces, black primary actions, neutral gray supporting states, and semantic color only when the state demands it. Alternate themes preserve the same semantic roles and change only the color values behind those roles.
+
+### Color Themes
+
+Launchpad supports four color themes: Standard, Vercel, Codex, and Claude. Each theme supplies light and dark token values for primary actions, tonal panels, borders, focus rings, and sidebar accents. Components continue to consume the shared CSS variables, so theme switching does not change layout, typography, spacing, radius, or interaction patterns.
+
+Color theme selection is separate from Light/Dark/System appearance mode. The selected color theme is applied through the `data-color-theme` attribute on `<html>` and stored locally in the browser under `launchpad-color-theme`; it is not workspace data and is not persisted in Convex. Theme accents must remain restrained, inactive states must remain low saturation, and all foreground/background combinations must maintain WCAG AA contrast.
 
 ### Primary
 
