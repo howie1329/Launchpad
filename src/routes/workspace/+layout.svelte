@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { afterNavigate, goto, invalidateAll } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
@@ -70,10 +71,12 @@
 		workspacePathIds
 	} from '$lib/workspace-shell-route-state';
 	import {
+		Add01Icon,
 		ArrowLeft01Icon,
 		ArrowRight01Icon,
 		BellDotIcon,
 		Cancel01Icon,
+		Chat01Icon,
 		ChatAdd01Icon,
 		CheckmarkCircle01Icon,
 		Clock01Icon,
@@ -88,7 +91,8 @@
 		Rocket01Icon,
 		Search01Icon,
 		MoreHorizontalCircle01Icon,
-		Settings01Icon
+		Settings01Icon,
+		UserCircleIcon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { useQuery } from 'convex-svelte';
@@ -96,7 +100,7 @@
 
 	let { children } = $props();
 
-	let sidebarOpen = $state(false);
+	let sidebarOpen = $state(true);
 	let isSigningOut = $state(false);
 	let promoteDialogOpen = $state(false);
 	let promoteName = $state('');
@@ -129,11 +133,12 @@
 	let artifactActionError = $state('');
 	let workspaceNotice = $state('');
 	let openSections = $state({
-		Projects: false,
-		Chats: false,
-		Artifacts: false
+		Projects: true,
+		Chats: true,
+		Artifacts: true
 	});
 	let openProjectIds = $state<Record<string, boolean>>({});
+	let sidebarPrefsHydrated = $state(false);
 	let commandCenterOpen = $state(false);
 	let tabPickerOpen = $state(false);
 	let projectDeleteDialogOpen = $state(false);
@@ -181,9 +186,6 @@
 		threads.data?.find((thread) => thread._id === activeThreadId) ?? null
 	);
 	const activeProjectId = $derived(routeProjectId || selectedThread?.projectId || '');
-	const selectedProject = $derived(
-		projects.data?.find((project) => project._id === activeProjectId) ?? null
-	);
 	const canPromoteThreadToProject = $derived(
 		Boolean(
 			activeThreadId &&
@@ -196,9 +198,6 @@
 	const activeThreadArtifactIds = $derived(
 		new Set(threadArtifacts.data?.map((item) => item.artifact._id) ?? [])
 	);
-	const selectedArtifact = $derived(
-		artifacts.data?.find((artifact) => artifact._id === activeArtifactId) ?? null
-	);
 	const notificationRows = $derived(notifications.data ?? []);
 	const unreadNotificationCount = $derived(unreadNotifications.data?.count ?? 0);
 	const unreadNotificationLabel = $derived(
@@ -207,7 +206,29 @@
 	const generalThreads = $derived(
 		threads.data?.filter((thread) => thread.scopeType === 'general') ?? []
 	);
-	const artifactGroups = $derived(groupArtifacts(artifacts.data ?? [], (artifact) => artifact));
+	const SIDEBAR_ITEM_LIMIT = 8;
+	const PROJECT_THREAD_LIMIT = 5;
+	function cappedItems<T extends { _id: string }>(items: T[], activeId: string, limit: number) {
+		if (items.length <= limit) return items;
+		const visible = items.slice(0, limit);
+		if (!activeId || visible.some((item) => item._id === activeId)) return visible;
+		const activeItem = items.find((item) => item._id === activeId);
+		return activeItem ? [...visible.slice(0, -1), activeItem] : visible;
+	}
+	const visibleGeneralThreads = $derived(
+		cappedItems(generalThreads, activeThreadId, SIDEBAR_ITEM_LIMIT)
+	);
+	const visibleProjects = $derived(
+		cappedItems(projects.data ?? [], activeProjectId, SIDEBAR_ITEM_LIMIT)
+	);
+	const visibleArtifacts = $derived(
+		cappedItems(artifacts.data ?? [], activeArtifactId, SIDEBAR_ITEM_LIMIT)
+	);
+	const artifactGroups = $derived(groupArtifacts(visibleArtifacts, (artifact) => artifact));
+	const sidebarArtifactTypeLabel = (type: string) =>
+		artifactTypeLabel(type)
+			.replace(/[_-]+/g, ' ')
+			.replace(/\b\w/g, (letter) => letter.toUpperCase());
 	const activeWorkspaceTarget = $derived.by(() => {
 		const t = urlToWorkspaceTarget($page.url);
 		return t ?? { kind: 'home' as const };
@@ -224,15 +245,41 @@
 			.catch((e) => console.error(e));
 	}
 
-	afterNavigate(syncWorkspaceTabsFromUrl);
+	function revealActiveSidebarContext() {
+		if (activeArtifactId) openSections.Artifacts = true;
+		if (activeThreadId && !activeProjectId) openSections.Chats = true;
+		if (activeProjectId) {
+			openSections.Projects = true;
+			setProjectOpen(activeProjectId, true);
+		}
+	}
+
+	afterNavigate(() => {
+		syncWorkspaceTabsFromUrl();
+		revealActiveSidebarContext();
+	});
 
 	onMount(() => {
+		const storedSections = window.localStorage.getItem('launchpad:sidebar-sections');
+		if (storedSections) {
+			try {
+				openSections = { ...openSections, ...JSON.parse(storedSections) };
+			} catch {
+				window.localStorage.removeItem('launchpad:sidebar-sections');
+			}
+		}
+		sidebarPrefsHydrated = true;
 		window.addEventListener('launchpad:review-project-promotion', openPromoteDialog);
 		window.addEventListener('launchpad:create-artifact', openCreateArtifactDialog);
 		return () => {
 			window.removeEventListener('launchpad:review-project-promotion', openPromoteDialog);
 			window.removeEventListener('launchpad:create-artifact', openCreateArtifactDialog);
 		};
+	});
+
+	$effect(() => {
+		if (!browser || !sidebarPrefsHydrated) return;
+		window.localStorage.setItem('launchpad:sidebar-sections', JSON.stringify(openSections));
 	});
 
 	const selectWorkspaceTab = async (target: WorkspaceTabTarget) => {
@@ -254,41 +301,20 @@
 		}
 	};
 
-	/** Outline Launchpad mark + contextual copy; a11y name comes from the link. */
-	const SIDEBAR_HOME_LABEL_MAX = 24;
-	const ellipsizeSidebarLabel = (text: string, max: number) => {
-		const t = text.trim();
-		if (t.length <= max) return t;
-		if (max <= 1) return '…';
-		return `${t.slice(0, max - 1)}…`;
-	};
-
-	const sidebarHomeTitleFull = $derived.by(() => {
-		if (isSettingsActive) return 'Settings';
-		if (activeThreadId) {
-			return formatThreadTitleForDisplay(selectedThread?.title ?? '');
-		}
-		if (activeArtifactId) {
-			const at = selectedArtifact?.title?.trim();
-			return at || 'Artifact';
-		}
-		if (activeProjectId) {
-			const pn = selectedProject?.name?.trim();
-			return pn || 'Project';
-		}
-		return 'Launchpad';
-	});
-
-	const sidebarHomeDisplayLabel = $derived(
-		ellipsizeSidebarLabel(sidebarHomeTitleFull, SIDEBAR_HOME_LABEL_MAX)
-	);
-	const sidebarHomeLinkAria = $derived(`Go to workspace home — ${sidebarHomeTitleFull}`);
-
 	const projectThreads = (projectId: string) =>
 		threads.data?.filter((thread) => thread.projectId === projectId) ?? [];
+	const visibleProjectThreads = (projectId: string) =>
+		cappedItems(projectThreads(projectId), activeThreadId, PROJECT_THREAD_LIMIT);
 	const isProjectOpen = (projectId: string) => openProjectIds[projectId] ?? false;
 	const setProjectOpen = (projectId: string, open: boolean) => {
 		openProjectIds = { ...openProjectIds, [projectId]: open };
+	};
+	const revealSidebarSection = (section: keyof typeof openSections) => {
+		sidebarOpen = true;
+		openSections[section] = true;
+	};
+	const openWorkspaceSearch = () => {
+		commandCenterOpen = true;
 	};
 
 	const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -334,15 +360,15 @@
 
 	/** Sidebar row vocabulary: compact, distinct roles, no new tokens. */
 	const navPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/72 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/72 transition-colors [@media(pointer:coarse)]:h-11 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-primary/15 data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-primary/25';
 	const actionPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/82 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/82 transition-colors [@media(pointer:coarse)]:h-11 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground';
 	const sectionTrigger =
-		'group/section flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px] font-semibold text-sidebar-foreground/62 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
+		'group/section flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left text-[11px] font-semibold text-sidebar-foreground/62 transition-colors [@media(pointer:coarse)]:h-11 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none group-data-[collapsible=icon]:hidden';
 	const subNavPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors [@media(pointer:coarse)]:h-11 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-primary/15 data-[active=true]:font-medium data-[active=true]:text-sidebar-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-primary/25';
 	const footerPill =
-		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
+		'h-7 min-w-0 gap-2 rounded-md px-2 text-xs text-sidebar-foreground/68 transition-colors [@media(pointer:coarse)]:h-11 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground [&>svg]:size-3 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground';
 
 	const usageBarPct = $derived(
 		budget.data && budget.data.capUsd > 0
@@ -1149,7 +1175,7 @@ Important rules:
 	>
 		<Sidebar.Root class="overflow-hidden" collapsible="icon">
 			<nav id="workspace-sidebar-nav" class="flex min-h-0 flex-1 flex-col" aria-label="Workspace">
-				<Sidebar.Header class="flex h-10 items-center border-b border-sidebar-border/60 px-2 py-1">
+				<Sidebar.Header class="flex h-11 items-center border-b border-sidebar-border/60 px-2 py-1">
 					<Sidebar.Menu class="flex flex-row items-center gap-1">
 						<Sidebar.MenuItem class="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
 							<Sidebar.MenuButton
@@ -1160,8 +1186,7 @@ Important rules:
 									<a
 										href={resolve(workspaceRootHref() as '/workspace')}
 										data-workspace-nav-item
-										aria-label={sidebarHomeLinkAria}
-										title={sidebarHomeTitleFull}
+										aria-label="Go to workspace home"
 										{...props}
 									>
 										<div
@@ -1169,19 +1194,19 @@ Important rules:
 										>
 											<LaunchpadMarkOutline class="size-3.5" aria-hidden="true" />
 										</div>
-										<span class="min-w-0 flex-1 group-data-[collapsible=icon]:sr-only">
-											<span
-												class="block text-[10px] leading-3 font-medium text-sidebar-foreground/60"
-											>
-												Current
-											</span>
-											<span class="block truncate text-xs leading-4 font-semibold">
-												{sidebarHomeDisplayLabel}
-											</span>
+										<span
+											class="min-w-0 flex-1 truncate text-sm font-semibold group-data-[collapsible=icon]:sr-only"
+										>
+											Launchpad
 										</span>
 									</a>
 								{/snippet}
 							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+						<Sidebar.MenuItem class="group-data-[collapsible=icon]:hidden">
+							<Sidebar.Trigger
+								class="size-7 text-sidebar-foreground/60 hover:text-sidebar-foreground"
+							/>
 						</Sidebar.MenuItem>
 					</Sidebar.Menu>
 				</Sidebar.Header>
@@ -1207,10 +1232,8 @@ Important rules:
 							</Button>
 						</div>
 					{/if}
-					<Sidebar.Group class="px-2 py-1 group-data-[collapsible=icon]:px-2">
-						<Sidebar.Menu
-							class="gap-1 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/25 p-1 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0"
-						>
+					<Sidebar.Group class="order-1 px-2 py-1 group-data-[collapsible=icon]:px-2">
+						<Sidebar.Menu class="gap-0.5">
 							<Sidebar.MenuItem>
 								<Sidebar.MenuButton
 									size="sm"
@@ -1233,23 +1256,45 @@ Important rules:
 									{/snippet}
 								</Sidebar.MenuButton>
 							</Sidebar.MenuItem>
-							<Sidebar.MenuItem>
-								<Sidebar.MenuButton
-									size="sm"
-									class={cn(actionPill, 'min-w-0')}
-									tooltipContent="Create artifact"
-									onclick={openCreateArtifactDialog}
-								>
-									<HugeiconsIcon icon={File01Icon} strokeWidth={2} />
-									<span class="min-w-0 truncate group-data-[collapsible=icon]:sr-only"
-										>Create artifact</span
-									>
-								</Sidebar.MenuButton>
-							</Sidebar.MenuItem>
 						</Sidebar.Menu>
 					</Sidebar.Group>
 
-					<Collapsible.Root bind:open={openSections.Projects} class="border-0 shadow-none ring-0">
+					<div class="order-2 hidden px-2 group-data-[collapsible=icon]:block">
+						<Sidebar.Menu class="gap-0.5">
+							<Sidebar.MenuItem
+								><Sidebar.MenuButton
+									tooltipContent="Chats"
+									onclick={() => revealSidebarSection('Chats')}
+									><HugeiconsIcon icon={Chat01Icon} strokeWidth={2} /><span class="sr-only"
+										>Chats</span
+									></Sidebar.MenuButton
+								></Sidebar.MenuItem
+							>
+							<Sidebar.MenuItem
+								><Sidebar.MenuButton
+									tooltipContent="Projects"
+									onclick={() => revealSidebarSection('Projects')}
+									><HugeiconsIcon icon={Folder01Icon} strokeWidth={2} /><span class="sr-only"
+										>Projects</span
+									></Sidebar.MenuButton
+								></Sidebar.MenuItem
+							>
+							<Sidebar.MenuItem
+								><Sidebar.MenuButton
+									tooltipContent="Artifacts"
+									onclick={() => revealSidebarSection('Artifacts')}
+									><HugeiconsIcon icon={File01Icon} strokeWidth={2} /><span class="sr-only"
+										>Artifacts</span
+									></Sidebar.MenuButton
+								></Sidebar.MenuItem
+							>
+						</Sidebar.Menu>
+					</div>
+
+					<Collapsible.Root
+						bind:open={openSections.Projects}
+						class="order-3 border-0 shadow-none ring-0 group-data-[collapsible=icon]:hidden"
+					>
 						<Sidebar.Group class="border-0 shadow-none ring-0">
 							<Collapsible.Trigger class={sectionTrigger}>
 								<HugeiconsIcon
@@ -1279,12 +1324,23 @@ Important rules:
 											<Sidebar.MenuItem>
 												<div class="space-y-2 px-2 py-1.5">
 													<p class="text-[11px] leading-snug text-sidebar-foreground/65">
-														Promoted chats land here when an idea becomes focused work.
+														No projects yet.
 													</p>
+													{#if canPromoteThreadToProject}
+														<Button
+															type="button"
+															size="sm"
+															class="h-7 w-full justify-start gap-2 px-2 text-xs"
+															onclick={openPromoteDialog}
+														>
+															<HugeiconsIcon icon={Rocket01Icon} strokeWidth={2} class="size-3" />
+															Promote current chat
+														</Button>
+													{/if}
 												</div>
 											</Sidebar.MenuItem>
 										{:else}
-											{#each projects.data as project (project._id)}
+											{#each visibleProjects as project (project._id)}
 												<Sidebar.MenuItem class="mb-0.5 min-w-0 last:mb-0">
 													<Collapsible.Root
 														open={isProjectOpen(project._id)}
@@ -1318,7 +1374,7 @@ Important rules:
 																<DropdownMenu.Root>
 																	<DropdownMenu.Trigger
 																		type="button"
-																		class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																		class="inline-flex size-7 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3 [@media(pointer:coarse)]:size-11"
 																		onclick={(e) => e.stopPropagation()}
 																		onpointerdown={(e) => e.stopPropagation()}
 																		aria-label={`Project actions: ${project.name}`}
@@ -1341,7 +1397,7 @@ Important rules:
 																<a
 																	href={resolve(workspaceProjectHref(project._id) as '/workspace')}
 																	data-workspace-nav-item
-																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																	class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 ring-sidebar-ring transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3 [@media(pointer:coarse)]:size-11"
 																	aria-label={`New chat in ${project.name}`}
 																>
 																	<HugeiconsIcon icon={ChatAdd01Icon} strokeWidth={2} />
@@ -1352,7 +1408,8 @@ Important rules:
 															class="overflow-hidden pt-0.5 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 														>
 															<Sidebar.MenuSub>
-																{@const threadsForProject = projectThreads(project._id)}
+																{@const allThreadsForProject = projectThreads(project._id)}
+																{@const threadsForProject = visibleProjectThreads(project._id)}
 																{#if threads.data === undefined}
 																	<Sidebar.MenuSubItem>
 																		<Sidebar.MenuSubButton aria-disabled class={subNavPill}>
@@ -1404,7 +1461,7 @@ Important rules:
 																				<DropdownMenu.Root>
 																					<DropdownMenu.Trigger
 																						type="button"
-																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																						class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/subthread:opacity-100 group-hover/subthread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
 																						onclick={(e) => e.stopPropagation()}
 																						onpointerdown={(e) => e.stopPropagation()}
 																						aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -1432,11 +1489,29 @@ Important rules:
 																		</Sidebar.MenuSubItem>
 																	{/each}
 																{/if}
+																{#if allThreadsForProject.length > PROJECT_THREAD_LIMIT}
+																	<Sidebar.MenuSubItem>
+																		<button
+																			type="button"
+																			class="h-7 w-full rounded-md px-2 text-left text-[11px] font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+																			onclick={openWorkspaceSearch}>View all chats</button
+																		>
+																	</Sidebar.MenuSubItem>
+																{/if}
 															</Sidebar.MenuSub>
 														</Collapsible.Content>
 													</Collapsible.Root>
 												</Sidebar.MenuItem>
 											{/each}
+											{#if projects.data.length > SIDEBAR_ITEM_LIMIT}
+												<Sidebar.MenuItem
+													><button
+														type="button"
+														class="h-7 w-full rounded-md px-2 text-left text-[11px] font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+														onclick={openWorkspaceSearch}>View all projects</button
+													></Sidebar.MenuItem
+												>
+											{/if}
 										{/if}
 									</Sidebar.Menu>
 								</Sidebar.GroupContent>
@@ -1444,7 +1519,10 @@ Important rules:
 						</Sidebar.Group>
 					</Collapsible.Root>
 
-					<Collapsible.Root bind:open={openSections.Chats} class="border-0 shadow-none ring-0">
+					<Collapsible.Root
+						bind:open={openSections.Chats}
+						class="order-2 border-0 shadow-none ring-0 group-data-[collapsible=icon]:hidden"
+					>
 						<Sidebar.Group class="border-0 shadow-none ring-0">
 							<Collapsible.Trigger class={sectionTrigger}>
 								<HugeiconsIcon
@@ -1452,7 +1530,7 @@ Important rules:
 									strokeWidth={2}
 									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
 								/>
-								<span class="min-w-0 truncate">Inbox</span>
+								<span class="min-w-0 truncate">Chats</span>
 								{#if threads.data && generalThreads.length > 0}
 									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
 										{generalThreads.length}
@@ -1491,7 +1569,7 @@ Important rules:
 												</div>
 											</Sidebar.MenuItem>
 										{:else}
-											{#each generalThreads as thread (thread._id)}
+											{#each visibleGeneralThreads as thread (thread._id)}
 												<Sidebar.MenuItem class="min-w-0">
 													<div class="group/inbox-thread flex w-full min-w-0 items-center gap-0.5">
 														<Sidebar.MenuButton
@@ -1515,7 +1593,7 @@ Important rules:
 														<DropdownMenu.Root>
 															<DropdownMenu.Trigger
 																type="button"
-																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3"
+																class="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/60 opacity-0 ring-sidebar-ring transition-colors group-focus-within/inbox-thread:opacity-100 group-hover/inbox-thread:opacity-100 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:outline-hidden [&>svg]:size-3 [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:opacity-100"
 																onclick={(e) => e.stopPropagation()}
 																onpointerdown={(e) => e.stopPropagation()}
 																aria-label={`Chat actions: ${formatThreadTitleForDisplay(thread.title)}`}
@@ -1535,6 +1613,15 @@ Important rules:
 													</div>
 												</Sidebar.MenuItem>
 											{/each}
+											{#if generalThreads.length > SIDEBAR_ITEM_LIMIT}
+												<Sidebar.MenuItem
+													><button
+														type="button"
+														class="h-7 w-full rounded-md px-2 text-left text-[11px] font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+														onclick={openWorkspaceSearch}>View all chats</button
+													></Sidebar.MenuItem
+												>
+											{/if}
 										{/if}
 									</Sidebar.Menu>
 								</Sidebar.GroupContent>
@@ -1542,21 +1629,34 @@ Important rules:
 						</Sidebar.Group>
 					</Collapsible.Root>
 
-					<Collapsible.Root bind:open={openSections.Artifacts} class="border-0 shadow-none ring-0">
+					<Collapsible.Root
+						bind:open={openSections.Artifacts}
+						class="order-4 border-0 shadow-none ring-0 group-data-[collapsible=icon]:hidden"
+					>
 						<Sidebar.Group class="border-0 shadow-none ring-0">
-							<Collapsible.Trigger class={sectionTrigger}>
-								<HugeiconsIcon
-									icon={ArrowRight01Icon}
-									strokeWidth={2}
-									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-								/>
-								<span class="min-w-0 truncate">Artifacts</span>
-								{#if artifacts.data && artifacts.data.length > 0}
-									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
-										{artifacts.data.length}
-									</span>
-								{/if}
-							</Collapsible.Trigger>
+							<div class="flex items-center group-data-[collapsible=icon]:hidden">
+								<Collapsible.Trigger class={cn(sectionTrigger, 'min-w-0 flex-1')}>
+									<HugeiconsIcon
+										icon={ArrowRight01Icon}
+										strokeWidth={2}
+										class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+									/>
+									<span class="min-w-0 truncate">Artifacts</span>
+									{#if artifacts.data && artifacts.data.length > 0}
+										<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+											{artifacts.data.length}
+										</span>
+									{/if}
+								</Collapsible.Trigger>
+								<button
+									type="button"
+									class="mr-2 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none [@media(pointer:coarse)]:size-11"
+									aria-label="Create artifact"
+									onclick={openCreateArtifactDialog}
+								>
+									<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3" />
+								</button>
+							</div>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 							>
@@ -1577,11 +1677,6 @@ Important rules:
 										{:else}
 											{#each artifactGroups as group (group.key)}
 												{#if group.artifacts.length > 0}
-													<li class="list-none px-2 pt-2 pb-0.5 first:pt-0" role="presentation">
-														<p class="text-[10px] font-semibold text-sidebar-foreground/55">
-															{group.label}
-														</p>
-													</li>
 													{#each group.artifacts as artifact (artifact._id)}
 														{@const canUseArtifactInThread =
 															Boolean(activeThreadId) &&
@@ -1593,7 +1688,7 @@ Important rules:
 															<Sidebar.MenuButton
 																size="sm"
 																isActive={activeArtifactId === artifact._id && !activeThreadId}
-																class={cn(navPill, 'min-w-0 gap-2')}
+																class={cn(navPill, 'h-10 min-w-0 gap-2')}
 																tooltipContent={artifact.title}
 															>
 																{#snippet child({ props })}
@@ -1604,9 +1699,13 @@ Important rules:
 																		data-workspace-nav-item
 																		{...props}
 																	>
-																		<span class="min-w-0 flex-1 truncate">{artifact.title}</span>
-																		<span class="shrink-0 text-[10px] text-sidebar-foreground/55">
-																			{artifactTypeLabel(artifact.type)}
+																		<span class="min-w-0 flex-1">
+																			<span class="block truncate">{artifact.title}</span>
+																			<span
+																				class="block truncate text-[10px] font-normal text-sidebar-foreground/55"
+																			>
+																				{sidebarArtifactTypeLabel(artifact.type)}
+																			</span>
 																		</span>
 																	</a>
 																{/snippet}
@@ -1625,6 +1724,15 @@ Important rules:
 													{/each}
 												{/if}
 											{/each}
+											{#if artifacts.data.length > SIDEBAR_ITEM_LIMIT}
+												<Sidebar.MenuItem
+													><button
+														type="button"
+														class="h-7 w-full rounded-md px-2 text-left text-[11px] font-medium text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+														onclick={openWorkspaceSearch}>View all artifacts</button
+													></Sidebar.MenuItem
+												>
+											{/if}
 										{/if}
 									</Sidebar.Menu>
 								</Sidebar.GroupContent>
@@ -1639,11 +1747,11 @@ Important rules:
 							<a
 								href={resolve(workspaceSettingsHref() as '/workspace/settings')}
 								data-workspace-nav-item
-								class="mb-2 block rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 px-2.5 py-2 transition-colors outline-none hover:bg-sidebar-accent/40 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+								class="mb-1.5 block rounded-md px-2 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 								aria-label={usageTooltip}
 							>
 								<div
-									class="mb-1.5 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/65"
+									class="mb-1 flex items-center justify-between gap-2 text-[10px] text-sidebar-foreground/65"
 								>
 									<span class="font-semibold">AI today</span>
 									<span class="text-sidebar-foreground/75 tabular-nums">
@@ -1752,20 +1860,41 @@ Important rules:
 								{/snippet}
 							</Sidebar.MenuButton>
 						</Sidebar.MenuItem>
-						<ThemeMenu variant="sidebar-label" />
 						<Sidebar.MenuItem>
-							<Sidebar.MenuButton
-								size="sm"
-								tooltipContent="Sign out"
-								class={cn(footerPill, 'min-w-0')}
-								aria-disabled={isSigningOut}
-								onclick={handleSignOut}
-							>
-								<HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
-								<span class="group-data-[collapsible=icon]:sr-only">
-									{isSigningOut ? 'Signing out…' : 'Sign out'}
-								</span>
-							</Sidebar.MenuButton>
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger>
+									{#snippet child({ props })}
+										<Sidebar.MenuButton
+											size="sm"
+											{...props}
+											tooltipContent="Account"
+											class={cn(footerPill, 'min-w-0')}
+										>
+											<HugeiconsIcon icon={UserCircleIcon} strokeWidth={2} />
+											<span class="min-w-0 flex-1 truncate group-data-[collapsible=icon]:sr-only"
+												>Account</span
+											>
+											<HugeiconsIcon
+												icon={ArrowRight01Icon}
+												strokeWidth={2}
+												class="size-3 group-data-[collapsible=icon]:hidden"
+											/>
+										</Sidebar.MenuButton>
+									{/snippet}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content class="min-w-48" align="end">
+									<ThemeMenu variant="submenu" />
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item
+										variant="destructive"
+										disabled={isSigningOut}
+										onclick={handleSignOut}
+									>
+										<HugeiconsIcon icon={Logout01Icon} strokeWidth={2} class="size-3.5" />
+										{isSigningOut ? 'Signing out…' : 'Sign out'}
+									</DropdownMenu.Item>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
 						</Sidebar.MenuItem>
 					</Sidebar.Menu>
 				</Sidebar.Footer>

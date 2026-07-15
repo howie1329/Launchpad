@@ -14,7 +14,7 @@
 	import { ComputerIcon, Moon01Icon, Sun01Icon, Tick02Icon } from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
 
-	type Variant = 'default' | 'icon' | 'sidebar' | 'sidebar-label';
+	type Variant = 'default' | 'icon' | 'sidebar' | 'sidebar-label' | 'submenu';
 
 	let {
 		variant = 'default' as Variant,
@@ -94,7 +94,17 @@
 	{/each}
 {/snippet}
 
-{#if variant === 'sidebar' || variant === 'sidebar-label'}
+{#if variant === 'submenu'}
+	<DropdownMenu.Sub>
+		<DropdownMenu.SubTrigger class="gap-2">
+			<HugeiconsIcon icon={triggerIcon} strokeWidth={2} class="size-3.5" />
+			<span class="flex-1">Theme</span>
+		</DropdownMenu.SubTrigger>
+		<DropdownMenu.SubContent class="min-w-48">
+			{@render appearanceItems()}
+		</DropdownMenu.SubContent>
+	</DropdownMenu.Sub>
+{:else if variant === 'sidebar' || variant === 'sidebar-label'}
 	<Sidebar.MenuItem>
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
