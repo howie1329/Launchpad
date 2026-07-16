@@ -62,6 +62,13 @@ export function artifactPreview(content: string) {
 	return firstLine.length > 140 ? `${firstLine.slice(0, 137)}...` : firstLine;
 }
 
+export function artifactSearchPreview(content: string) {
+	const preview = artifactPreview(content)
+		.replace(/^#{1,6}(?:\s+|$)/, '')
+		.trim();
+	return preview || 'No content yet.';
+}
+
 export function draftPreview(content: string) {
 	const preview = artifactPreview(content);
 	return preview.length > 120 ? `${preview.slice(0, 117)}...` : preview;
