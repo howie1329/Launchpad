@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { auth, getConvexClient } from '$lib/auth.svelte';
 	import {
-		isCodeArtifactFormat,
 		listArtifactVersionsQuery,
 		restoreArtifactVersionMutation,
 		updateArtifactMutation,
@@ -14,8 +13,6 @@
 	import { workspaceArtifactChrome } from '$lib/workspace-artifact-chrome.svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import { browser } from '$app/environment';
-	import { SaveIcon } from '@hugeicons/core-free-icons';
-	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { useQuery } from 'convex-svelte';
 	import { onMount } from 'svelte';
 	import type { Id } from '../../../convex/_generated/dataModel';
@@ -23,14 +20,12 @@
 	let {
 		artifact,
 		compact = false,
-		fullWidthContent = false,
 		initialSelectedVersionNumber = null,
 		showHeader,
 		onBack
 	}: {
 		artifact: SavedArtifact | null | undefined;
 		compact?: boolean;
-		fullWidthContent?: boolean;
 		initialSelectedVersionNumber?: number | null;
 		showHeader?: boolean;
 		linkReason?: ArtifactLinkReason;
@@ -38,7 +33,7 @@
 	} = $props();
 
 	type SurfaceMode = 'read' | 'history';
-	type ReadSubMode = 'editor' | 'preview';
+	type ReadSubMode = 'read' | 'edit';
 
 	let editorValue = $state('');
 	let contentDirty = $state(false);
@@ -46,7 +41,7 @@
 	let isSaving = $state(false);
 	let isRestoringVersionId = $state('');
 	let surfaceMode = $state<SurfaceMode>('read');
-	let readMode = $state<ReadSubMode>('editor');
+	let readMode = $state<ReadSubMode>('read');
 	let selectedVersionId = $state<Id<'artifactVersions'> | null>(null);
 	let compareBaseVersionId = $state<Id<'artifactVersions'> | null>(null);
 	let editorBaseRevision = $state<number | null>(null);
@@ -72,7 +67,7 @@
 	const canSave = $derived(
 		Boolean(artifact) &&
 			surfaceMode === 'read' &&
-			readMode === 'editor' &&
+			readMode === 'edit' &&
 			editorValue.trim().length > 0 &&
 			editorValue !== (artifact?.content ?? '') &&
 			!isSaving
@@ -84,11 +79,6 @@
 			editorBaseRevision !== null &&
 			artifact.revision > editorBaseRevision
 		)
-	);
-	const updatedAtLabel = $derived(
-		artifact
-			? new Date(artifact.updatedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-			: ''
 	);
 	const saveStateLabel = $derived.by(() => {
 		if (saveError) return 'Save failed';
@@ -110,10 +100,7 @@
 			contentDirty = false;
 			saveError = '';
 			surfaceMode = initialSelectedVersionNumber ? 'history' : 'read';
-			readMode =
-				fullWidthContent || (artifact && isCodeArtifactFormat(artifact.contentFormat))
-					? 'preview'
-					: 'editor';
+			readMode = 'read';
 			selectedVersionId = null;
 			compareBaseVersionId = null;
 			editorBaseRevision = artifact.revision;
@@ -193,14 +180,15 @@
 		saveError = '';
 	};
 
-	const setEditorMode = () => {
+	const setEditMode = () => {
 		if (!artifact) return;
-		readMode = 'editor';
+		readMode = 'edit';
 		saveError = '';
 	};
 
-	const setPreviewMode = () => {
-		readMode = 'preview';
+	const setReadMode = () => {
+		if (!artifact) return;
+		readMode = 'read';
 		saveError = '';
 	};
 
@@ -229,7 +217,7 @@
 	onMount(() => {
 		const onKeydown = (event: KeyboardEvent) => {
 			if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
-			if (surfaceMode !== 'read' || readMode !== 'editor') return;
+			if (surfaceMode !== 'read' || readMode !== 'edit') return;
 
 			event.preventDefault();
 			void saveChanges();
@@ -340,9 +328,18 @@
 		workspaceArtifactChrome.value = {
 			onBack,
 			surfaceMode,
+			readMode,
 			canHistory: canShowHistory,
+			contentDirty,
+			isSaving,
+			saveError: Boolean(saveError),
+			saveStateLabel,
+			canSave,
 			setRead: setReadSurface,
-			setHistory: setHistorySurface
+			setHistory: setHistorySurface,
+			setReadMode,
+			setEditMode,
+			save: saveChanges
 		};
 
 		return () => {
@@ -372,103 +369,18 @@
 		</div>
 	{:else}
 		<div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-			<header class="shrink-0 border-b border-border/70 bg-background px-4 py-2">
+			{#if compact}
+				<header class="shrink-0 border-b border-border/60 px-3 py-2">
+					<h2 class="truncate text-xs font-medium tracking-tight">{artifact.title}</h2>
+				</header>
+			{/if}
+			<div class="min-h-0 flex-1 overflow-y-auto">
 				<div
-					class={fullWidthContent
-						? 'mx-auto flex max-w-6xl flex-wrap items-center gap-2'
-						: 'flex flex-wrap items-center gap-2'}
-				>
-					<div class="flex min-w-0 flex-1 items-center gap-2">
-						<h1 class="truncate text-sm font-semibold tracking-tight">{artifact.title}</h1>
-						<span class="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-foreground">
-							{artifact.type}
-						</span>
-						<span class="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
-							Revision {artifact.revision}
-						</span>
-						<span class="hidden min-w-0 truncate text-[11px] text-muted-foreground xl:inline">
-							Updated {updatedAtLabel}
-						</span>
-					</div>
-
-					<div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-						<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
-							<Button
-								type="button"
-								size="sm"
-								variant={surfaceMode === 'read' ? 'secondary' : 'ghost'}
-								class="h-7 rounded-sm px-2.5 text-xs font-medium"
-								onclick={setReadSurface}
-							>
-								Document
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant={surfaceMode === 'history' ? 'secondary' : 'ghost'}
-								class="h-7 rounded-sm px-2.5 text-xs font-medium"
-								disabled={!canShowHistory}
-								onclick={setHistorySurface}
-							>
-								History
-							</Button>
-						</div>
-
-						{#if surfaceMode === 'read'}
-							<div class="inline-flex items-center rounded-md border border-border/70 p-0.5">
-								<Button
-									type="button"
-									size="sm"
-									variant={readMode === 'preview' ? 'secondary' : 'ghost'}
-									class="h-7 rounded-sm px-2.5 text-xs font-medium"
-									onclick={setPreviewMode}
-								>
-									Preview
-								</Button>
-								<Button
-									type="button"
-									size="sm"
-									variant={readMode === 'editor' ? 'secondary' : 'ghost'}
-									class="h-7 rounded-sm px-2.5 text-xs font-medium"
-									onclick={setEditorMode}
-								>
-									Edit
-								</Button>
-							</div>
-						{/if}
-
-						<p
-							class={saveError
-								? 'text-xs text-destructive'
-								: contentDirty
-									? 'text-xs text-foreground'
-									: 'text-xs text-muted-foreground'}
-							role="status"
-						>
-							{saveStateLabel}
-						</p>
-						<Button
-							type="button"
-							variant="default"
-							size="sm"
-							class="h-7 gap-1.5 px-2.5 text-xs"
-							disabled={!canSave}
-							onclick={saveChanges}
-						>
-							<HugeiconsIcon icon={SaveIcon} strokeWidth={2} class="size-3.5" />
-							{isSaving ? 'Saving…' : 'Save'}
-						</Button>
-					</div>
-				</div>
-			</header>
-
-			<div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-				<div
-					class={fullWidthContent
-						? 'mx-auto max-w-6xl space-y-6'
-						: compact
-							? 'space-y-5'
-							: 'mx-auto max-w-5xl space-y-6'}
+					class={compact
+						? 'space-y-5 px-4 py-4'
+						: surfaceMode === 'history'
+							? 'mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6'
+							: 'min-h-full'}
 				>
 					{#if newerSavedVersionAvailable}
 						<div class="rounded-lg border border-border/70 bg-muted/30 px-4 py-3">
@@ -504,10 +416,11 @@
 						{:else}
 							<ArtifactReadSurface
 								artifactId={artifact._id}
+								title={artifact.title}
 								value={editorValue}
 								contentFormat={artifact.contentFormat}
 								{compact}
-								{readMode}
+								readMode={readMode === 'edit' ? 'editor' : 'preview'}
 								{saveError}
 								onChange={(nextValue) => {
 									editorValue = nextValue;

@@ -1956,7 +1956,7 @@ Important rules:
 
 				{#if workspaceArtifactChrome.value}
 					<div
-						class="flex max-w-[min(100%,20rem)] shrink-[2] flex-wrap items-center justify-end gap-1 sm:max-w-none"
+						class="flex max-w-[min(100%,22rem)] shrink-[2] items-center justify-end gap-1 sm:max-w-none"
 					>
 						{#if workspaceArtifactChrome.value.onBack}
 							<Button
@@ -1975,34 +1975,82 @@ Important rules:
 								/>
 							</Button>
 						{/if}
-						<div class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5">
+
+						{#if workspaceArtifactChrome.value.surfaceMode === 'history'}
 							<Button
 								type="button"
+								variant="ghost"
 								size="sm"
-								variant={workspaceArtifactChrome.value.surfaceMode === 'read'
-									? 'secondary'
-									: 'ghost'}
-								class="h-7 rounded-sm px-2 text-xs font-medium"
+								class="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
 								onclick={() => workspaceArtifactChrome.value?.setRead()}
 							>
-								Read
+								Back to note
 							</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant={workspaceArtifactChrome.value.surfaceMode === 'history'
-									? 'secondary'
-									: 'ghost'}
-								class="h-7 rounded-sm px-2 text-xs font-medium"
-								disabled={!workspaceArtifactChrome.value.canHistory}
-								title={!workspaceArtifactChrome.value.canHistory
-									? 'No saved versions to inspect yet'
-									: undefined}
-								onclick={() => workspaceArtifactChrome.value?.setHistory()}
+						{:else}
+							<div
+								class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5"
 							>
-								History
-							</Button>
-						</div>
+								<Button
+									type="button"
+									size="sm"
+									variant={workspaceArtifactChrome.value.readMode === 'read'
+										? 'secondary'
+										: 'ghost'}
+									class="h-7 rounded-sm px-2 text-xs font-medium"
+									onclick={() => workspaceArtifactChrome.value?.setReadMode()}
+								>
+									Read
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									variant={workspaceArtifactChrome.value.readMode === 'edit'
+										? 'secondary'
+										: 'ghost'}
+									class="h-7 rounded-sm px-2 text-xs font-medium"
+									onclick={() => workspaceArtifactChrome.value?.setEditMode()}
+								>
+									Edit
+								</Button>
+							</div>
+
+							{#if workspaceArtifactChrome.value.canHistory}
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+									onclick={() => workspaceArtifactChrome.value?.setHistory()}
+								>
+									History
+								</Button>
+							{/if}
+
+							{#if workspaceArtifactChrome.value.readMode === 'edit'}
+								<p
+									class={workspaceArtifactChrome.value.saveError
+										? 'text-xs text-destructive'
+										: workspaceArtifactChrome.value.contentDirty
+											? 'text-xs text-foreground'
+											: 'text-xs text-muted-foreground'}
+									role="status"
+								>
+									{workspaceArtifactChrome.value.saveStateLabel}
+								</p>
+								{#if workspaceArtifactChrome.value.contentDirty || workspaceArtifactChrome.value.isSaving}
+									<Button
+										type="button"
+										variant="default"
+										size="sm"
+										class="h-7 gap-1.5 px-2.5 text-xs"
+										disabled={!workspaceArtifactChrome.value.canSave}
+										onclick={() => workspaceArtifactChrome.value?.save()}
+									>
+										Save changes
+									</Button>
+								{/if}
+							{/if}
+						{/if}
 					</div>
 				{/if}
 				{#if canPromoteThreadToProject}

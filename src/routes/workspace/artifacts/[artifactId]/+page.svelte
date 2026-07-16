@@ -44,9 +44,5 @@
 		</div>
 	</div>
 {:else}
-	<WorkspaceArtifactReader
-		artifact={selectedArtifact.data}
-		fullWidthContent
-		{initialSelectedVersionNumber}
-	/>
+	<WorkspaceArtifactReader artifact={selectedArtifact.data} {initialSelectedVersionNumber} />
 {/if}
