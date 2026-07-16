@@ -79,7 +79,6 @@
 		ChatAdd01Icon,
 		CheckmarkCircle01Icon,
 		Clock01Icon,
-		DatabaseImportIcon,
 		Delete02Icon,
 		DollarCircleIcon,
 		File01Icon,
@@ -1288,27 +1287,34 @@ Important rules:
 						class="order-3 border-0 shadow-none ring-0 group-data-[collapsible=icon]:hidden"
 					>
 						<Sidebar.Group class="border-0 shadow-none ring-0">
-							<Sidebar.GroupAction
-								type="button"
-								aria-label="Import external context"
-								title="Import external context"
-								onclick={openImportDialog}
-							>
-								<HugeiconsIcon icon={DatabaseImportIcon} strokeWidth={2} aria-hidden="true" />
-							</Sidebar.GroupAction>
-							<Collapsible.Trigger class={cn(sectionTrigger, 'pr-8')}>
-								<HugeiconsIcon
-									icon={ArrowRight01Icon}
-									strokeWidth={2}
-									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-								/>
-								<span class="min-w-0 truncate">Projects</span>
-								{#if projects.data && projects.data.length > 0}
-									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
-										{projects.data.length}
-									</span>
-								{/if}
-							</Collapsible.Trigger>
+							<div class="flex items-center group-data-[collapsible=icon]:hidden">
+								<Collapsible.Trigger class={cn(sectionTrigger, 'min-w-0 flex-1')}>
+									<HugeiconsIcon
+										icon={ArrowRight01Icon}
+										strokeWidth={2}
+										class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+									/>
+									<span class="min-w-0 truncate">Projects</span>
+									{#if projects.data && projects.data.length > 0}
+										<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+											{projects.data.length}
+										</span>
+									{/if}
+								</Collapsible.Trigger>
+								<button
+									type="button"
+									class="mr-2 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none [@media(pointer:coarse)]:size-11"
+									aria-label="Import external context"
+									onclick={openImportDialog}
+								>
+									<HugeiconsIcon
+										icon={Add01Icon}
+										strokeWidth={2}
+										class="size-3"
+										aria-hidden="true"
+									/>
+								</button>
+							</div>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 							>
