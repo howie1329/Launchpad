@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { UIMessage } from 'ai';
 import {
 	assistantMessageHasVisibleContent,
-	buildAssistantMessageCopyText
+	assistantMessageWasInterrupted,
+	buildAssistantMessageCopyText,
+	markAssistantMessageInterrupted
 } from './workspace-chat-message-actions';
 
 describe('assistant message copy text', () => {
@@ -68,5 +70,22 @@ describe('assistantMessageHasVisibleContent', () => {
 			parts: []
 		};
 		expect(assistantMessageHasVisibleContent(message)).toBe(false);
+	});
+});
+
+describe('interrupted assistant messages', () => {
+	it('marks and detects an interrupted assistant message without dropping metadata', () => {
+		const message: UIMessage = {
+			id: 'assistant-interrupted',
+			role: 'assistant',
+			metadata: { source: 'workspace-chat' },
+			parts: [{ type: 'text', text: 'Partial answer' }]
+		};
+
+		const interrupted = markAssistantMessageInterrupted(message);
+
+		expect(interrupted.metadata).toEqual({ source: 'workspace-chat', interrupted: true });
+		expect(assistantMessageWasInterrupted(interrupted)).toBe(true);
+		expect(assistantMessageWasInterrupted(message)).toBe(false);
 	});
 });

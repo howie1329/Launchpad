@@ -7,5 +7,5 @@
 
 <MessageResponse
 	content={props.content}
-	class={props.muted ? 'text-xs leading-relaxed text-muted-foreground' : 'text-xs leading-relaxed'}
+	class={props.muted ? 'text-sm leading-6 text-muted-foreground' : 'text-sm leading-6'}
 />

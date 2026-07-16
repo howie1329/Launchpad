@@ -10,10 +10,7 @@
 		Tick02Icon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/svelte';
-	let {
-		tools,
-		deemphasized = false
-	}: { tools: ToolStepView[]; deemphasized?: boolean } = $props();
+	let { tools, deemphasized = false }: { tools: ToolStepView[]; deemphasized?: boolean } = $props();
 
 	let open = $state(false);
 
@@ -21,9 +18,15 @@
 	const anyError = $derived(tools.some((t) => t.phase === 'error'));
 	const anyDenied = $derived(tools.some((t) => t.phase === 'denied'));
 
-	const triggerLabel = $derived(
-		tools.length === 1 ? (tools[0]?.title ?? 'Tool activity') : `Tool activity (${tools.length})`
-	);
+	const triggerLabel = $derived.by(() => {
+		if (anyRunning) {
+			return tools.length === 1
+				? (tools[0]?.summary ?? 'Working…')
+				: `Working… · ${tools.length} steps`;
+		}
+		if (tools.length === 1) return tools[0]?.summary ?? 'Activity complete';
+		return `Activity · ${tools.length} steps`;
+	});
 
 	function reviewProjectPromotion() {
 		window.dispatchEvent(new CustomEvent('launchpad:review-project-promotion'));
@@ -80,6 +83,8 @@
 <div
 	role="region"
 	aria-label="Assistant tool activity"
+	aria-live="polite"
+	aria-atomic="true"
 	class={cn('max-w-full min-w-0', deemphasized && 'opacity-80')}
 >
 	<Steps bind:open class="min-w-0">
@@ -125,16 +130,18 @@
 								>
 									{tool.actionLabel}
 								</button>
-							{:else if tool.actionLabel && tool.actionArtifactId && tool.actionVersionNumber !== undefined}
+							{:else if tool.actionLabel && tool.actionArtifactId}
 								{@const actionArtifactId = tool.actionArtifactId}
+								{@const actionVersionNumber = tool.actionVersionNumber}
 								<button
 									type="button"
 									class="inline-flex w-fit rounded-sm text-[11px] font-medium text-foreground underline underline-offset-2 hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 									onclick={() => {
+										const artifactPath = resolve('/workspace/artifacts/[artifactId]', {
+											artifactId: actionArtifactId
+										});
 										window.location.assign(
-											`${resolve('/workspace/artifacts/[artifactId]', {
-												artifactId: actionArtifactId
-											})}?version=${tool.actionVersionNumber}`
+											`${artifactPath}${actionVersionNumber !== undefined ? `?version=${actionVersionNumber}` : ''}`
 										);
 									}}
 								>

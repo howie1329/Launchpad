@@ -2,6 +2,10 @@ import type { UIMessage } from 'ai';
 import { buildAssistantSegments } from '$lib/idea-chat-assistant-parts';
 import { openUIVisibleText } from '$lib/openui/response';
 
+export type WorkspaceMessageMetadata = {
+	interrupted?: boolean;
+};
+
 /**
  * Workspace chat UX — product defaults for PRD “open confirmations” (v1):
  * - Retry from any user message (truncate everything after that user turn, then new assistant reply).
@@ -39,6 +43,26 @@ export function assistantMessageHasVisibleContent(message: UIMessage): boolean {
 	if (message.role !== 'assistant') return false;
 	if (uiMessageText(message).trim()) return true;
 	return buildAssistantSegments(message).length > 0;
+}
+
+function messageMetadata(message: UIMessage): WorkspaceMessageMetadata {
+	return message.metadata && typeof message.metadata === 'object'
+		? (message.metadata as WorkspaceMessageMetadata)
+		: {};
+}
+
+export function assistantMessageWasInterrupted(message: UIMessage): boolean {
+	return message.role === 'assistant' && messageMetadata(message).interrupted === true;
+}
+
+export function markAssistantMessageInterrupted(message: UIMessage): UIMessage {
+	return {
+		...message,
+		metadata: {
+			...messageMetadata(message),
+			interrupted: true
+		} satisfies WorkspaceMessageMetadata
+	};
 }
 
 /** Plain text for assistant copy: OpenUI visible text or legacy markdown source. */

@@ -182,13 +182,39 @@ function summarizeWorkspaceTool(
 			};
 		case 'createIdeaArtifact':
 			return {
-				summary: title ? `Saved idea artifact: ${title}` : 'Saved idea artifact.',
-				detailJson
+				summary: title ? `Saved idea artifact: ${title}.` : 'Saved idea artifact.',
+				detailJson,
+				...(artifactId
+					? {
+							actionLabel: 'Open artifact',
+							actionArtifactId: artifactId,
+							...(versionNumber !== null ? { actionVersionNumber: versionNumber } : {})
+						}
+					: {})
 			};
 		case 'createPrdArtifact':
 			return {
-				summary: title ? `Saved PRD artifact: ${title}` : 'Saved PRD artifact.',
-				detailJson
+				summary: title ? `Saved PRD artifact: ${title}.` : 'Saved PRD artifact.',
+				detailJson,
+				...(artifactId
+					? {
+							actionLabel: 'Open artifact',
+							actionArtifactId: artifactId,
+							...(versionNumber !== null ? { actionVersionNumber: versionNumber } : {})
+						}
+					: {})
+			};
+		case 'createVisualArtifact':
+			return {
+				summary: title ? `Saved visual artifact: ${title}.` : 'Saved visual artifact.',
+				detailJson,
+				...(artifactId
+					? {
+							actionLabel: 'Open artifact',
+							actionArtifactId: artifactId,
+							...(versionNumber !== null ? { actionVersionNumber: versionNumber } : {})
+						}
+					: {})
 			};
 		case 'prepareProjectPromotion': {
 			const linkedArtifactCount =

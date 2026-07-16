@@ -46,5 +46,5 @@
 		{onRetry}
 	/>
 {:else if classification.kind === 'markdown'}
-	<MessageResponse content={response} class="text-xs leading-relaxed" />
+	<MessageResponse content={response} class="text-sm leading-6" />
 {/if}
