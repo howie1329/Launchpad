@@ -1908,9 +1908,7 @@ Important rules:
 		</Sidebar.Root>
 
 		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
-			<header
-				class="flex h-10 shrink-0 items-center gap-1.5 border-b border-border/50 bg-background px-2 py-1"
-			>
+			<header class="flex h-9 shrink-0 items-center gap-1.5 bg-background px-2 py-0.5">
 				<Sidebar.Trigger class="shrink-0" />
 				<Button
 					type="button"
