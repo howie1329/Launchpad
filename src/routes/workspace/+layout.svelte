@@ -14,7 +14,6 @@
 		getWorkspaceTabStripQuery,
 		removeWorkspaceTabMutation
 	} from '$lib/workspaceTabs';
-	import type { WorkspaceTabTarget } from '$lib/workspaceTabs';
 	import {
 		workspaceArtifactHref,
 		workspaceProjectHref,
@@ -80,6 +79,7 @@
 		ChatAdd01Icon,
 		CheckmarkCircle01Icon,
 		Clock01Icon,
+		DatabaseImportIcon,
 		Delete02Icon,
 		DollarCircleIcon,
 		File01Icon,
@@ -281,14 +281,6 @@
 		if (!browser || !sidebarPrefsHydrated) return;
 		window.localStorage.setItem('launchpad:sidebar-sections', JSON.stringify(openSections));
 	});
-
-	const selectWorkspaceTab = async (target: WorkspaceTabTarget) => {
-		const href = resolve(hrefForWorkspaceTarget(target) as '/workspace');
-		const u = get(page).url;
-		const next = new URL(href, u.origin);
-		if (u.pathname === next.pathname && u.search === next.search) return;
-		await goto(href, { noScroll: true, keepFocus: true });
-	};
 
 	const closeWorkspaceTab = async (tabId: string) => {
 		const result = await getConvexClient().mutation(removeWorkspaceTabMutation, { tabId });
@@ -1296,7 +1288,15 @@ Important rules:
 						class="order-3 border-0 shadow-none ring-0 group-data-[collapsible=icon]:hidden"
 					>
 						<Sidebar.Group class="border-0 shadow-none ring-0">
-							<Collapsible.Trigger class={sectionTrigger}>
+							<Sidebar.GroupAction
+								type="button"
+								aria-label="Import external context"
+								title="Import external context"
+								onclick={openImportDialog}
+							>
+								<HugeiconsIcon icon={DatabaseImportIcon} strokeWidth={2} aria-hidden="true" />
+							</Sidebar.GroupAction>
+							<Collapsible.Trigger class={cn(sectionTrigger, 'pr-8')}>
 								<HugeiconsIcon
 									icon={ArrowRight01Icon}
 									strokeWidth={2}
@@ -1916,7 +1916,12 @@ Important rules:
 						commandCenterOpen = true;
 					}}
 				>
-					<HugeiconsIcon icon={Search01Icon} strokeWidth={2} class="size-3.5 opacity-80" />
+					<HugeiconsIcon
+						icon={Search01Icon}
+						strokeWidth={2}
+						class="size-3.5 opacity-80"
+						aria-hidden="true"
+					/>
 					<span class="hidden min-[400px]:inline">Search</span>
 					<Kbd.KbdGroup class="hidden gap-0.5 opacity-80 min-[400px]:inline-flex">
 						<Kbd.Kbd>⌘</Kbd.Kbd>
@@ -1930,19 +1935,19 @@ Important rules:
 						projects={projects.data}
 						threads={threads.data}
 						artifacts={artifacts.data}
-						onSelectTab={(t) => {
-							void selectWorkspaceTab(t);
-						}}
 						onCloseTab={(id) => {
 							void closeWorkspaceTab(id);
 						}}
-					/>
-					<WorkspaceTabPicker
-						bind:open={tabPickerOpen}
-						projects={projects.data}
-						threads={threads.data}
-						artifacts={artifacts.data}
-					/>
+					>
+						{#snippet trailing()}
+							<WorkspaceTabPicker
+								bind:open={tabPickerOpen}
+								projects={projects.data}
+								threads={threads.data}
+								artifacts={artifacts.data}
+							/>
+						{/snippet}
+					</WorkspaceTabStrip>
 				</div>
 
 				{#if workspaceArtifactChrome.value}
@@ -1958,7 +1963,12 @@ Important rules:
 								aria-label="Back to thread artifacts"
 								onclick={() => workspaceArtifactChrome.value?.onBack?.()}
 							>
-								<HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} class="size-4" />
+								<HugeiconsIcon
+									icon={ArrowLeft01Icon}
+									strokeWidth={2}
+									class="size-4"
+									aria-hidden="true"
+								/>
 							</Button>
 						{/if}
 						<div class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5">
@@ -1997,35 +2007,24 @@ Important rules:
 						variant="outline"
 						size="sm"
 						class="h-8 shrink-0 gap-1.5 px-2 text-xs font-medium"
+						aria-label="Promote to project"
 						onclick={openPromoteDialog}
 					>
-						<HugeiconsIcon icon={Rocket01Icon} strokeWidth={2} class="size-3.5 shrink-0" />
-						<span class="hidden min-[420px]:inline">Create project from chat</span>
-						<span class="min-[420px]:hidden">Project</span>
+						<HugeiconsIcon
+							icon={Rocket01Icon}
+							strokeWidth={2}
+							class="size-3.5 shrink-0"
+							aria-hidden="true"
+						/>
+						<span class="hidden min-[640px]:inline">Promote to project</span>
+						<span class="hidden min-[480px]:inline min-[640px]:hidden">Promote</span>
+						<span class="sr-only min-[480px]:hidden">Promote to project</span>
 					</Button>
 				{/if}
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
-						type="button"
-						class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
-					>
-						<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} class="size-3.5 shrink-0" />
-						<span class="hidden min-[460px]:inline">New project</span>
-						<span class="min-[460px]:hidden">New</span>
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="min-w-56">
-						<DropdownMenu.Item
-							onclick={() => {
-								void goto(resolve(workspaceRootHref() as '/workspace'));
-							}}
-						>
-							Start from scratch
-						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={openImportDialog}>
-							Import external AI context
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+				<span
+					class="mx-1 hidden h-5 w-px shrink-0 bg-border/60 min-[480px]:block"
+					aria-hidden="true"
+				></span>
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger
 						type="button"
@@ -2034,7 +2033,7 @@ Important rules:
 							? `${unreadNotificationCount} unread notifications`
 							: 'Open notifications'}
 					>
-						<HugeiconsIcon icon={BellDotIcon} strokeWidth={2} class="size-4" />
+						<HugeiconsIcon icon={BellDotIcon} strokeWidth={2} class="size-4" aria-hidden="true" />
 						{#if unreadNotificationCount > 0}
 							<span
 								class="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-4 font-semibold text-primary-foreground"
@@ -2190,9 +2189,19 @@ Important rules:
 						onclick={toggleThreadContext}
 					>
 						{#if contextPanelOpen}
-							<HugeiconsIcon icon={PanelRightCloseIcon} strokeWidth={2} class="size-3.5" />
+							<HugeiconsIcon
+								icon={PanelRightCloseIcon}
+								strokeWidth={2}
+								class="size-3.5"
+								aria-hidden="true"
+							/>
 						{:else}
-							<HugeiconsIcon icon={PanelRightOpenIcon} strokeWidth={2} class="size-3.5" />
+							<HugeiconsIcon
+								icon={PanelRightOpenIcon}
+								strokeWidth={2}
+								class="size-3.5"
+								aria-hidden="true"
+							/>
 						{/if}
 					</Button>
 				{/if}
@@ -2224,6 +2233,7 @@ Important rules:
 			{canPromoteThreadToProject}
 			onRequestPromote={openPromoteDialog}
 			onRequestCreateArtifact={openCreateArtifactDialog}
+			onRequestImportContext={openImportDialog}
 			onUseArtifactInThread={useArtifactInThread}
 			onToggleThreadContext={toggleThreadContext}
 		/>

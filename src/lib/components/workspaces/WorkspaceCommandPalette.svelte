@@ -54,6 +54,7 @@
 		canPromoteThreadToProject = false,
 		onRequestPromote,
 		onRequestCreateArtifact,
+		onRequestImportContext,
 		onUseArtifactInThread,
 		onToggleThreadContext
 	}: {
@@ -67,6 +68,7 @@
 		canPromoteThreadToProject?: boolean;
 		onRequestPromote: () => void;
 		onRequestCreateArtifact: () => void;
+		onRequestImportContext: () => void;
 		onUseArtifactInThread: (artifactId: Id<'artifacts'>) => void | Promise<void>;
 		onToggleThreadContext: () => void | Promise<void>;
 	} = $props();
@@ -294,6 +296,18 @@
 			>
 				<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
 				<span class="min-w-0 flex-1 truncate">Create artifact</span>
+			</Command.Item>
+			<Command.Item
+				class={paletteItemClass}
+				value="action import external context"
+				keywords={['import', 'external', 'context', 'chat', 'project']}
+				onSelect={() => {
+					close();
+					onRequestImportContext();
+				}}
+			>
+				<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+				<span class="min-w-0 flex-1 truncate">Import external context</span>
 			</Command.Item>
 			<Command.Item
 				class={paletteItemClass}
