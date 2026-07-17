@@ -26,6 +26,7 @@
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import OpenUIResponse from '$lib/openui/OpenUIResponse.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
+	import { Marker, MarkerContent, MarkerIcon } from '$lib/components/ui/marker';
 	import {
 		Context,
 		ContextContent,
@@ -1002,16 +1003,17 @@
 													<!-- Tool state stays explicit; final assistant text is one progressively rendered OpenUI document. -->
 													<div class="flex w-full min-w-0 flex-col gap-2">
 														{#each segments as segment, segmentIndex (segmentIndex)}
-															<div class="border-l border-border/40 pl-4 sm:pl-5">
-																{#if segment.kind === 'tools'}
-																	<IdeaChatToolSteps
-																		tools={segment.tools}
-																		deemphasized={Boolean(assistantText)}
-																	/>
-																{:else}
+															{#if segment.kind === 'tools'}
+																<IdeaChatToolSteps
+																	tools={segment.tools}
+																	deemphasized={Boolean(assistantText)}
+																	hasAssistantText={Boolean(assistantText)}
+																/>
+															{:else}
+																<div class="border-l border-border/40 pl-4 sm:pl-5">
 																	<IdeaChatPromotionCard proposal={segment.proposal} />
-																{/if}
-															</div>
+																</div>
+															{/if}
 														{/each}
 														{#if assistantText}
 															<OpenUIResponse
@@ -1083,12 +1085,16 @@
 									<MessageContent
 										class="flex w-full min-w-0 flex-row items-center gap-2 text-muted-foreground"
 									>
-										<HugeiconsIcon
-											icon={Loading03Icon}
-											strokeWidth={2}
-											class="size-3.5 motion-safe:animate-spin"
-										/>
-										Working…
+										<Marker role="status">
+											<MarkerIcon>
+												<HugeiconsIcon
+													icon={Loading03Icon}
+													strokeWidth={2}
+													class="motion-safe:animate-spin"
+												/>
+											</MarkerIcon>
+											<MarkerContent>Working…</MarkerContent>
+										</Marker>
 									</MessageContent>
 								</Message>
 							{/if}

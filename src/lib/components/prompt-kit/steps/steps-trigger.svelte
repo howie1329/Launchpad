@@ -10,12 +10,14 @@
 		class: className,
 		leftIcon,
 		swapIconOnHover = true,
-		children
+		children,
+		onclick
 	}: {
 		class?: string;
 		leftIcon?: Snippet;
 		swapIconOnHover?: boolean;
 		children?: Snippet;
+		onclick?: (event: MouseEvent) => void;
 	} = $props();
 </script>
 
@@ -24,6 +26,7 @@
 		'group flex w-full cursor-pointer items-center justify-start gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground',
 		className
 	)}
+	{onclick}
 >
 	<div class="flex items-center gap-2">
 		{#if leftIcon}
