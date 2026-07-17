@@ -66,10 +66,18 @@
 </script>
 
 <DropdownMenu.Root bind:open>
-	<DropdownMenu.Trigger type="button" class="inline-flex shrink-0" aria-label="Add workspace tab">
-		<Button variant="ghost" size="icon" type="button" class="size-8" aria-label="Add workspace tab">
-			<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3.5" />
-		</Button>
+	<DropdownMenu.Trigger>
+		{#snippet child({ props })}
+			<Button
+				{...props}
+				variant="ghost"
+				size="icon"
+				class="size-8 shrink-0"
+				aria-label="Open workspace tab"
+			>
+				<HugeiconsIcon icon={Add01Icon} strokeWidth={2} class="size-3.5" aria-hidden="true" />
+			</Button>
+		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content
 		class="w-[min(100vw-2rem,18rem)] rounded-lg border-border/70 bg-popover p-0"

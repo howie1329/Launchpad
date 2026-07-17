@@ -282,7 +282,7 @@
 	const editorTheme = EditorView.theme({
 		'&': {
 			height: '100%',
-			backgroundColor: 'var(--background)',
+			backgroundColor: 'transparent',
 			color: 'var(--foreground)'
 		},
 		'.cm-scroller': {
@@ -290,7 +290,7 @@
 			fontFamily: 'var(--font-mono)'
 		},
 		'.cm-content': {
-			padding: '0.75rem 1rem'
+			padding: '1.25rem 1.5rem 4rem'
 		},
 		'.cm-line': {
 			padding: '0'
@@ -318,9 +318,9 @@
 				maxWidth: isCompact ? 'none' : '48rem',
 				minHeight: '100%',
 				margin: isCompact ? '0' : '0 auto',
-				fontFamily: 'var(--font-sans)',
-				fontSize: isCompact ? '0.8125rem' : '0.9375rem',
-				lineHeight: isCompact ? '1.5' : '1.65'
+				fontFamily: 'var(--font-mono)',
+				fontSize: isCompact ? '0.8125rem' : '0.875rem',
+				lineHeight: isCompact ? '1.5' : '1.8'
 			}
 		});
 
@@ -424,7 +424,7 @@
 </script>
 
 <div
-	class="artifact-code-editor rounded-md outline-none focus-within:ring-2 focus-within:ring-ring"
+	class="artifact-code-editor outline-none focus-within:ring-1 focus-within:ring-ring"
 	bind:this={editorElement}
 ></div>
 

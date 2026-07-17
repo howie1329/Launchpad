@@ -1,9 +1,9 @@
 import { PUBLIC_CONVEX_URL } from '$env/static/public';
-import { ConvexHttpClient, ConvexClient } from 'convex/browser';
+import { ConvexHttpClient, type ConvexClient } from 'convex/browser';
 import { makeFunctionReference } from 'convex/server';
 import type { Value } from 'convex/values';
 import { BROWSER } from 'esm-env';
-import { setConvexClientContext } from 'convex-svelte';
+import { setupConvex } from 'convex-svelte';
 
 type Tokens = {
 	token: string;
@@ -41,12 +41,10 @@ export function setupAuth() {
 		throw new Error('PUBLIC_CONVEX_URL is required to set up Convex Auth');
 	}
 
-	const convexClient = new ConvexClient(PUBLIC_CONVEX_URL, { disabled: !BROWSER });
+	const convexClient = setupConvex(PUBLIC_CONVEX_URL);
 	client = convexClient;
 	httpClient = new ConvexHttpClient(PUBLIC_CONVEX_URL);
 	storagePrefix = PUBLIC_CONVEX_URL.replace(/[^a-zA-Z0-9]/g, '');
-
-	setConvexClientContext(convexClient);
 
 	if (BROWSER) {
 		convexClient.setAuth(fetchAccessToken, updateAuthenticatedState);
@@ -54,10 +52,6 @@ export function setupAuth() {
 	} else {
 		auth.isLoading = false;
 	}
-
-	$effect(() => () => {
-		void convexClient.close();
-	});
 }
 
 export async function signIn(provider: string, params?: FormData | Record<string, Value>) {

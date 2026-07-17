@@ -26,6 +26,7 @@
 	import IdeaChatToolSteps from '$lib/components/idea-chat/IdeaChatToolSteps.svelte';
 	import OpenUIResponse from '$lib/openui/OpenUIResponse.svelte';
 	import WorkspaceArtifactReader from '$lib/components/workspaces/WorkspaceArtifactReader.svelte';
+	import { Marker, MarkerContent, MarkerIcon } from '$lib/components/ui/marker';
 	import {
 		Context,
 		ContextContent,
@@ -82,8 +83,10 @@
 	import WorkspaceMessageActions from '$lib/components/workspaces/WorkspaceMessageActions.svelte';
 	import {
 		assistantMessageHasVisibleContent,
+		assistantMessageWasInterrupted,
 		buildAssistantMessageCopyText,
 		buildUserMessageCopyText,
+		markAssistantMessageInterrupted,
 		truncateMessagesAfterUserMessage,
 		uiMessageText
 	} from '$lib/workspace-chat-message-actions';
@@ -97,7 +100,8 @@
 		Cancel01Icon,
 		GlobeIcon,
 		Loading03Icon,
-		Plug02Icon
+		Plug02Icon,
+		SquareIcon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Chat } from '@ai-sdk/svelte';
@@ -846,6 +850,27 @@
 		}
 	}
 
+	async function stopAssistantGeneration() {
+		if (!chat || !isChatBusy) return;
+
+		chatError = '';
+		try {
+			await chat.stop();
+			await tick();
+
+			const lastMessage = chat.lastMessage;
+			if (lastMessage?.role !== 'assistant') return;
+
+			chat.messages = chat.messages.map((message) =>
+				message.id === lastMessage.id ? markAssistantMessageInterrupted(message) : message
+			);
+			if (activeThreadId) await persistMessages(activeThreadId, chat.messages);
+		} catch (error) {
+			console.error(error);
+			chatError = 'Could not stop the assistant response. Try again.';
+		}
+	}
+
 	const showStreamFailure = $derived(Boolean(chatError) || chat?.status === 'error');
 
 	function authHeaders(): Record<string, string> {
@@ -978,16 +1003,17 @@
 													<!-- Tool state stays explicit; final assistant text is one progressively rendered OpenUI document. -->
 													<div class="flex w-full min-w-0 flex-col gap-2">
 														{#each segments as segment, segmentIndex (segmentIndex)}
-															<div class="border-l border-border/40 pl-4 sm:pl-5">
-																{#if segment.kind === 'tools'}
-																	<IdeaChatToolSteps
-																		tools={segment.tools}
-																		deemphasized={Boolean(assistantText)}
-																	/>
-																{:else}
+															{#if segment.kind === 'tools'}
+																<IdeaChatToolSteps
+																	tools={segment.tools}
+																	deemphasized={Boolean(assistantText)}
+																	hasAssistantText={Boolean(assistantText)}
+																/>
+															{:else}
+																<div class="border-l border-border/40 pl-4 sm:pl-5">
 																	<IdeaChatPromotionCard proposal={segment.proposal} />
-																{/if}
-															</div>
+																</div>
+															{/if}
 														{/each}
 														{#if assistantText}
 															<OpenUIResponse
@@ -1002,11 +1028,14 @@
 													</div>
 												{:else if assistantAwaitingStreamContent(message, messageIndex, chat.messages)}
 													<MessageResponse
-														content="Thinking..."
-														class="text-xs leading-relaxed text-muted-foreground"
+														content="Working…"
+														class="text-sm leading-6 text-muted-foreground"
 													/>
 												{:else}
 													<p class="text-xs text-muted-foreground">No response yet.</p>
+												{/if}
+												{#if assistantMessageWasInterrupted(message)}
+													<p class="text-xs leading-5 text-muted-foreground">Interrupted</p>
 												{/if}
 											{:else}
 												{@const composed = parseComposedUserMessage(uiMessageText(message))}
@@ -1027,7 +1056,7 @@
 														</div>
 													{/if}
 													{#if composed.body}
-														<p class="text-xs leading-5 whitespace-pre-wrap">{composed.body}</p>
+														<p class="text-sm leading-6 whitespace-pre-wrap">{composed.body}</p>
 													{/if}
 												</div>
 											{/if}
@@ -1056,12 +1085,16 @@
 									<MessageContent
 										class="flex w-full min-w-0 flex-row items-center gap-2 text-muted-foreground"
 									>
-										<HugeiconsIcon
-											icon={Loading03Icon}
-											strokeWidth={2}
-											class="size-3.5 motion-safe:animate-spin"
-										/>
-										Thinking...
+										<Marker role="status">
+											<MarkerIcon>
+												<HugeiconsIcon
+													icon={Loading03Icon}
+													strokeWidth={2}
+													class="motion-safe:animate-spin"
+												/>
+											</MarkerIcon>
+											<MarkerContent>Working…</MarkerContent>
+										</Marker>
 									</MessageContent>
 								</Message>
 							{/if}
@@ -1593,13 +1626,14 @@
 										</ContextContent>
 									</Context>
 								</PromptInputTools>
-								<PromptInputSubmit class="size-8 shrink-0" disabled={!canSubmit}>
+								<PromptInputSubmit
+									class="size-8 shrink-0"
+									status={chat?.status ?? 'ready'}
+									onStop={stopAssistantGeneration}
+									disabled={!canSubmit && !isChatBusy}
+								>
 									{#if isChatBusy}
-										<HugeiconsIcon
-											icon={Loading03Icon}
-											strokeWidth={2}
-											class="size-4 animate-spin"
-										/>
+										<HugeiconsIcon icon={SquareIcon} strokeWidth={2} class="size-3.5" />
 									{:else}
 										<HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} class="size-4" />
 									{/if}

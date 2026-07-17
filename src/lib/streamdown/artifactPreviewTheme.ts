@@ -4,15 +4,15 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 
 /**
  * Streamdown (shadcn base) partial theme for artifact + chat preview:
- * design-system tokens, quiet headings, text-xs or 11px compact body, no literal alert accents.
+ * design-system tokens, readable chat body text, compact metadata, no literal alert accents.
  */
 export function getArtifactPreviewStreamdownTheme(compact: boolean): DeepPartial<Theme> {
 	const body = compact
 		? 'text-[11px] leading-[1.4] text-foreground'
-		: 'text-xs leading-[1.4] text-foreground';
+		: 'text-sm leading-[1.6] text-foreground';
 	const thTdBase = compact
 		? 'px-3 py-2 text-[11px] min-w-[200px] max-w-[400px] break-words'
-		: 'px-3 py-2 text-xs min-w-[200px] max-w-[400px] break-words';
+		: 'px-3 py-2 text-[13px] leading-5 min-w-[200px] max-w-[400px] break-words';
 
 	return {
 		paragraph: { base: body },

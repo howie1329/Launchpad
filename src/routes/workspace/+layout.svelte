@@ -14,7 +14,6 @@
 		getWorkspaceTabStripQuery,
 		removeWorkspaceTabMutation
 	} from '$lib/workspaceTabs';
-	import type { WorkspaceTabTarget } from '$lib/workspaceTabs';
 	import {
 		workspaceArtifactHref,
 		workspaceProjectHref,
@@ -281,14 +280,6 @@
 		if (!browser || !sidebarPrefsHydrated) return;
 		window.localStorage.setItem('launchpad:sidebar-sections', JSON.stringify(openSections));
 	});
-
-	const selectWorkspaceTab = async (target: WorkspaceTabTarget) => {
-		const href = resolve(hrefForWorkspaceTarget(target) as '/workspace');
-		const u = get(page).url;
-		const next = new URL(href, u.origin);
-		if (u.pathname === next.pathname && u.search === next.search) return;
-		await goto(href, { noScroll: true, keepFocus: true });
-	};
 
 	const closeWorkspaceTab = async (tabId: string) => {
 		const result = await getConvexClient().mutation(removeWorkspaceTabMutation, { tabId });
@@ -1296,19 +1287,34 @@ Important rules:
 						class="order-3 border-0 shadow-none ring-0 group-data-[collapsible=icon]:hidden"
 					>
 						<Sidebar.Group class="border-0 shadow-none ring-0">
-							<Collapsible.Trigger class={sectionTrigger}>
-								<HugeiconsIcon
-									icon={ArrowRight01Icon}
-									strokeWidth={2}
-									class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
-								/>
-								<span class="min-w-0 truncate">Projects</span>
-								{#if projects.data && projects.data.length > 0}
-									<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
-										{projects.data.length}
-									</span>
-								{/if}
-							</Collapsible.Trigger>
+							<div class="flex items-center group-data-[collapsible=icon]:hidden">
+								<Collapsible.Trigger class={cn(sectionTrigger, 'min-w-0 flex-1')}>
+									<HugeiconsIcon
+										icon={ArrowRight01Icon}
+										strokeWidth={2}
+										class="size-3 shrink-0 transition-transform group-data-[state=open]/section:rotate-90"
+									/>
+									<span class="min-w-0 truncate">Projects</span>
+									{#if projects.data && projects.data.length > 0}
+										<span class="ml-auto text-[10px] font-medium text-sidebar-foreground/55">
+											{projects.data.length}
+										</span>
+									{/if}
+								</Collapsible.Trigger>
+								<button
+									type="button"
+									class="mr-2 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none [@media(pointer:coarse)]:size-11"
+									aria-label="Import external context"
+									onclick={openImportDialog}
+								>
+									<HugeiconsIcon
+										icon={Add01Icon}
+										strokeWidth={2}
+										class="size-3"
+										aria-hidden="true"
+									/>
+								</button>
+							</div>
 							<Collapsible.Content
 								class="overflow-hidden group-data-[collapsible=icon]:hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down"
 							>
@@ -1902,9 +1908,7 @@ Important rules:
 		</Sidebar.Root>
 
 		<Sidebar.Inset class="min-h-0 min-w-0 overflow-hidden">
-			<header
-				class="flex h-10 shrink-0 items-center gap-1.5 border-b border-border/50 bg-background px-2 py-1"
-			>
+			<header class="flex h-9 shrink-0 items-center gap-1.5 bg-background px-2 py-0.5">
 				<Sidebar.Trigger class="shrink-0" />
 				<Button
 					type="button"
@@ -1916,7 +1920,12 @@ Important rules:
 						commandCenterOpen = true;
 					}}
 				>
-					<HugeiconsIcon icon={Search01Icon} strokeWidth={2} class="size-3.5 opacity-80" />
+					<HugeiconsIcon
+						icon={Search01Icon}
+						strokeWidth={2}
+						class="size-3.5 opacity-80"
+						aria-hidden="true"
+					/>
 					<span class="hidden min-[400px]:inline">Search</span>
 					<Kbd.KbdGroup class="hidden gap-0.5 opacity-80 min-[400px]:inline-flex">
 						<Kbd.Kbd>⌘</Kbd.Kbd>
@@ -1930,24 +1939,24 @@ Important rules:
 						projects={projects.data}
 						threads={threads.data}
 						artifacts={artifacts.data}
-						onSelectTab={(t) => {
-							void selectWorkspaceTab(t);
-						}}
 						onCloseTab={(id) => {
 							void closeWorkspaceTab(id);
 						}}
-					/>
-					<WorkspaceTabPicker
-						bind:open={tabPickerOpen}
-						projects={projects.data}
-						threads={threads.data}
-						artifacts={artifacts.data}
-					/>
+					>
+						{#snippet trailing()}
+							<WorkspaceTabPicker
+								bind:open={tabPickerOpen}
+								projects={projects.data}
+								threads={threads.data}
+								artifacts={artifacts.data}
+							/>
+						{/snippet}
+					</WorkspaceTabStrip>
 				</div>
 
 				{#if workspaceArtifactChrome.value}
 					<div
-						class="flex max-w-[min(100%,20rem)] shrink-[2] flex-wrap items-center justify-end gap-1 sm:max-w-none"
+						class="flex max-w-[min(100%,22rem)] shrink-[2] items-center justify-end gap-1 sm:max-w-none"
 					>
 						{#if workspaceArtifactChrome.value.onBack}
 							<Button
@@ -1958,37 +1967,90 @@ Important rules:
 								aria-label="Back to thread artifacts"
 								onclick={() => workspaceArtifactChrome.value?.onBack?.()}
 							>
-								<HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} class="size-4" />
+								<HugeiconsIcon
+									icon={ArrowLeft01Icon}
+									strokeWidth={2}
+									class="size-4"
+									aria-hidden="true"
+								/>
 							</Button>
 						{/if}
-						<div class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5">
+
+						{#if workspaceArtifactChrome.value.surfaceMode === 'history'}
 							<Button
 								type="button"
+								variant="ghost"
 								size="sm"
-								variant={workspaceArtifactChrome.value.surfaceMode === 'read'
-									? 'secondary'
-									: 'ghost'}
-								class="h-7 rounded-sm px-2 text-xs font-medium"
+								class="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
 								onclick={() => workspaceArtifactChrome.value?.setRead()}
 							>
-								Read
+								Back to note
 							</Button>
-							<Button
-								type="button"
-								size="sm"
-								variant={workspaceArtifactChrome.value.surfaceMode === 'history'
-									? 'secondary'
-									: 'ghost'}
-								class="h-7 rounded-sm px-2 text-xs font-medium"
-								disabled={!workspaceArtifactChrome.value.canHistory}
-								title={!workspaceArtifactChrome.value.canHistory
-									? 'No saved versions to inspect yet'
-									: undefined}
-								onclick={() => workspaceArtifactChrome.value?.setHistory()}
+						{:else}
+							<div
+								class="inline-flex shrink-0 items-center rounded-md border border-border/70 p-0.5"
 							>
-								History
-							</Button>
-						</div>
+								<Button
+									type="button"
+									size="sm"
+									variant={workspaceArtifactChrome.value.readMode === 'read'
+										? 'secondary'
+										: 'ghost'}
+									class="h-7 rounded-sm px-2 text-xs font-medium"
+									onclick={() => workspaceArtifactChrome.value?.setReadMode()}
+								>
+									Read
+								</Button>
+								<Button
+									type="button"
+									size="sm"
+									variant={workspaceArtifactChrome.value.readMode === 'edit'
+										? 'secondary'
+										: 'ghost'}
+									class="h-7 rounded-sm px-2 text-xs font-medium"
+									onclick={() => workspaceArtifactChrome.value?.setEditMode()}
+								>
+									Edit
+								</Button>
+							</div>
+
+							{#if workspaceArtifactChrome.value.canHistory}
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									class="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+									onclick={() => workspaceArtifactChrome.value?.setHistory()}
+								>
+									History
+								</Button>
+							{/if}
+
+							{#if workspaceArtifactChrome.value.readMode === 'edit'}
+								<p
+									class={workspaceArtifactChrome.value.saveError
+										? 'text-xs text-destructive'
+										: workspaceArtifactChrome.value.contentDirty
+											? 'text-xs text-foreground'
+											: 'text-xs text-muted-foreground'}
+									role="status"
+								>
+									{workspaceArtifactChrome.value.saveStateLabel}
+								</p>
+								{#if workspaceArtifactChrome.value.contentDirty || workspaceArtifactChrome.value.isSaving}
+									<Button
+										type="button"
+										variant="default"
+										size="sm"
+										class="h-7 gap-1.5 px-2.5 text-xs"
+										disabled={!workspaceArtifactChrome.value.canSave}
+										onclick={() => workspaceArtifactChrome.value?.save()}
+									>
+										Save changes
+									</Button>
+								{/if}
+							{/if}
+						{/if}
 					</div>
 				{/if}
 				{#if canPromoteThreadToProject}
@@ -1997,35 +2059,24 @@ Important rules:
 						variant="outline"
 						size="sm"
 						class="h-8 shrink-0 gap-1.5 px-2 text-xs font-medium"
+						aria-label="Promote to project"
 						onclick={openPromoteDialog}
 					>
-						<HugeiconsIcon icon={Rocket01Icon} strokeWidth={2} class="size-3.5 shrink-0" />
-						<span class="hidden min-[420px]:inline">Create project from chat</span>
-						<span class="min-[420px]:hidden">Project</span>
+						<HugeiconsIcon
+							icon={Rocket01Icon}
+							strokeWidth={2}
+							class="size-3.5 shrink-0"
+							aria-hidden="true"
+						/>
+						<span class="hidden min-[640px]:inline">Promote to project</span>
+						<span class="hidden min-[480px]:inline min-[640px]:hidden">Promote</span>
+						<span class="sr-only min-[480px]:hidden">Promote to project</span>
 					</Button>
 				{/if}
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger
-						type="button"
-						class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
-					>
-						<HugeiconsIcon icon={Folder01Icon} strokeWidth={2} class="size-3.5 shrink-0" />
-						<span class="hidden min-[460px]:inline">New project</span>
-						<span class="min-[460px]:hidden">New</span>
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="min-w-56">
-						<DropdownMenu.Item
-							onclick={() => {
-								void goto(resolve(workspaceRootHref() as '/workspace'));
-							}}
-						>
-							Start from scratch
-						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={openImportDialog}>
-							Import external AI context
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+				<span
+					class="mx-1 hidden h-5 w-px shrink-0 bg-border/60 min-[480px]:block"
+					aria-hidden="true"
+				></span>
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger
 						type="button"
@@ -2034,7 +2085,7 @@ Important rules:
 							? `${unreadNotificationCount} unread notifications`
 							: 'Open notifications'}
 					>
-						<HugeiconsIcon icon={BellDotIcon} strokeWidth={2} class="size-4" />
+						<HugeiconsIcon icon={BellDotIcon} strokeWidth={2} class="size-4" aria-hidden="true" />
 						{#if unreadNotificationCount > 0}
 							<span
 								class="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-4 font-semibold text-primary-foreground"
@@ -2190,9 +2241,19 @@ Important rules:
 						onclick={toggleThreadContext}
 					>
 						{#if contextPanelOpen}
-							<HugeiconsIcon icon={PanelRightCloseIcon} strokeWidth={2} class="size-3.5" />
+							<HugeiconsIcon
+								icon={PanelRightCloseIcon}
+								strokeWidth={2}
+								class="size-3.5"
+								aria-hidden="true"
+							/>
 						{:else}
-							<HugeiconsIcon icon={PanelRightOpenIcon} strokeWidth={2} class="size-3.5" />
+							<HugeiconsIcon
+								icon={PanelRightOpenIcon}
+								strokeWidth={2}
+								class="size-3.5"
+								aria-hidden="true"
+							/>
 						{/if}
 					</Button>
 				{/if}
@@ -2224,6 +2285,7 @@ Important rules:
 			{canPromoteThreadToProject}
 			onRequestPromote={openPromoteDialog}
 			onRequestCreateArtifact={openCreateArtifactDialog}
+			onRequestImportContext={openImportDialog}
 			onUseArtifactInThread={useArtifactInThread}
 			onToggleThreadContext={toggleThreadContext}
 		/>

@@ -7,7 +7,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import {
-		artifactPreview,
+		artifactSearchPreview,
 		artifactTypeLabel,
 		formatArtifactUpdatedAt
 	} from '$lib/artifact-display';
@@ -39,7 +39,9 @@
 		PanelRightOpenIcon,
 		Rocket01Icon,
 		Settings01Icon,
-		File01Icon
+		File01Icon,
+		ArrowDown01Icon,
+		ArrowUp01Icon
 	} from '@hugeicons/core-free-icons';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 
@@ -54,6 +56,7 @@
 		canPromoteThreadToProject = false,
 		onRequestPromote,
 		onRequestCreateArtifact,
+		onRequestImportContext,
 		onUseArtifactInThread,
 		onToggleThreadContext
 	}: {
@@ -67,16 +70,31 @@
 		canPromoteThreadToProject?: boolean;
 		onRequestPromote: () => void;
 		onRequestCreateArtifact: () => void;
+		onRequestImportContext: () => void;
 		onUseArtifactInThread: (artifactId: Id<'artifacts'>) => void | Promise<void>;
 		onToggleThreadContext: () => void | Promise<void>;
 	} = $props();
 
 	const sidebar = useSidebar();
+	const newChatCommandValue = 'action new chat new thread compose';
 
 	let searchValue = $state('');
+	let selectedCommandValue = $state(newChatCommandValue);
 	let typeFilter = $state('');
 	let projectFilter = $state('all');
 	let recencyFilter = $state('any');
+	let filtersOpen = $state(false);
+	let wasOpen = $state(false);
+
+	$effect(() => {
+		if (open && !wasOpen) {
+			searchValue = '';
+			selectedCommandValue = newChatCommandValue;
+			resetArtifactFilters();
+			filtersOpen = false;
+		}
+		wasOpen = open;
+	});
 
 	const typeOptions = $derived(
 		Array.from(new Set((artifacts ?? []).map((artifact) => artifact.type).filter(Boolean))).sort(
@@ -102,9 +120,12 @@
 		updatedAfter,
 		limit: 25
 	}));
-	const hasArtifactSearch = $derived(searchValue.trim().length > 0);
+	const hasSearch = $derived(searchValue.trim().length > 0);
 	const hasArtifactFilters = $derived(
 		Boolean(typeFilter) || projectFilter !== 'all' || recencyFilter !== 'any'
+	);
+	const artifactFilterCount = $derived(
+		Number(Boolean(typeFilter)) + Number(projectFilter !== 'all') + Number(recencyFilter !== 'any')
 	);
 	const workspaceLoading = $derived(
 		projects === undefined || threads === undefined || artifacts === undefined
@@ -121,13 +142,13 @@
 	const emptyMessage = $derived.by(() => {
 		if (workspaceLoading) return 'Loading workspace...';
 		if (artifactSearchLoading) return 'Searching artifacts...';
-		if (!hasWorkspaceItems && !hasArtifactSearch) return 'No workspace items yet.';
-		if (hasArtifactSearch) return `No results for "${searchValue.trim()}".`;
+		if (!hasWorkspaceItems && !hasSearch) return 'No workspace items yet.';
+		if (hasSearch) return `No results for "${searchValue.trim()}".`;
 		return 'No matching action, project, chat, or artifact.';
 	});
 	const typeFilterLabel = $derived(typeFilter ? artifactTypeLabel(typeFilter) : 'Type');
 	const projectFilterLabel = $derived.by(() => {
-		if (projectFilter === 'all') return 'Scope';
+		if (projectFilter === 'all') return 'Project';
 		if (projectFilter === 'none') return 'No project';
 		return projectLabel(projectFilter);
 	});
@@ -135,7 +156,7 @@
 		if (recencyFilter === '7') return 'Last 7 days';
 		if (recencyFilter === '30') return 'Last 30 days';
 		if (recencyFilter === '90') return 'Last 90 days';
-		return 'Updated';
+		return 'Updated within';
 	});
 
 	function close() {
@@ -165,6 +186,14 @@
 		return projects?.find((project) => project._id === projectId)?.name ?? 'Project';
 	}
 
+	function formatWorkspaceUpdatedAt(updatedAt: number) {
+		return new Intl.DateTimeFormat(undefined, {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		}).format(new Date(updatedAt));
+	}
+
 	function resetArtifactFilters() {
 		typeFilter = '';
 		projectFilter = 'all';
@@ -183,13 +212,15 @@
 	 */
 	const paletteItemClass =
 		'gap-2 rounded-md px-2.5 py-2 font-sans text-xs hover:bg-accent/50 ' +
+		'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset ' +
 		'data-selected:bg-accent data-selected:font-medium data-selected:text-accent-foreground ' +
 		'data-selected:hover:bg-accent data-selected:[&_svg]:text-accent-foreground';
 	/** Nav-style section label (DESIGN.md §2–3) for this overlay. */
 	const paletteGroupHeadingClass =
 		'!text-[11px] !font-medium !tracking-normal !text-muted-foreground';
 	const filterChipClass =
-		'w-auto [&_[data-slot=native-select]]:h-6 [&_[data-slot=native-select]]:rounded-md ' +
+		'w-auto [&_[data-slot=native-select]]:h-10 sm:[&_[data-slot=native-select]]:h-6 ' +
+		'[&_[data-slot=native-select]]:rounded-md ' +
 		'[&_[data-slot=native-select]]:border-border/70 [&_[data-slot=native-select]]:bg-transparent ' +
 		'[&_[data-slot=native-select]]:text-[11px] [&_[data-slot=native-select]]:text-muted-foreground ' +
 		'[&_[data-slot=native-select]]:hover:bg-accent';
@@ -197,77 +228,110 @@
 
 <Command.CommandDialog
 	bind:open
+	bind:value={selectedCommandValue}
 	title="Command center"
 	description="Search projects, chats, and artifacts, or run a quick action."
-	class="sm:max-w-2xl"
+	class="top-[10vh] translate-y-0 sm:top-[12vh] sm:max-w-2xl"
 >
 	<Command.Input
 		bind:value={searchValue}
-		placeholder="Search threads, projects, artifacts, actions…"
+		placeholder="Search projects, chats, artifacts, or actions…"
 	/>
 	<div
-		class="flex flex-wrap items-center gap-1.5 border-b border-border/50 px-2.5 py-2"
-		aria-label="Artifact filters"
+		class="flex items-center justify-between gap-2 border-b border-border/50 px-2.5 py-1.5"
+		aria-label="Artifact filter controls"
 	>
-		<span class="mr-0.5 text-[11px] text-muted-foreground">Artifacts</span>
-		<NativeSelect.Root
-			bind:value={projectFilter}
+		<Button
+			type="button"
+			variant="ghost"
 			size="sm"
-			class={filterChipClass}
-			aria-label="Filter artifacts by project"
+			class="min-h-10 gap-1.5 text-[11px] sm:min-h-7"
+			aria-expanded={filtersOpen}
+			aria-controls="workspace-command-artifact-filters"
+			onclick={() => (filtersOpen = !filtersOpen)}
 		>
-			<option value="all" disabled hidden>{projectFilterLabel}</option>
-			<option value="all">All projects</option>
-			<option value="none">No project</option>
-			{#each projects ?? [] as project (project._id)}
-				<option value={project._id}>{project.name}</option>
-			{/each}
-		</NativeSelect.Root>
-		<NativeSelect.Root
-			bind:value={typeFilter}
-			size="sm"
-			class={filterChipClass}
-			aria-label="Filter artifacts by type"
-		>
-			<option value="" disabled hidden>{typeFilterLabel}</option>
-			<option value="">All types</option>
-			{#each typeOptions as type (type)}
-				<option value={type}>{artifactTypeLabel(type)}</option>
-			{/each}
-		</NativeSelect.Root>
-		<NativeSelect.Root
-			bind:value={recencyFilter}
-			size="sm"
-			class={filterChipClass}
-			aria-label="Filter artifacts by recency"
-		>
-			<option value="any" disabled hidden>{recencyFilterLabel}</option>
-			<option value="any">Any time</option>
-			<option value="7">Last 7 days</option>
-			<option value="30">Last 30 days</option>
-			<option value="90">Last 90 days</option>
-		</NativeSelect.Root>
+			<span>Filters</span>
+			{#if artifactFilterCount > 0}
+				<span
+					class="inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px]"
+				>
+					{artifactFilterCount}
+				</span>
+			{/if}
+			<HugeiconsIcon
+				icon={filtersOpen ? ArrowUp01Icon : ArrowDown01Icon}
+				strokeWidth={2}
+				class="size-3 text-muted-foreground"
+			/>
+		</Button>
+		<span class="hidden text-[10px] text-muted-foreground sm:inline"> Artifact filters </span>
 		{#if hasArtifactFilters}
 			<Button
 				type="button"
 				variant="ghost"
-				size="xs"
-				class="h-6 rounded-md px-2 text-[11px]"
+				size="sm"
+				class="min-h-10 rounded-md px-2 text-[11px] sm:min-h-7"
 				onclick={resetArtifactFilters}
 			>
-				Clear
+				Clear filters
 			</Button>
 		{/if}
 	</div>
+	{#if filtersOpen}
+		<div
+			id="workspace-command-artifact-filters"
+			class="flex flex-wrap items-center gap-1.5 border-b border-border/50 px-2.5 py-2"
+			aria-label="Filter artifacts"
+		>
+			<span class="mr-0.5 text-[11px] text-muted-foreground">Filter artifacts</span>
+			<NativeSelect.Root
+				bind:value={projectFilter}
+				size="sm"
+				class={filterChipClass}
+				aria-label="Filter artifacts by project"
+			>
+				<option value="all" disabled hidden>{projectFilterLabel}</option>
+				<option value="all">All projects</option>
+				<option value="none">No project</option>
+				{#each projects ?? [] as project (project._id)}
+					<option value={project._id}>{project.name}</option>
+				{/each}
+			</NativeSelect.Root>
+			<NativeSelect.Root
+				bind:value={typeFilter}
+				size="sm"
+				class={filterChipClass}
+				aria-label="Filter artifacts by type"
+			>
+				<option value="" disabled hidden>{typeFilterLabel}</option>
+				<option value="">All types</option>
+				{#each typeOptions as type (type)}
+					<option value={type}>{artifactTypeLabel(type)}</option>
+				{/each}
+			</NativeSelect.Root>
+			<NativeSelect.Root
+				bind:value={recencyFilter}
+				size="sm"
+				class={filterChipClass}
+				aria-label="Filter artifacts by update time"
+			>
+				<option value="any" disabled hidden>{recencyFilterLabel}</option>
+				<option value="any">Any time</option>
+				<option value="7">Last 7 days</option>
+				<option value="30">Last 30 days</option>
+				<option value="90">Last 90 days</option>
+			</NativeSelect.Root>
+		</div>
+	{/if}
 	<Command.List class="max-h-[min(26rem,62vh)] px-1 py-1">
 		<Command.Empty class="px-2 py-6 text-center text-xs text-muted-foreground">
 			{emptyMessage}
 		</Command.Empty>
 
-		<Command.Group heading="Actions" value="actions" headingClass={paletteGroupHeadingClass}>
+		<Command.Group heading="Quick actions" value="actions" headingClass={paletteGroupHeadingClass}>
 			<Command.Item
 				class={paletteItemClass}
-				value="action new chat new thread compose"
+				value={newChatCommandValue}
 				keywords={['new', 'chat', 'compose', 'start']}
 				onSelect={nav(workspaceRootHref())}
 			>
@@ -294,6 +358,18 @@
 			>
 				<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
 				<span class="min-w-0 flex-1 truncate">Create artifact</span>
+			</Command.Item>
+			<Command.Item
+				class={paletteItemClass}
+				value="action import external context"
+				keywords={['import', 'external', 'context', 'chat', 'project']}
+				onSelect={() => {
+					close();
+					onRequestImportContext();
+				}}
+			>
+				<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
+				<span class="min-w-0 flex-1 truncate">Import external context</span>
 			</Command.Item>
 			<Command.Item
 				class={paletteItemClass}
@@ -337,7 +413,7 @@
 				}}
 			>
 				<HugeiconsIcon icon={PanelLeftIcon} strokeWidth={2} class="size-3 text-muted-foreground" />
-				<span class="min-w-0 flex-1 truncate">Focus workspace list</span>
+				<span class="min-w-0 flex-1 truncate">Focus sidebar</span>
 				<Command.Shortcut
 					class="text-muted-foreground/90 group-data-selected/command-item:text-accent-foreground/90"
 				>
@@ -388,7 +464,11 @@
 
 		{#if projects && projects.length > 0}
 			<Command.Separator class="-mx-1 h-px bg-border" />
-			<Command.Group heading="Projects" value="projects" headingClass={paletteGroupHeadingClass}>
+			<Command.Group
+				heading={hasSearch ? 'Projects' : 'Recent projects'}
+				value="projects"
+				headingClass={paletteGroupHeadingClass}
+			>
 				{#each projects as project (project._id)}
 					<Command.Item
 						class={paletteItemClass}
@@ -399,9 +479,14 @@
 						<HugeiconsIcon
 							icon={Folder01Icon}
 							strokeWidth={2}
-							class="size-3 text-muted-foreground"
+							class="mt-0.5 size-3.5 text-muted-foreground"
 						/>
-						<span class="min-w-0 flex-1 truncate">{project.name}</span>
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+							<span class="truncate">{project.name}</span>
+							<span class="truncate text-[11px] font-normal text-muted-foreground">
+								Project · {formatWorkspaceUpdatedAt(project.updatedAt)}
+							</span>
+						</span>
 					</Command.Item>
 				{/each}
 			</Command.Group>
@@ -409,7 +494,11 @@
 
 		{#if threads && threads.length > 0}
 			<Command.Separator class="-mx-1 h-px bg-border" />
-			<Command.Group heading="Chats" value="chats" headingClass={paletteGroupHeadingClass}>
+			<Command.Group
+				heading={hasSearch ? 'Chats' : 'Recent chats'}
+				value="chats"
+				headingClass={paletteGroupHeadingClass}
+			>
 				{#each threads as thread (thread._id)}
 					<Command.Item
 						class={paletteItemClass}
@@ -424,15 +513,29 @@
 						]}
 						onSelect={nav(workspaceThreadHref(thread))}
 					>
-						<HugeiconsIcon icon={Chat01Icon} strokeWidth={2} class="size-3 text-muted-foreground" />
-						<span class="min-w-0 flex-1 truncate">{formatThreadTitleForDisplay(thread.title)}</span>
+						<HugeiconsIcon
+							icon={Chat01Icon}
+							strokeWidth={2}
+							class="mt-0.5 size-3.5 text-muted-foreground"
+						/>
+						<span class="flex min-w-0 flex-1 flex-col gap-0.5">
+							<span class="truncate">{formatThreadTitleForDisplay(thread.title)}</span>
+							<span class="truncate text-[11px] font-normal text-muted-foreground">
+								Chat · {thread.projectId ? projectLabel(thread.projectId) : 'No project'} ·
+								{formatWorkspaceUpdatedAt(thread.updatedAt)}
+							</span>
+						</span>
 					</Command.Item>
 				{/each}
 			</Command.Group>
 		{/if}
 
 		<Command.Separator class="-mx-1 h-px bg-border" />
-		<Command.Group heading="Artifacts" value="artifacts" headingClass={paletteGroupHeadingClass}>
+		<Command.Group
+			heading={hasSearch ? 'Artifacts' : 'Recent artifacts'}
+			value="artifacts"
+			headingClass={paletteGroupHeadingClass}
+		>
 			{#if artifactSearchLoading}
 				<div class="space-y-1 px-2 py-2" aria-label="Searching artifacts">
 					<div class="h-8 rounded-md bg-muted/60"></div>
@@ -445,7 +548,7 @@
 					<p class="min-w-0">
 						{hasArtifactFilters
 							? 'No artifacts match these filters.'
-							: hasArtifactSearch
+							: hasSearch
 								? `No artifacts for "${searchValue.trim()}".`
 								: 'No artifacts yet.'}
 					</p>
@@ -468,40 +571,39 @@
 					Boolean(activeThreadId) && !activeThreadArtifactIds.has(artifact._id)}
 				<Command.Item
 					class={paletteItemClass}
-					value="artifact {artifact._id} {artifact.title} {artifact.type} {artifactPreview(
+					value="artifact {artifact._id} {artifact.title} {artifact.type} {artifactSearchPreview(
 						artifact.content
 					)}"
 					keywords={[
 						artifact.title,
 						artifactTypeLabel(artifact.type),
 						artifact.type,
-						artifactPreview(artifact.content),
+						artifactSearchPreview(artifact.content),
 						projectLabel(artifact.projectId),
 						'document',
 						'doc'
 					]}
 					onSelect={nav(workspaceArtifactHref(artifact._id))}
 				>
-					<HugeiconsIcon icon={File01Icon} strokeWidth={2} class="size-3.5 text-muted-foreground" />
+					<HugeiconsIcon
+						icon={File01Icon}
+						strokeWidth={2}
+						class="mt-0.5 size-3.5 text-muted-foreground"
+					/>
 					<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span class="truncate">{artifact.title}</span>
 						<span class="truncate text-[11px] font-normal text-muted-foreground">
-							{artifactPreview(artifact.content)}
+							{artifactSearchPreview(artifact.content)}
 						</span>
-					</span>
-					<span
-						class="ml-auto hidden shrink-0 items-center gap-1 pl-1 text-right text-[11px] font-normal text-muted-foreground sm:flex"
-					>
-						<span>{artifactTypeLabel(artifact.type)}</span>
-						<span aria-hidden="true">·</span>
-						<span>{projectLabel(artifact.projectId)}</span>
-						<span aria-hidden="true">·</span>
-						<span>{formatArtifactUpdatedAt(artifact.updatedAt)}</span>
+						<span class="truncate text-[11px] font-normal text-muted-foreground">
+							{artifactTypeLabel(artifact.type)} · {projectLabel(artifact.projectId)} ·
+							{formatArtifactUpdatedAt(artifact.updatedAt)}
+						</span>
 					</span>
 					{#if canUseArtifact}
 						<button
 							type="button"
-							class="ml-1 hidden h-6 shrink-0 rounded-md px-2 text-[11px] font-medium text-muted-foreground hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none sm:inline-flex"
+							class="ml-1 hidden min-h-8 shrink-0 rounded-md px-2 text-[11px] font-medium text-muted-foreground hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none sm:inline-flex sm:h-6"
 							onclick={(event) => useArtifactButton(event, artifact._id)}
 						>
 							Use in this chat
@@ -514,13 +616,6 @@
 
 	<div class="border-t border-border/50 px-2.5 py-2" data-workspace-command-footer>
 		<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-			<span class="inline-flex items-center gap-1">
-				Open
-				<Kbd.Group class="inline-flex items-center gap-0.5" aria-label="Command center shortcut">
-					<Kbd.Kbd>⌘</Kbd.Kbd>
-					<Kbd.Kbd>K</Kbd.Kbd>
-				</Kbd.Group>
-			</span>
 			<span class="inline-flex items-center gap-1">
 				Navigate
 				<Kbd.Kbd>↑↓</Kbd.Kbd>

@@ -69,8 +69,8 @@ export const synthesizeDraft = internalAction({
 				usage &&
 				((usage.inputTokens ?? 0) > 0 ||
 					(usage.outputTokens ?? 0) > 0 ||
-					(usage.reasoningTokens ?? 0) > 0 ||
-					(usage.cachedInputTokens ?? 0) > 0)
+					(usage.outputTokenDetails?.reasoningTokens ?? 0) > 0 ||
+					(usage.inputTokenDetails?.cacheReadTokens ?? 0) > 0)
 			) {
 				await ctx.runMutation(internal.usage.recordAiRunForOwner, {
 					ownerId,
@@ -81,8 +81,8 @@ export const synthesizeDraft = internalAction({
 					usage: {
 						inputTokens: usage.inputTokens,
 						outputTokens: usage.outputTokens,
-						reasoningTokens: usage.reasoningTokens,
-						cachedInputTokens: usage.cachedInputTokens
+						reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
+						cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens
 					},
 					reservationId: reservation.reservationId
 				});

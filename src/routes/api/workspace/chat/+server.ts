@@ -24,6 +24,7 @@ import { getMyUserSettingsQuery } from '$lib/user-settings';
 import { createNotificationMutation } from '$lib/notifications';
 import { uiMessageText } from '$lib/workspace-chat-message-actions';
 import { getWorkspaceChatAi, traceWorkspaceChatRun } from '$lib/server/braintrust';
+import { createTavilyTools } from '$lib/server/tavily-tools';
 import { buildFullWorkspaceChatInstructions } from '$lib/server/workspace-chat-instructions';
 import {
 	OpenRouterNotConfiguredError,
@@ -52,9 +53,8 @@ import {
 } from '$lib/server/memory';
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
-import { tavilyExtract, tavilySearch } from '@tavily/ai-sdk';
 import { ConvexHttpClient } from 'convex/browser';
-import { safeValidateUIMessages, stepCountIs, tool, type UIMessage } from 'ai';
+import { isStepCount, safeValidateUIMessages, tool, type UIMessage } from 'ai';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import { z } from 'zod';
 
@@ -218,18 +218,18 @@ export const POST: RequestHandler = async ({ request }) => {
 						model: languageModel,
 						instructions,
 						tools,
-						stopWhen: stepCountIs(8),
-						onFinish: async ({ totalUsage }) => {
-							if ((totalUsage.inputTokens ?? 0) > 0 || (totalUsage.outputTokens ?? 0) > 0) {
+						stopWhen: isStepCount(8),
+						onEnd: async ({ usage }) => {
+							if ((usage.inputTokens ?? 0) > 0 || (usage.outputTokens ?? 0) > 0) {
 								await convex.mutation(recordAiRunMutation, {
 									threadId: thread._id,
 									modelId: body.modelId,
 									occurredAt: Date.now(),
 									usage: {
-										inputTokens: totalUsage.inputTokens,
-										outputTokens: totalUsage.outputTokens,
-										reasoningTokens: totalUsage.outputTokenDetails?.reasoningTokens,
-										cachedInputTokens: totalUsage.inputTokenDetails?.cacheReadTokens
+										inputTokens: usage.inputTokens,
+										outputTokens: usage.outputTokens,
+										reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
+										cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens
 									},
 									reservationId: reservation.reservationId
 								});
@@ -288,26 +288,7 @@ function workspaceTools({
 	});
 
 	return {
-		...(webSearchAvailable
-			? {
-					tavilySearch: tavilySearch({
-						apiKey: webSearchApiKey,
-						searchDepth: 'basic',
-						maxResults: 5,
-						includeAnswer: false,
-						includeImages: false,
-						includeFavicon: true
-					}),
-					tavilyExtract: tavilyExtract({
-						apiKey: webSearchApiKey,
-						extractDepth: 'basic',
-						format: 'markdown',
-						includeImages: false,
-						chunksPerSource: 3,
-						timeout: 10
-					})
-				}
-			: {}),
+		...(webSearchAvailable ? createTavilyTools({ apiKey: webSearchApiKey }) : {}),
 		listThreadArtifacts: tool({
 			description: 'List artifacts already linked to the active thread.',
 			inputSchema: z.object({}),

@@ -116,8 +116,8 @@ export const POST: RequestHandler = async ({ request }) => {
 					usage: {
 						inputTokens: usage.inputTokens,
 						outputTokens: usage.outputTokens,
-						reasoningTokens: usage.reasoningTokens,
-						cachedInputTokens: usage.cachedInputTokens
+						reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
+						cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens
 					},
 					reservationId: reservation.reservationId
 				});

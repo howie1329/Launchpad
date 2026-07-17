@@ -6,7 +6,7 @@
 </script>
 
 <div class="max-w-full overflow-x-auto rounded-md border border-border/70">
-	<table class="w-full min-w-max border-collapse text-left text-[11px]">
+	<table class="w-full min-w-max border-collapse text-left text-[13px] leading-5">
 		<thead class="bg-muted/60 text-muted-foreground">
 			<tr>
 				{#each props.columns as column, index (`${column}-${index}`)}

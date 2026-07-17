@@ -17,8 +17,8 @@
 	class={cn(
 		'group flex w-full flex-col gap-2',
 		from === 'user'
-			? 'is-user ml-auto max-w-[95%] justify-end'
-			: 'is-assistant max-w-[95%] min-w-0 self-start',
+			? 'is-user ml-auto w-fit max-w-full justify-end sm:max-w-[82%]'
+			: 'is-assistant w-full max-w-full min-w-0 self-start',
 		className
 	)}
 	data-role={from}
